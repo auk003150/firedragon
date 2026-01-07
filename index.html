@@ -2,8 +2,9 @@
 <html lang="zh-HK">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>大坑舞火龍 AR 小遊戲（降誤判版）</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>大坑舞火龍 AR 小遊戲（單張貼圖・無旋轉）</title>
   <style>
     html, body {
       margin: 0; padding: 0;
@@ -17,7 +18,7 @@
     .wrap { position: relative; width: 100%; height: 100%; background: #000; }
     video#cam {
       position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-      transform: none; background: #000; /* 鏡像預設關閉 */
+      transform: none; background: #000;
     }
     img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0.25; mix-blend-mode: lighten; }
     canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
@@ -49,7 +50,7 @@
 </head>
 <body>
   <div class="wrap">
-    <video id="cam" playsinline muted autoplay></video>
+    <video id="cam" playsinline autoplay muted></video>
     <img id="bg" alt="背景" src="image_1.png" />
     <canvas id="game"></canvas>
 
@@ -70,15 +71,15 @@
 
     <div class="bar">
       <div class="range-group">
-        Hmin <input id="hMin" type="range" min="0" max="360" value="350">
-        Hmax <input id="hMax" type="range" min="0" max="360" value="10">
+        Hmin <input id="hMin" type="range" min="0" max="360" value="330">
+        Hmax <input id="hMax" type="range" min="0" max="360" value="20">
       </div>
       <div class="range-group">
-        Smin <input id="sMin" type="range" min="0" max="100" value="70">
-        Vmin <input id="vMin" type="range" min="0" max="100" value="55">
+        Smin <input id="sMin" type="range" min="0" max="100" value="50">
+        Vmin <input id="vMin" type="range" min="0" max="100" value="40">
       </div>
       <div class="range-group">
-        靈敏度 <input id="sens" type="range" min="0" max="300" value="160">
+        靈敏度 <input id="sens" type="range" min="0" max="300" value="80">
       </div>
       <div class="range-group">
         目標密度 <input id="density" type="range" min="1" max="10" value="4">
@@ -127,25 +128,10 @@
 
     let centroid = { x: 0, y: 0 };
     let direction = { x: 1, y: 0 };
-
-    // 更平滑以抑制抖動與短暫誤判
-    let smoothing = 0.38;
+    const smoothing = 0.28;
 
     let useEnvironment = true;
-    // 鏡像預設關閉
     let mirrored = false;
-
-    // 連續幀濾波（啟停）
-    let hitStreak = 0, missStreak = 0;
-    const STREAK_ON = 3;   // 需連續命中 3 幀才啟用
-    const STREAK_OFF = 4;  // 連續 4 幀失配才關閉
-    let targetActive = false;
-
-    // 啟發式膚色排除與掃描區域限制
-    const ENABLE_SKIN_REJECT = true;
-    const ENABLE_SCAN_BAND = true; // 只掃描畫面 35%~95% 高度
-    const SCAN_Y_START = 0.35;
-    const SCAN_Y_END = 0.95;
 
     // ========= 單張貼圖（無旋轉）=========
     const dragonImg = new Image();
@@ -153,7 +139,6 @@
     let dragonImgReady = false;
     dragonImg.onload = () => { dragonImgReady = true; };
 
-    // 90×90 + 錨點微調
     const sprite = {
       drawWidth: 90,
       drawHeight: 90,
@@ -171,18 +156,24 @@
 
     // 粒子
     const particles = [];
+    const MAX_PARTICLES = 1200;
 
     // ========= 畫布大小 =========
+    let resizeTimer = null;
     function resize() {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const rect = canvas.getBoundingClientRect();
-      W = rect.width; H = rect.height;
-      canvas.width = Math.round(W * dpr);
-      canvas.height = Math.round(H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const doResize = () => {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const rect = canvas.getBoundingClientRect();
+        W = rect.width; H = rect.height;
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(doResize, 50);
     }
-    window.addEventListener('resize', resize);
-    window.addEventListener('orientationchange', () => setTimeout(resize, 150));
+    window.addEventListener('resize', resize, { passive: true });
+    window.addEventListener('orientationchange', () => setTimeout(resize, 150), { passive: true });
     resize();
 
     // ========= 能力檢查 =========
@@ -202,7 +193,10 @@
     // ========= 相機 =========
     let currentStream = null;
     async function stopStream() {
-      if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); currentStream = null; }
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+        currentStream = null;
+      }
     }
     async function initCamera() {
       const kinds = [
@@ -215,11 +209,14 @@
       await stopStream();
       for (const res of kinds) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...res, facingMode: facing } });
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { ...res, facingMode: facing }
+          });
           currentStream = stream;
           video.srcObject = stream;
-          await video.play();
           video.playsInline = true;
+          await video.play().catch(()=>{});
           applyMirror();
           return true;
         } catch (err) { lastErr = err; }
@@ -245,34 +242,27 @@
       let h=0; if(d!==0){ if(max===r) h=((g-b)/d)%6; else if(max===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; }
       if(h<0) h+=360; const s=max===0?0:d/max; const v=max; return [h,s*100,v*100];
     }
-    function inHueRange(h, hMin, hMax){ return hMin<=hMax ? (h>=hMin && h<=hMax) : (h>=hMin || h<=hMax); }
-
-    // 膚色啟發式排除（可視現場調整）
-    function isSkin(h, s, v) {
-      // 暖光時皮膚落在 0–30 或 330–360；飽和度偏低到中等，亮度中等到高
-      const inHue = (h >= 0 && h <= 30) || (h >= 330 && h <= 360);
-      return inHue && s >= 10 && s <= 65 && v >= 40;
+    function inHueRange(h, hMin, hMax){
+      return hMin<=hMax ? (h>=hMin && h<=hMax) : (h>=hMin || h<=hMax);
     }
 
     function trackRedCentroid() {
-      if (video.videoWidth===0 || video.videoHeight===0) return null;
+      const vw = video.videoWidth|0, vh = video.videoHeight|0;
+      if (vw === 0 || vh === 0) return null;
 
-      // 降低縮放比例以減噪，換得更準的質心
-      const scale = 0.18;
-      const vw = video.videoWidth, vh = video.videoHeight;
+      const scale = 0.22;
       const w = Math.max(2, Math.round(vw * scale));
       const h = Math.max(2, Math.round(vh * scale));
+      if (w < 2 || h < 2) return null;
+
       workCanvas.width = w; workCanvas.height = h;
 
-      // 限制掃描區域：只取畫面下半帶，以避開臉與上半部膚色
-      let yStart = 0, yEnd = h;
-      if (ENABLE_SCAN_BAND) {
-        yStart = Math.floor(h * SCAN_Y_START);
-        yEnd = Math.floor(h * SCAN_Y_END);
+      try {
+        wctx.drawImage(video, 0, 0, w, h);
+      } catch (e) {
+        return null;
       }
 
-      // 對應鏡像時，不需特別處理色域，但若要對 x 反向，可在最後映射時處理
-      wctx.drawImage(video, 0, 0, w, h);
       const { data } = wctx.getImageData(0, 0, w, h);
 
       const hMin = parseInt(hMinEl.value, 10);
@@ -282,42 +272,19 @@
       const sens = parseInt(sensEl.value, 10);
 
       let sumX=0,sumY=0,count=0;
-      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
-
       const step=2;
-      for (let y=yStart; y<yEnd; y+=step){
+      for (let y=0; y<h; y+=step){
         for (let x=0; x<w; x+=step){
           const i=(y*w+x)*4;
           const r=data[i], g=data[i+1], b=data[i+2];
           const [hh,ss,vv]=rgb2hsv(r,g,b);
-
-          // 色域命中
-          let ok = inHueRange(hh,hMin,hMax) && ss>=sMin && vv>=vMin;
-          // 膚色排除
-          if (ok && ENABLE_SKIN_REJECT && isSkin(hh,ss,vv)) ok = false;
-
-          if (ok){
-            sumX+=x; sumY+=y; count++;
-            if (x<minX) minX=x; if (y<minY) minY=y;
-            if (x>maxX) maxX=x; if (y>maxY) maxY=y;
-          }
+          if (inHueRange(hh,hMin,hMax) && ss>=sMin && vv>=vMin){ sumX+=x; sumY+=y; count++; }
         }
       }
       if (count < sens) return null;
-
-      // 以質心為主
-      let cx = (sumX / count);
-      let cy = (sumY / count);
-
-      // 對應整體畫面座標
-      // 若鏡像顯示開啟，也可選擇把追蹤點鏡像對齊 UI；這裡沿用顯示鏡像但追蹤用實際座標的方式
-      const px = cx / w;
-      const py = cy / h;
-
-      const globalX = px * W;
-      const globalY = py * H;
-
-      return { x: globalX, y: globalY, count, box: { minX, minY, maxX, maxY, w, h } };
+      const cx = (sumX / count) / w * W;
+      const cy = (sumY / count) / h * H;
+      return { x: cx, y: cy, count };
     }
 
     // ========= 目標物件 =========
@@ -362,9 +329,9 @@
     }
 
     // ========= 粒子效果 =========
-    const particles = [];
     function spawnIncenseParticles(pos, dir, count=6) {
       for (let i=0; i<count; i++){
+        if (particles.length >= MAX_PARTICLES) break;
         const angle = Math.atan2(dir.y, dir.x) + (Math.random()*0.8 - 0.4);
         const speed = 40 + Math.random()*120;
         const vx = Math.cos(angle)*speed;
@@ -391,17 +358,17 @@
       }
     }
     function drawParticles(ctx) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
       for (const p of particles){
         const t = p.age / p.life;
         const alpha = 1 - t;
         const size = p.size * (0.8 + 0.4*(1-t));
         const col = `hsla(${p.hue}, 90%, ${60 - t*30}%, ${alpha})`;
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
         ctx.fillStyle = col;
         ctx.beginPath(); ctx.arc(p.x, p.y, size, 0, Math.PI*2); ctx.fill();
-        ctx.restore();
       }
+      ctx.restore();
     }
 
     // ========= 單張貼圖繪製（無旋轉）=========
@@ -414,13 +381,14 @@
       ctx.save();
       ctx.translate(head.x, head.y);
 
-      // 使用錨點與微調
       const headOffsetX = -imgW * sprite.headAnchorX + (sprite.fineOffsetX || 0);
       const headOffsetY = -imgH * sprite.headAnchorY + (sprite.fineOffsetY ? sprite.fineOffsetY * imgH : 0);
       ctx.translate(headOffsetX, headOffsetY);
 
+      // 繪製單張貼圖，固定無旋轉
       ctx.drawImage(dragonImg, 0, -imgH * 0.5, imgW, imgH);
 
+      // 從頭部向右噴灑粒子
       spawnIncenseParticles({ x: 0, y: 0 }, { x: 1, y: 0 }, 8);
 
       ctx.restore();
@@ -480,23 +448,15 @@
       ctx.clearRect(0, 0, W, H);
 
       const c = trackRedCentroid();
-
-      // 連續幀啟停邏輯
       if (c) {
-        hitStreak++; missStreak = 0;
-        if (!targetActive && hitStreak >= STREAK_ON) targetActive = true;
-      } else {
-        missStreak++; hitStreak = 0;
-        if (targetActive && missStreak >= STREAK_OFF) targetActive = false;
-      }
-
-      if (targetActive && c) {
         centroid.x = centroid.x + (c.x - centroid.x) * smoothing || c.x;
         centroid.y = centroid.y + (c.y - centroid.y) * smoothing || c.y;
         direction.x = 1; direction.y = 0;
-        hintEl.textContent = '已偵測到紅色目標，盡情舞動！'; hintEl.className = 'hint ok';
+        hintEl.textContent = '已偵測到紅色目標，盡情舞動！';
+        hintEl.className = 'hint ok';
       } else {
-        hintEl.textContent = '未偵測到紅色物件，請調整光線/色域或靠近鏡頭。'; hintEl.className = 'hint bad';
+        hintEl.textContent = '未偵測到紅色物件，請調整光線/色域或靠近鏡頭。';
+        hintEl.className = 'hint bad';
       }
 
       updateItems(dt);
@@ -530,6 +490,7 @@
           running = false; gameOver = true;
           hintEl.textContent = `時間到！總分：${score}`;
           hintEl.className = 'hint';
+          startBtn.disabled = false;
         }
       }, 1000);
       requestAnimationFrame(tick);
@@ -557,19 +518,29 @@
       centroid = { x: W/2, y: H/2 };
       direction = { x: 1, y: 0 };
       hintEl.textContent = '重置完成，按「開始」重新啟動相機。';
+      hintEl.className = 'hint';
       running = false; gameOver = false;
       clearInterval(timerId);
-      hitStreak = 0; missStreak = 0; targetActive = false;
+      timeLeft = 60; timeEl.textContent = timeLeft;
       startBtn.disabled = false;
       await stopStream();
     });
 
-    toggleFacingBtn.addEventListener('click', async () => { useEnvironment = !useEnvironment; await initCamera(); });
-    toggleMirrorBtn.addEventListener('click', () => { mirrored = !mirrored; applyMirror(); });
+    toggleFacingBtn.addEventListener('click', async () => {
+      useEnvironment = !useEnvironment;
+      await initCamera();
+    });
+    toggleMirrorBtn.addEventListener('click', () => {
+      mirrored = !mirrored;
+      applyMirror();
+    });
     fullscreenBtn.addEventListener('click', () => {
       const el = document.documentElement;
-      if (!document.fullscreenElement) { (el.requestFullscreen && el.requestFullscreen()) || (el.webkitRequestFullscreen && el.webkitRequestFullscreen()); }
-      else { (document.exitFullscreen && document.exitFullscreen()) || (document.webkitExitFullscreen && document.webkitExitFullscreen()); }
+      if (!document.fullscreenElement) {
+        (el.requestFullscreen && el.requestFullscreen()) || (el.webkitRequestFullscreen && el.webkitRequestFullscreen());
+      } else {
+        (document.exitFullscreen && document.exitFullscreen()) || (document.webkitExitFullscreen && document.webkitExitFullscreen());
+      }
     });
 
     // 初始
