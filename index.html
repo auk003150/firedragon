@@ -3,77 +3,45 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>大坑舞火龍 AR 小遊戲（原型）</title>
+  <title>大坑舞火龍 AR 小遊戲（貼圖版）</title>
   <style>
     html, body {
-      margin: 0; padding: 0;
-      height: 100%; background: #000; color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "Noto Sans CJK", "PingFang HK", "Heiti TC", Arial, sans-serif;
-      overflow: hidden;
+      margin: 0; padding: 0; height: 100%;
+      background: #000; color: #fff; overflow: hidden;
+      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans HK","PingFang HK",Arial,sans-serif;
     }
-    .wrap {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      background: #000;
+    .wrap { position: relative; width: 100%; height: 100%; }
+    video#cam, img#bg, canvas#game {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover;
     }
-    /* 後置鏡頭影像 */
-    video#cam {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover; transform: scaleX(-1); /* 鏡像，較符合自拍感；若要真實方向可移除 */
-      filter: none;
-    }
-    /* 20% 透明度的大坑舞火龍背景圖（可替換 src） */
-    img#bg {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover; pointer-events: none;
-      opacity: 0.2; mix-blend-mode: lighten;
-    }
-    /* 遊戲Canvas層：火龍、目標、碰撞、UI */
-    canvas#game {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      touch-action: none; pointer-events: none;
-    }
-    /* 控制列 */
+    video#cam { transform: scaleX(-1); }
+    img#bg { pointer-events: none; opacity: .2; mix-blend-mode: lighten; }
+    canvas#game { pointer-events: none; }
     .ui {
       position: absolute; left: 0; right: 0; top: 0;
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; justify-content: space-between; align-items: center;
       padding: 10px 12px; gap: 8px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0));
-      user-select: none;
+      background: linear-gradient(180deg, rgba(0,0,0,.5), rgba(0,0,0,0));
     }
     .btn {
-      background: #e11d48; border: none; color: #fff; border-radius: 10px;
-      padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px;
-      box-shadow: 0 4px 12px rgba(225,29,72,0.35);
+      background: #e11d48; color: #fff; border: 0; border-radius: 10px;
+      padding: 10px 14px; font-weight: 700; box-shadow: 0 4px 12px rgba(225,29,72,.35);
     }
-    .btn:active { transform: translateY(1px); }
-    .hud {
-      display: flex; gap: 10px; align-items: center; font-weight: 700;
-      text-shadow: 0 2px 6px rgba(0,0,0,0.6);
-    }
-    .chip {
-      background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 999px; padding: 6px 10px; font-size: 14px;
-    }
+    .hud { display: flex; gap: 10px; align-items: center; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.6);}
+    .chip { background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.2); border-radius: 999px; padding: 6px 10px; font-size: 14px;}
     .bar {
       position: absolute; left: 12px; right: 12px; bottom: 12px;
       display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-      background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.1);
       border-radius: 12px; padding: 10px;
     }
-    .range-group {
-      display: flex; align-items: center; gap: 8px; color: #ddd; font-size: 12px;
-    }
+    .range-group { display: flex; align-items: center; gap: 8px; color: #ddd; font-size: 12px; }
     input[type="range"] { width: 120px; }
     .hint {
-      position: absolute; left: 0; right: 0; top: 50%;
-      transform: translateY(-50%);
+      position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
       text-align: center; padding: 0 16px; color: #ffd166; font-weight: 700;
-      text-shadow: 0 2px 10px rgba(0,0,0,0.7);
+      text-shadow: 0 2px 10px rgba(0,0,0,.7);
     }
     .ok { color: #22c55e; }
     .bad { color: #f97316; }
@@ -82,7 +50,6 @@
 <body>
   <div class="wrap">
     <video id="cam" playsinline muted autoplay></video>
-    <!-- 將此 img 的 src 換成你提供的背景圖（例如你上載的巡遊圖片）。-->
     <img id="bg" alt="大坑舞火龍背景" src="" />
     <canvas id="game"></canvas>
 
@@ -120,10 +87,9 @@
   </div>
 
   <script>
-    // ========= 基本設定 =========
+    // 基本引用
     const video = document.getElementById('cam');
     const bgImg = document.getElementById('bg');
-    // 如有實際背景圖，設置 src：bgImg.src = 'your-dahing-photo.jpg';
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d', { alpha: true });
 
@@ -142,28 +108,23 @@
     const densEl = document.getElementById('density');
     const speedEl = document.getElementById('speed');
 
-    let running = false;
-    let gameOver = false;
+    let running = false, gameOver = false;
     let W = 0, H = 0;
-
-    let score = 0, combo = 0, timeLeft = 60;
-    let timerId = null;
+    let score = 0, combo = 0, timeLeft = 60, timerId = null;
 
     // 追蹤狀態
     let centroid = { x: 0, y: 0 };
     let lastCentroid = { x: 0, y: 0 };
-    let direction = { x: 0, y: 0 }; // 單位方向
-    let dragonLen = 80; // 火龍顯示的主體長度（頭尾距）
-    let smoothing = 0.25; // 位置平滑
+    let direction = { x: 1, y: 0 };
+    let smoothing = 0.25;
 
-    // 目標物件（賀年詞、非賀年）
-    const goodList = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
-    const badList  = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
-
+    // 目標
+    const goodList = ['福','春','財','安','旺','吉','祥','賀','龍','年'];
+    const badList  = ['⚽','🍔','🎧','🧊','🧼','🍺','💡','📎','🧽','🧯'];
     const items = [];
     const MAX_ITEMS = 12;
 
-    // 調整畫布大小
+    // 尺寸
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1.5, 2);
       W = canvas.clientWidth;
@@ -175,125 +136,85 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // ========= 開相機（後置）=========
+    // 相機
     async function initCamera() {
-      const constraints = {
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
       video.srcObject = stream;
       await video.play();
     }
 
-    // ========= 顏色追蹤（簡化 HSV）=========
+    // 顏色追蹤（簡化 HSV）
     const workCanvas = document.createElement('canvas');
     const wctx = workCanvas.getContext('2d', { willReadFrequently: true });
-
-    function rgb2hsv(r, g, b) {
-      r /= 255; g /= 255; b /= 255;
-      const max = Math.max(r, g, b), min = Math.min(r, g, b);
-      const d = max - min;
-      let h = 0;
-      if (d !== 0) {
-        if (max === r) h = ((g - b) / d) % 6;
-        else if (max === g) h = (b - r) / d + 2;
-        else h = (r - g) / d + 4;
-        h *= 60;
-      }
-      if (h < 0) h += 360;
-      const s = max === 0 ? 0 : d / max;
-      const v = max;
-      return [h, s * 100, v * 100];
+    function rgb2hsv(r,g,b){
+      r/=255; g/=255; b/=255;
+      const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+      let h=0;
+      if(d!==0){ if(max===r) h=((g-b)/d)%6; else if(max===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; if(h<0) h+=360; }
+      const s=max===0?0:d/max, v=max;
+      return [h, s*100, v*100];
     }
-
-    function inHueRange(h, hMin, hMax) {
-      // 支援跨 0/360 的環狀區間
-      if (hMin <= hMax) return h >= hMin && h <= hMax;
-      return h >= hMin || h <= hMax;
+    function inHueRange(h, hMin, hMax){
+      return (hMin<=hMax) ? (h>=hMin && h<=hMax) : (h>=hMin || h<=hMax);
     }
+    function trackRedCentroid(){
+      const scale=0.3;
+      const w=Math.max(2, Math.round(video.videoWidth*scale));
+      const h=Math.max(2, Math.round(video.videoHeight*scale));
+      workCanvas.width=w; workCanvas.height=h;
+      wctx.drawImage(video,0,0,w,h);
+      const {data}=wctx.getImageData(0,0,w,h);
 
-    function trackRedCentroid() {
-      const scale = 0.3; // 低解析加速
-      const w = Math.max(2, Math.round(video.videoWidth * scale));
-      const h = Math.max(2, Math.round(video.videoHeight * scale));
-      workCanvas.width = w; workCanvas.height = h;
-      wctx.drawImage(video, 0, 0, w, h);
-      const { data } = wctx.getImageData(0, 0, w, h);
-
-      const hMin = parseInt(hMinEl.value, 10);
-      const hMax = parseInt(hMaxEl.value, 10);
-      const sMin = parseInt(sMinEl.value, 10);
-      const vMin = parseInt(vMinEl.value, 10);
-      const sens = parseInt(sensEl.value, 10);
-
-      let sumX = 0, sumY = 0, count = 0;
-
-      for (let y = 0; y < h; y += 1) {
-        for (let x = 0; x < w; x += 1) {
-          const i = (y * w + x) * 4;
-          const r = data[i], g = data[i+1], b = data[i+2];
-          const [hh, ss, vv] = rgb2hsv(r, g, b);
-          if (inHueRange(hh, hMin, hMax) && ss >= sMin && vv >= vMin) {
-            sumX += x; sumY += y; count++;
-          }
+      const hMin=+hMinEl.value, hMax=+hMaxEl.value, sMin=+sMinEl.value, vMin=+vMinEl.value, sens=+sensEl.value;
+      let sumX=0,sumY=0,count=0;
+      for(let y=0;y<h;y++){
+        for(let x=0;x<w;x++){
+          const i=(y*w+x)*4;
+          const [hh,ss,vv]=rgb2hsv(data[i],data[i+1],data[i+2]);
+          if(inHueRange(hh,hMin,hMax) && ss>=sMin && vv>=vMin){ sumX+=x; sumY+=y; count++; }
         }
       }
-
-      if (count < sens) {
-        return null; // 不足像素，視為未偵測
-      }
-
-      const cx = (sumX / count) / w * W;
-      const cy = (sumY / count) / h * H;
-
+      if(count<sens) return null;
+      const cx=(sumX/count)/w*W, cy=(sumY/count)/h*H;
       return { x: cx, y: cy, count };
     }
 
-    // ========= 遊戲物件 =========
-    function spawnItem() {
-      const isGood = Math.random() < 0.6;
-      const text = isGood ? goodList[Math.floor(Math.random() * goodList.length)]
-                          : badList[Math.floor(Math.random() * badList.length)];
-      const size = 28 + Math.random() * 18;
-      const x = 30 + Math.random() * (W - 60);
-      const y = 80 + Math.random() * (H - 160);
-      const vx = (Math.random() - 0.5) * parseInt(speedEl.value, 10);
-      const vy = (Math.random() - 0.5) * parseInt(speedEl.value, 10);
-      const ttl = 12 + Math.random() * 10;
-      items.push({ x, y, vx, vy, text, size, isGood, ttl });
+    // 遊戲物件
+    function spawnItem(){
+      const isGood = Math.random()<0.6;
+      const text = isGood ? goodList[Math.floor(Math.random()*goodList.length)]
+                          : badList[Math.floor(Math.random()*badList.length)];
+      const size = 28 + Math.random()*18;
+      const x = 30 + Math.random()*(W-60);
+      const y = 80 + Math.random()*(H-160);
+      const vx = (Math.random()-0.5) * +speedEl.value;
+      const vy = (Math.random()-0.5) * +speedEl.value;
+      const ttl = 12 + Math.random()*10;
+      items.push({ x,y,vx,vy,text,size,isGood,ttl });
     }
-
-    function ensureItems() {
-      const target = parseInt(densEl.value, 10) * 3;
-      while (items.length < Math.min(MAX_ITEMS, target)) spawnItem();
+    function ensureItems(){
+      const target = +densEl.value * 3;
+      while(items.length < Math.min(MAX_ITEMS, target)) spawnItem();
     }
-
-    function updateItems(dt) {
-      for (let i = items.length - 1; i >= 0; i--) {
-        const it = items[i];
-        it.x += it.vx;
-        it.y += it.vy;
-        it.ttl -= dt;
-        // 邊界彈跳
-        if (it.x < 20 || it.x > W - 20) it.vx *= -1;
-        if (it.y < 60 || it.y > H - 60) it.vy *= -1;
-        if (it.ttl <= 0) items.splice(i, 1);
+    function updateItems(dt){
+      for(let i=items.length-1;i>=0;i--){
+        const it=items[i];
+        it.x+=it.vx; it.y+=it.vy; it.ttl-=dt;
+        if(it.x<20||it.x>W-20) it.vx*=-1;
+        if(it.y<60||it.y>H-60) it.vy*=-1;
+        if(it.ttl<=0) items.splice(i,1);
       }
       ensureItems();
     }
-
-    function drawItems(ctx) {
-      for (const it of items) {
+    function drawItems(ctx){
+      for(const it of items){
         ctx.save();
         ctx.font = `700 ${it.size}px system-ui, "Noto Color Emoji", "Apple Color Emoji"`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.shadowColor = it.isGood ? 'rgba(255,215,0,0.9)' : 'rgba(255,90,0,0.7)';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.shadowColor = it.isGood ? 'rgba(255,215,0,.9)' : 'rgba(255,90,0,.7)';
         ctx.shadowBlur = 12;
         ctx.fillStyle = it.isGood ? '#ffd166' : '#ff6b6b';
         ctx.fillText(it.text, it.x, it.y);
@@ -301,207 +222,171 @@
       }
     }
 
-    // ========= 火龍繪製 =========
-    function drawDragon(ctx, head, dir) {
-      // 頭部
-      const nx = dir.x, ny = dir.y;
-      const angle = Math.atan2(ny, nx);
-      const headLen = 26;
+    // ========== 使用火龍 PNG 貼圖 ==========
+    const imgDragon = new Image();
+    // 將路徑換成你的實際檔案或 URL：
+    imgDragon.src = 'dragon.png'; // 例：同資料夾中的檔名
+    let dragonReady = false;
+    imgDragon.onload = () => { dragonReady = true; };
+
+    // 對齊設定：把貼圖上的「龍頭口鼻」當成跟隨位置
+    // 以你的 500x500 圖為例，口鼻偏右上；以下是估算偏移比例，可微調：
+    const headAlign = {
+      // 將圖像中心視為 (0,0)，貼圖渲染時以中心對齊，再加上偏移把「口鼻」對到中心
+      // 正值向右/向下；單位：像素，將在繪製時計入縮放
+      headOffsetX: 80,  // 從圖中心往右偏移
+      headOffsetY: -40  // 從圖中心往上偏移
+    };
+    // 縮放：基於畫面高度調整貼圖大小
+    function getDragonScale() {
+      // 讓龍大概佔螢幕高度的 28%
+      const targetH = H * 0.28;
+      const s = (imgDragon.height > 0) ? targetH / imgDragon.height : 0.5;
+      return s;
+    }
+
+    function drawDragonImage(ctx, head, dir) {
+      if(!dragonReady) return;
+      const angle = Math.atan2(dir.y, dir.x);
+      const s = getDragonScale();
+      const w = imgDragon.width * s;
+      const h = imgDragon.height * s;
+
+      // 計算把「口鼻」對到 head 的位移（先以圖中心對齊，再校正偏移）
+      const ox = headAlign.headOffsetX * s;
+      const oy = headAlign.headOffsetY * s;
+
       ctx.save();
+      // 在 head 位置，將貼圖旋轉，使「口鼻」朝向 dir
       ctx.translate(head.x, head.y);
       ctx.rotate(angle);
+      // 先把貼圖中心移到 (0,0)
+      // 再把 headOffset 反向移回，使口鼻落在 (0,0)
+      ctx.drawImage(imgDragon, -w/2 - ox, -h/2 - oy, w, h);
+      ctx.restore();
 
-      // 火焰光暈
-      const grad = ctx.createRadialGradient(0, 0, 8, 0, 0, 60);
-      grad.addColorStop(0, 'rgba(255,200,80,0.9)');
-      grad.addColorStop(0.6, 'rgba(255,120,0,0.35)');
-      grad.addColorStop(1, 'rgba(255,0,0,0.05)');
+      // 可選：在龍頭前方加一點火光
+      ctx.save();
+      const flareR = 40;
+      const px = head.x + dir.x * 8, py = head.y + dir.y * 8;
+      const grad = ctx.createRadialGradient(px, py, 6, px, py, flareR);
+      grad.addColorStop(0, 'rgba(255,220,120,0.9)');
+      grad.addColorStop(0.6, 'rgba(255,120,0,0.3)');
+      grad.addColorStop(1, 'rgba(255,0,0,0.04)');
       ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(0, 0, 40, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 龍頭
-      ctx.fillStyle = '#ff3b30';
-      ctx.strokeStyle = '#ffee99';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(-headLen, -12);
-      ctx.lineTo(-headLen - 6, 0);
-      ctx.lineTo(-headLen, 12);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // 眼睛
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(-10, -6, 3, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(-10,  6, 3, 0, Math.PI*2); ctx.fill();
-
-      // 身體（波浪）
-      ctx.strokeStyle = '#ff9f1c';
-      ctx.lineWidth = 8;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      for (let i = 1; i <= 12; i++) {
-        const t = i / 12;
-        const dx = -t * dragonLen;
-        const dy = Math.sin((performance.now()/200) + i) * 6;
-        ctx.lineTo(dx, dy);
-      }
-      ctx.stroke();
-
+      ctx.beginPath(); ctx.arc(px, py, flareR, 0, Math.PI*2); ctx.fill();
       ctx.restore();
     }
 
-    // ========= 碰撞與得分 =========
-    function circleHit(ax, ay, bx, by, r) {
-      const dx = ax - bx, dy = ay - by;
-      return (dx*dx + dy*dy) <= r*r;
-    }
-
-    function handleCollisions(head) {
-      for (let i = items.length - 1; i >= 0; i--) {
-        const it = items[i];
-        if (circleHit(head.x, head.y, it.x, it.y, 28)) {
-          if (it.isGood) {
+    // 碰撞與得分
+    function circleHit(ax, ay, bx, by, r){ const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy<=r*r; }
+    function handleCollisions(head){
+      for(let i=items.length-1;i>=0;i--){
+        const it=items[i];
+        if(circleHit(head.x, head.y, it.x, it.y, 28)){
+          if(it.isGood){
             combo++;
-            const bonus = 10 + Math.min(50, combo * 2);
-            score += bonus;
-            flash('+ ' + bonus, it.x, it.y, true);
+            const bonus = 10 + Math.min(50, combo*2);
+            score += bonus; flash('+'+bonus, it.x, it.y, true);
           } else {
-            combo = 0;
-            score -= 15;
-            flash('− 15', it.x, it.y, false);
+            combo=0; score -= 15; flash('−15', it.x, it.y, false);
           }
-          items.splice(i, 1);
-          scoreEl.textContent = score;
-          comboEl.textContent = combo;
+          items.splice(i,1);
+          scoreEl.textContent=score; comboEl.textContent=combo;
         }
       }
     }
-
-    const floatTexts = [];
-    function flash(text, x, y, ok) {
-      floatTexts.push({ text, x, y, ok, t: 0 });
-    }
-    function drawFloatTexts(dt) {
-      for (let i = floatTexts.length - 1; i >= 0; i--) {
-        const f = floatTexts[i];
-        f.t += dt;
-        const alpha = Math.max(0, 1 - f.t / 1.2);
-        const dy = -f.t * 40;
+    const floatTexts=[];
+    function flash(text,x,y,ok){ floatTexts.push({text,x,y,ok,t:0}); }
+    function drawFloatTexts(dt){
+      for(let i=floatTexts.length-1;i>=0;i--){
+        const f=floatTexts[i];
+        f.t+=dt;
+        const a=Math.max(0,1-f.t/1.2);
+        const dy=-f.t*40;
         ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.font = '800 22px system-ui';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = f.ok ? '#22c55e' : '#f97316';
-        ctx.fillText(f.text, f.x, f.y + dy);
+        ctx.globalAlpha=a;
+        ctx.font='800 22px system-ui';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillStyle=f.ok?'#22c55e':'#f97316';
+        ctx.fillText(f.text,f.x,f.y+dy);
         ctx.restore();
-        if (alpha <= 0.01) floatTexts.splice(i, 1);
+        if(a<=0.01) floatTexts.splice(i,1);
       }
     }
 
-    // ========= 主循環 =========
+    // 迴圈
     let lastTime = performance.now();
+    function tick(now){
+      const dt=Math.min(0.033,(now-lastTime)/1000); lastTime=now;
+      ctx.clearRect(0,0,W,H);
 
-    function tick(now) {
-      const dt = Math.min(0.033, (now - lastTime) / 1000);
-      lastTime = now;
-
-      ctx.clearRect(0, 0, W, H);
-
-      // 追蹤紅色標的
-      const c = trackRedCentroid();
-      if (c) {
+      const c=trackRedCentroid();
+      if(c){
         lastCentroid.x = centroid.x || c.x;
         lastCentroid.y = centroid.y || c.y;
-        centroid.x = centroid.x + (c.x - centroid.x) * smoothing || c.x;
-        centroid.y = centroid.y + (c.y - centroid.y) * smoothing || c.y;
+        centroid.x = centroid.x + (c.x-centroid.x)*smoothing || c.x;
+        centroid.y = centroid.y + (c.y-centroid.y)*smoothing || c.y;
 
-        // 方向（單位）
-        const dx = centroid.x - lastCentroid.x;
-        const dy = centroid.y - lastCentroid.y;
-        const len = Math.hypot(dx, dy) || 1;
-        direction.x = dx / len;
-        direction.y = dy / len;
-
-        hintEl.textContent = '已偵測到紅色目標，盡情舞動！';
-        hintEl.className = 'hint ok';
-      } else {
-        // 無偵測，用上次方向，提示使用者
-        hintEl.textContent = '未偵測到紅色物件，請調整光線/色域或靠近鏡頭。';
-        hintEl.className = 'hint bad';
+        const dx=centroid.x-lastCentroid.x, dy=centroid.y-lastCentroid.y;
+        const len=Math.hypot(dx,dy)||1;
+        direction.x=dx/len; direction.y=dy/len;
+        hintEl.textContent='已偵測到紅色目標，盡情舞動！'; hintEl.className='hint ok';
+      }else{
+        hintEl.textContent='未偵測到紅色物件，請調整光線/色域或靠近鏡頭。'; hintEl.className='hint bad';
       }
 
-      // 更新與繪製物件
       updateItems(dt);
       drawItems(ctx);
 
-      // 畫火龍（用 centroid 作為龍頭）
+      // 火龍頭位置（用貼圖的口鼻作為頭）
       const head = { x: centroid.x || W/2, y: centroid.y || H/2 };
-      drawDragon(ctx, head, direction);
+      drawDragonImage(ctx, head, direction);
 
-      // 碰撞
       handleCollisions(head);
-
-      // 飄字
       drawFloatTexts(dt);
 
-      if (running && !gameOver) requestAnimationFrame(tick);
+      if(running && !gameOver) requestAnimationFrame(tick);
     }
 
-    // ========= 遊戲控制 =========
-    function startGameLoop() {
-      if (running) return;
-      running = true; gameOver = false;
-      lastTime = performance.now();
+    // 控制
+    function startGameLoop(){
+      if(running) return;
+      running=true; gameOver=false;
       ensureItems();
-      // 倒數計時
       clearInterval(timerId);
-      timeLeft = 60;
-      timeEl.textContent = timeLeft;
-      timerId = setInterval(() => {
-        timeLeft--;
-        timeEl.textContent = timeLeft;
-        if (timeLeft <= 0) {
-          clearInterval(timerId);
-          running = false; gameOver = true;
-          hintEl.textContent = `時間到！總分：${score}`;
-          hintEl.className = 'hint';
+      timeLeft=60; timeEl.textContent=timeLeft;
+      timerId=setInterval(()=>{
+        timeLeft--; timeEl.textContent=timeLeft;
+        if(timeLeft<=0){
+          clearInterval(timerId); running=false; gameOver=true;
+          hintEl.textContent=`時間到！總分：${score}`; hintEl.className='hint';
         }
-      }, 1000);
+      },1000);
+      lastTime=performance.now();
       requestAnimationFrame(tick);
     }
-
-    async function startAll() {
-      try {
+    async function startAll(){
+      try{
         await initCamera();
-        // 若需要載入背景圖，這裡可設定 bgImg.src = '...';
+        // 如需背景圖，設定 bgImg.src = 'your-parade.jpg';
         startGameLoop();
-      } catch (err) {
-        console.error(err);
-        hintEl.textContent = '相機無法啟動，請確認權限與 HTTPS。';
+      }catch(e){
+        console.error(e);
+        hintEl.textContent='相機無法啟動，請確認權限與 HTTPS。';
       }
     }
-
     startBtn.addEventListener('click', startAll);
-    resetBtn.addEventListener('click', () => {
-      score = 0; combo = 0; scoreEl.textContent = score; comboEl.textContent = combo;
-      items.length = 0; ensureItems();
-      centroid = { x: W/2, y: H/2 };
-      lastCentroid = { x: W/2, y: H/2 };
-      direction = { x: 1, y: 0 };
-      hintEl.textContent = '重置完成，按「開始」重新啟動相機。';
-      running = false; gameOver = false;
-      clearInterval(timerId);
+    resetBtn.addEventListener('click', ()=>{
+      score=0; combo=0; scoreEl.textContent=score; comboEl.textContent=combo;
+      items.length=0; ensureItems();
+      centroid={x:W/2,y:H/2}; lastCentroid={x:W/2-10,y:H/2}; direction={x:1,y:0};
+      hintEl.textContent='重置完成，按「開始」重新啟動相機。';
+      running=false; gameOver=false; clearInterval(timerId);
     });
 
-    // 初始頭尾方向
-    centroid = { x: W/2, y: H/2 };
-    lastCentroid = { x: W/2 - 10, y: H/2 };
-    direction = { x: 1, y: 0 };
+    // 初始
+    centroid={x:W/2,y:H/2}; lastCentroid={x:W/2-10,y:H/2}; direction={x:1,y:0};
   </script>
 </body>
 </html>
