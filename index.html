@@ -11,28 +11,43 @@
       height: 100%; background: #000; color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "Noto Sans CJK", "PingFang HK", "Heiti TC", Arial, sans-serif;
       overflow: hidden;
-      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
       touch-action: manipulation;
     }
     .wrap { position: relative; width: 100%; height: 100%; background: #000; }
-    video#cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: none; background: #000; }
+    video#cam {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      transform: none; background: #000;
+    }
     img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0.25; mix-blend-mode: lighten; }
     canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
 
-    /* 頂部 HUD（開始 + 分數） */
+    /* 頂部：改為兩行（第一行：開始 + 選單；第二行：分數 HUD） */
     .ui {
-      position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 12px; gap: 8px; background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0)); user-select: none; z-index: 20;
+      position: absolute; left: 0; right: 0; top: 0;
+      display: grid; gap: 6px; padding: 10px 12px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0));
+      user-select: none; z-index: 20;
     }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      flex-wrap: nowrap;
+    }
+    .hudbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+
     .btn { background: #e11d48; border: none; color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(225,29,72,0.35); }
     .btn.secondary { background:#334155; box-shadow: 0 4px 12px rgba(15,23,42,0.35); }
     .btn.ghost { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; box-shadow: none; }
     .btn:disabled { opacity: 0.6; }
     .btn:active { transform: translateY(1px); }
+
     .hud { display: flex; gap: 10px; align-items: center; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,0.6); flex-wrap: wrap; }
     .chip { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 6px 10px; font-size: 14px; }
 
-    /* 中央提示 */
+    /* 底部提示 */
     .hint {
       position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
       text-align: center; padding: 0 16px; color: #ffd166; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.7); z-index: 5;
@@ -40,18 +55,14 @@
     .ok { color: #22c55e; }
     .bad { color: #f97316; }
 
-    /* 選單觸發鈕（右上角） */
-    .menu-trigger { position: absolute; top: 10px; right: 10px; z-index: 25; display: flex; gap: 8px; }
+    /* 選單觸發鈕（移入 topbar，不再使用絕對定位） */
     .menuBtn { padding: 8px 12px; font-weight: 700; border-radius: 10px; }
 
-    /* 遮罩 */
+    /* 面板與遮罩 */
     .panel-backdrop {
       position: absolute; inset: 0; background: rgba(0,0,0,0.4); z-index: 30;
       opacity: 0; pointer-events: none; transition: opacity .2s ease;
     }
-    .panel-backdrop.open { opacity: 1; pointer-events: auto; }
-
-    /* 面板：預設桌機右側抽屜 */
     .panel {
       position: absolute; top: 0; right: 0; height: 100%;
       background: rgba(17,24,39,0.9); backdrop-filter: blur(10px);
@@ -59,9 +70,11 @@
       width: min(420px, 92vw);
       transform: translateX(100%);
       transition: transform .25s ease;
-      z-index: 31; color: #fff; overflow: auto; -webkit-overflow-scrolling: touch;
+      z-index: 31; color: #fff; overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .panel.open { transform: translateX(0); }
+    .panel-backdrop.open { opacity: 1; pointer-events: auto; }
 
     .panel header {
       position: sticky; top: 0; background: rgba(17,24,39,0.95);
@@ -74,28 +87,12 @@
     .row .controls { display: flex; align-items: center; gap: 8px; }
     .mini { padding: 8px 10px; font-weight: 600; font-size: 12px; border-radius: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; }
     .danger { background: #7f1d1d; border-color: rgba(255,255,255,0.25); }
+
     input[type="range"] { width: 160px; }
     .sliderRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
     .val { font-variant-numeric: tabular-nums; color: #fcd34d; min-width: 40px; text-align: right; }
 
-    /* 行動裝置：<= 768px 時改為底部抽屜式 */
-    @media (max-width: 768px) {
-      .panel {
-        right: auto; left: 0; width: 100%;
-        height: auto; max-height: 80vh;
-        border-left: none; border-top: 1px solid rgba(255,255,255,0.12);
-        border-radius: 12px 12px 0 0;
-        transform: translateY(100%);
-        bottom: 0;
-      }
-      .panel.open { transform: translateY(0); }
-      .panel header {
-        cursor: grab;
-      }
-      /* 讓上方內容不被面板頂起時擋住點擊，使用遮罩控制互動 */
-    }
-
-    /* 隱藏舊底部 bar */
+    /* 隱藏原底部 bar（改放到面板內） */
     .bar { display: none; }
   </style>
 </head>
@@ -105,25 +102,25 @@
     <img id="bg" alt="背景" src="image_1.png" />
     <canvas id="game"></canvas>
 
-    <!-- 頂部：開始 + HUD -->
+    <!-- 頂部：分兩行 -->
     <div class="ui">
-      <button id="startBtn" class="btn">開始</button>
-      <div class="hud">
-        <div class="chip">分數：<span id="score">0</span></div>
-        <div class="chip">Combo：<span id="combo">0</span></div>
-        <div class="chip">時間：<span id="time">60</span>s</div>
+      <div class="topbar">
+        <button id="startBtn" class="btn">開始</button>
+        <button id="menuBtn" class="btn ghost menuBtn">≡ 選單</button>
       </div>
-    </div>
-
-    <!-- 右上：選單觸發鈕 -->
-    <div class="menu-trigger">
-      <button id="menuBtn" class="btn ghost menuBtn">≡ 選單</button>
+      <div class="hudbar">
+        <div class="hud">
+          <div class="chip">分數：<span id="score">0</span></div>
+          <div class="chip">Combo：<span id="combo">0</span></div>
+          <div class="chip">時間：<span id="time">60</span>s</div>
+        </div>
+      </div>
     </div>
 
     <!-- 面板與遮罩 -->
     <div id="panelBackdrop" class="panel-backdrop"></div>
     <aside id="panel" class="panel" aria-hidden="true">
-      <header id="panelHeader">
+      <header>
         <h2>設定</h2>
         <button id="closePanel" class="btn ghost" aria-label="關閉">✕</button>
       </header>
@@ -223,7 +220,6 @@
     const panel = document.getElementById('panel');
     const panelBackdrop = document.getElementById('panelBackdrop');
     const closePanelBtn = document.getElementById('closePanel');
-    const panelHeader = document.getElementById('panelHeader');
 
     const resetBtn = document.getElementById('resetBtn');
     const toggleFacingBtn = document.getElementById('toggleFacing');
@@ -392,7 +388,9 @@
 
       try {
         wctx.drawImage(video, 0, 0, w, h);
-      } catch (e) { return null; }
+      } catch (e) {
+        return null;
+      }
 
       const { data } = wctx.getImageData(0, 0, w, h);
 
@@ -460,8 +458,6 @@
     }
 
     // ========= 粒子效果 =========
-    const particles = [];
-    const MAX_PARTICLES = 1200;
     function spawnIncenseParticles(pos, dir, count=6) {
       for (let i=0; i<count; i++){
         if (particles.length >= MAX_PARTICLES) break;
@@ -507,14 +503,19 @@
     // ========= 單張貼圖繪製（無旋轉）=========
     function drawDragon(ctx, head) {
       if (!dragonImgReady) return;
+
       const imgW = sprite.drawWidth;
       const imgH = sprite.drawHeight;
+
       ctx.save();
       ctx.translate(head.x, head.y);
+
       const headOffsetX = -imgW * sprite.headAnchorX + (sprite.fineOffsetX || 0);
       const headOffsetY = -imgH * sprite.headAnchorY + (sprite.fineOffsetY ? sprite.fineOffsetY * imgH : 0);
       ctx.translate(headOffsetX, headOffsetY);
+
       ctx.drawImage(dragonImg, 0, -imgH * 0.5, imgW, imgH);
+
       spawnIncenseParticles({ x: 0, y: 0 }, { x: 1, y: 0 }, 8);
       ctx.restore();
     }
@@ -683,53 +684,6 @@
     closePanelBtn.addEventListener('click', closePanel);
     panelBackdrop.addEventListener('click', closePanel);
 
-    // ======== 行動裝置底部抽屜：簡易拖曳關閉（可選） ========
-    let startY = 0, currentY = 0, dragging = false;
-    const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
-
-    function onTouchStart(e){
-      if (!isMobile() || !panel.classList.contains('open')) return;
-      dragging = true;
-      startY = (e.touches ? e.touches[0].clientY : e.clientY);
-      panel.style.transition = 'none';
-    }
-    function onTouchMove(e){
-      if (!dragging) return;
-      currentY = (e.touches ? e.touches[0].clientY : e.clientY);
-      const delta = Math.max(0, currentY - startY);
-      // 將面板往下拖動
-      panel.style.transform = `translateY(${delta}px)`;
-      // 同步調整遮罩透明度
-      const h = panel.getBoundingClientRect().height || 1;
-      const progress = Math.min(1, delta / h);
-      panelBackdrop.style.opacity = String(1 - progress * 0.8);
-    }
-    function onTouchEnd(){
-      if (!dragging) return;
-      dragging = false;
-      const delta = Math.max(0, currentY - startY);
-      panel.style.transition = ''; // 恢復動畫
-      // 若拖動超過 25% 高度則關閉
-      const h = panel.getBoundingClientRect().height || 1;
-      if (delta > h * 0.25) {
-        closePanel();
-        // 重置 transform
-        requestAnimationFrame(()=>{ panel.style.transform=''; panelBackdrop.style.opacity=''; });
-      } else {
-        // 回彈
-        panel.classList.add('open');
-        panelBackdrop.classList.add('open');
-        requestAnimationFrame(()=>{ panel.style.transform=''; panelBackdrop.style.opacity=''; });
-      }
-    }
-
-    panelHeader.addEventListener('touchstart', onTouchStart, { passive: true });
-    panelHeader.addEventListener('touchmove', onTouchMove, { passive: true });
-    panelHeader.addEventListener('touchend', onTouchEnd);
-    panelHeader.addEventListener('mousedown', onTouchStart);
-    window.addEventListener('mousemove', onTouchMove);
-    window.addEventListener('mouseup', onTouchEnd);
-
     // ======== 滑桿數值同步 ========
     function bindVal(input, labelEl) {
       const sync = () => labelEl.textContent = input.value;
@@ -745,8 +699,6 @@
     bindVal(speedEl, speedVal);
 
     // 初始
-    let W = 0, H = 0, dpr = 1; // 防止上方重複宣告報錯的替代行
-    function applyMirror() { video.style.transform = mirrored ? 'scaleX(-1)' : 'none'; toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`; } // 保險定義
     centroid = { x: W/2, y: H/2 };
     direction = { x: 1, y: 0 };
   </script>
