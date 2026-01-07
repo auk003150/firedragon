@@ -2,668 +2,506 @@
 <html lang="zh-HK">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>大坑舞火龍 AR 小遊戲（示範原型）</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>大坑舞火龍 AR 小遊戲（原型）</title>
   <style>
-    :root{
-      --bg:#0b0f1a;
-      --gold:#f4c430;
-      --red:#c81d25;
-      --green:#1fa37d;
-      --muted:#1e2638;
-      --panel:#101828cc;
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%; background: #000; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "Noto Sans CJK", "PingFang HK", "Heiti TC", Arial, sans-serif;
+      overflow: hidden;
     }
-    html,body{height:100%;margin:0;background:#0b0f1a;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans","PingFang HK","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;}
-    *{box-sizing:border-box}
-
-    /* Layout */
-    .app{
-      display:grid;
-      grid-template-rows:auto 1fr auto;
-      height:100%;
+    .wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #000;
     }
-    header{
-      display:flex;align-items:center;gap:.75rem;
-      padding:.75rem 1rem;border-bottom:1px solid #16253a;background:#0c1424b3;backdrop-filter:blur(6px);
+    /* 後置鏡頭影像 */
+    video#cam {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover; transform: scaleX(-1); /* 鏡像，較符合自拍感；若要真實方向可移除 */
+      filter: none;
     }
-    header .title{font-size:1.05rem;font-weight:700;letter-spacing:.02em}
-    header .badge{font-size:.75rem;color:#ffd966;background:#512b0b;border:1px solid #7a4a12;padding:.15rem .4rem;border-radius:.4rem}
-    .hud{display:flex;gap:.5rem;margin-left:auto;align-items:center}
-    .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .6rem;border-radius:999px;background:#0f1b31;border:1px solid #1f3357;font-size:.8rem}
-    .pill strong{color:#fff}
-    .btn{appearance:none;border:1px solid #2a3f67;background:#142544;color:#e6eeff;padding:.5rem .8rem;border-radius:.6rem;cursor:pointer;font-weight:600;transition:.2s}
-    .btn:hover{background:#1a2f55}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-
-    main{position:relative;overflow:hidden}
-
-    /* Unified mirrored stack: camera + background image + canvas are all mirrored together */
-    .stage{
-      position:absolute;inset:0;display:grid;place-items:center;background:#000;
+    /* 20% 透明度的大坑舞火龍背景圖（可替換 src） */
+    img#bg {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover; pointer-events: none;
+      opacity: 0.2; mix-blend-mode: lighten;
     }
-
-    /* A single transform container that mirrors everything inside */
-    .mirror{
-      position:absolute;inset:0;
-      transform:scaleX(-1);
-      transform-origin:center;
+    /* 遊戲Canvas層：火龍、目標、碰撞、UI */
+    canvas#game {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      touch-action: none; pointer-events: none;
     }
-
-    /* Layers inside the mirrored container share the same coordinates */
-    .videoWrap,.bgWrap,.overlayCanvas,.uiOverlay{position:absolute;inset:0}
-
-    .videoEl{width:100%;height:100%;object-fit:cover}
-
-    /* Background image with 20% opacity (overlaid, but still mirrored together with camera and canvas) */
-    .bgWrap{
-      pointer-events:none;
-      opacity:.2; /* 20% */
-      background-position:center;
-      background-size:cover;
-      background-repeat:no-repeat;
-      /* 如果放在 GitHub，請把下面 URL 換成你的 raw 檔案連結 */
-      background-image:url('https://raw.githubusercontent.com/your-account/your-repo/main/assets/taikoo-fire-dragon-bg.jpg');
+    /* 控制列 */
+    .ui {
+      position: absolute; left: 0; right: 0; top: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; gap: 8px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0));
+      user-select: none;
     }
-
-    canvas.overlayCanvas{pointer-events:none}
-
-    /* Collapsible Side panel */
-    .sideWrap{position:absolute;right:.5rem;top:.5rem;z-index:5}
-    .sideToggle{
-      position:absolute; right:0; top:0; transform:translateY(-110%);
-      display:inline-flex; align-items:center; gap:.4rem;
-      padding:.4rem .55rem; border-radius:.6rem;
-      border:1px solid #233452; background:#0f1d35cc; color:#e6eeff; backdrop-filter:blur(6px);
-      cursor:pointer; font-weight:700; font-size:.85rem;
+    .btn {
+      background: #e11d48; border: none; color: #fff; border-radius: 10px;
+      padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px;
+      box-shadow: 0 4px 12px rgba(225,29,72,0.35);
     }
-    .sideToggle .chev{display:inline-block; transition:.2s transform}
-    .sideWrap.closed .sideToggle .chev{transform:rotate(180deg)}
-    .side{
-      display:flex;flex-direction:column;gap:.5rem;
-      width:min(92vw,340px);max-height:80vh;overflow:auto;padding:.5rem;
-      background:var(--panel);border:1px solid #233452;border-radius:.8rem;backdrop-filter:blur(6px);
-      transition: transform .25s ease, opacity .25s ease, visibility 0s linear .25s;
+    .btn:active { transform: translateY(1px); }
+    .hud {
+      display: flex; gap: 10px; align-items: center; font-weight: 700;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.6);
     }
-    .sideWrap.closed .side{
-      transform:translateY(-8px) translateX(8px) scale(.98);
-      opacity:0; visibility:hidden; transition: transform .25s ease, opacity .25s ease, visibility 0s;
+    .chip {
+      background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 999px; padding: 6px 10px; font-size: 14px;
     }
-    .side h3{margin:.2rem 0 .4rem;font-size:.95rem}
-    .row{display:flex;gap:.5rem;flex-wrap:wrap}
-    .tag{padding:.2rem .5rem;border:1px solid #334a77;background:#0e1d36;border-radius:.6rem;font-size:.8rem}
-    .legend{display:flex;gap:.4rem;align-items:center;font-size:.85rem}
-    .dot{width:.7rem;height:.7rem;border-radius:999px;display:inline-block}
-    .dot.good{background:var(--gold)}
-    .dot.bad{background:#9aa4b2}
-    .kv{display:flex;justify-content:space-between;gap:1rem;font-size:.9rem;padding:.35rem .5rem;background:#0b162c;border:1px solid #203356;border-radius:.5rem}
-    .slider{width:100%}
-    .small{font-size:.8rem;opacity:.9}
-
-    /* On-screen hint */
-    .hint{
-      position:absolute;left:50%;bottom:.5rem;transform:translateX(-50%);
-      padding:.5rem .75rem;border-radius:.6rem;background:#0f1d35cc;border:1px solid #23406d;backdrop-filter:blur(6px);
-      font-size:.9rem
+    .bar {
+      position: absolute; left: 12px; right: 12px; bottom: 12px;
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; padding: 10px;
     }
-
-    /* Floating festive UI elements (purely decorative) */
-    .lantern{
-      position:absolute; top:-60px; width:40px; height:60px; border-radius:20px; background:linear-gradient(#ff3b3b,#b40f0f);
-      border:2px solid #7a0b0b; box-shadow:0 0 18px #ff5050aa inset, 0 4px 12px #00000055; 
-      animation: float 5s ease-in-out infinite;
+    .range-group {
+      display: flex; align-items: center; gap: 8px; color: #ddd; font-size: 12px;
     }
-    .lantern::after{content:"福"; position:absolute; inset:auto 0 8px 0; margin:auto; text-align:center; color:#ffd966; font-weight:800}
-    .lantern.l1{left:12px; animation-delay:0s}
-    .lantern.l2{left:72px; animation-delay:1.2s}
-    .lantern.l3{right:20px; animation-delay:.6s}
-    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(12px)}}
-
-    /* Mobile safe areas */
-    @supports(padding:max(0px)) {
-      header{padding-left:max(1rem, env(safe-area-inset-left)); padding-right:max(1rem, env(safe-area-inset-right)); padding-top:max(.5rem, env(safe-area-inset-top));}
-      .hint{margin-bottom:max(.25rem, env(safe-area-inset-bottom))}
+    input[type="range"] { width: 120px; }
+    .hint {
+      position: absolute; left: 0; right: 0; top: 50%;
+      transform: translateY(-50%);
+      text-align: center; padding: 0 16px; color: #ffd166; font-weight: 700;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.7);
     }
-
-    /* Fallback message */
-    .blocked{
-      position:absolute; inset:0; display:none; place-items:center; text-align:center; padding:1rem; background:#0b1222; z-index:20;
-    }
-    .blocked.active{display:grid}
-    .blocked .card{max-width:560px; background:#0f1d35; border:1px solid #243a63; border-radius:.8rem; padding:1rem;}
-    .blocked h2{margin:.25rem 0}
-    .blocked p{opacity:.9}
+    .ok { color: #22c55e; }
+    .bad { color: #f97316; }
   </style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <span class="badge">示範原型</span>
-      <div class="title">大坑舞火龍 • 農曆新年 AR 小遊戲</div>
+  <div class="wrap">
+    <video id="cam" playsinline muted autoplay></video>
+    <!-- 將此 img 的 src 換成你提供的背景圖（例如你上載的巡遊圖片）。-->
+    <img id="bg" alt="大坑舞火龍背景" src="" />
+    <canvas id="game"></canvas>
+
+    <div class="ui">
+      <button id="startBtn" class="btn">開始</button>
       <div class="hud">
-        <div class="pill" id="scorePill">分數：<strong id="score">0</strong></div>
-        <div class="pill">時間：<strong id="time">60</strong>s</div>
-        <button class="btn" id="startBtn">開始</button>
-        <button class="btn" id="resetBtn" disabled>重設</button>
-        <button class="btn" id="togglePanelBtn" title="開關設定">設定</button>
+        <div class="chip">分數：<span id="score">0</span></div>
+        <div class="chip">Combo：<span id="combo">0</span></div>
+        <div class="chip">時間：<span id="time">60</span>s</div>
       </div>
-    </header>
+      <button id="resetBtn" class="btn" style="background:#334155">重置</button>
+    </div>
 
-    <main>
-      <div class="stage">
-        <!-- Decorative lanterns (not mirrored; keep UI natural) -->
-        <div class="lantern l1"></div>
-        <div class="lantern l2"></div>
-        <div class="lantern l3"></div>
-
-        <!-- Unified mirrored container: camera + background image + canvas overlap together -->
-        <div class="mirror" aria-hidden="true">
-          <!-- Camera stream -->
-          <div class="videoWrap">
-            <video id="cam" class="videoEl" playsinline muted></video>
-          </div>
-
-          <!-- Background image at 20% opacity -->
-          <div class="bgWrap" id="bgWrap" title="背景圖"></div>
-
-          <!-- Game overlay -->
-          <canvas id="game" class="overlayCanvas"></canvas>
-
-          <!-- Clickable overlay UI layer if needed inside mirror -->
-          <div class="uiOverlay"></div>
-        </div>
-
-        <!-- Side panel (collapsible) -->
-        <div id="sideWrap" class="sideWrap closed" aria-expanded="false">
-          <button id="floatingToggle" class="sideToggle" aria-label="開關遊戲設定">
-            遊戲設定 <span class="chev">▾</span>
-          </button>
-          <aside class="side" role="dialog" aria-label="遊戲設定">
-            <h3>遊戲設定</h3>
-            <div class="kv"><span>偵測模式</span><strong id="modeLabel">手持火龍（筷子）</strong></div>
-            <div class="kv"><span>靈敏度</span><input id="sensitivity" class="slider" type="range" min="0.2" max="2.0" step="0.1" value="1.0"></div>
-            <div class="kv"><span>物件數量</span><input id="targetCount" class="slider" type="range" min="3" max="12" step="1" value="7"></div>
-            <div class="kv"><span>遊戲時長</span><input id="duration" class="slider" type="range" min="30" max="120" step="10" value="60"></div>
-            <div class="legend"><span class="dot good"></span> 新年相關（+分）</div>
-            <div class="legend"><span class="dot bad"></span> 非新年（-分）</div>
-            <div class="row">
-              <span class="tag">恭喜發財</span>
-              <span class="tag">新年快樂</span>
-              <span class="tag">吉祥如意</span>
-              <span class="tag">利是逗來</span>
-            </div>
-            <p class="small">注意：此為瀏覽器原型，使用簡化的顏色追蹤來「跟住」你手上的火龍位置。實際產品可替換為先進的物件追蹤（如 MediaPipe/AR 模型）。</p>
-          </aside>
-        </div>
-
-        <!-- Hint -->
-        <div class="hint">提示：把手機後置鏡頭對準你手上用筷子拎住的火龍公仔，輕輕揮動來控制畫面內的火龍方向！</div>
-
-        <!-- Fallback (permissions / unsupported) -->
-        <div id="fallback" class="blocked">
-          <div class="card">
-            <h2>需要相機權限</h2>
-            <p>請允許使用後置鏡頭以開始遊戲。若無法使用，請改用 Chrome 或 Safari 最新版本。</p>
-            <div style="margin-top:.5rem;display:flex;gap:.5rem;justify-content:center">
-              <button id="retryBtn" class="btn">重新嘗試</button>
-            </div>
-          </div>
-        </div>
-
+    <div class="bar">
+      <div class="range-group">
+        Hmin <input id="hMin" type="range" min="0" max="360" value="330">
+        Hmax <input id="hMax" type="range" min="0" max="360" value="20">
       </div>
-    </main>
+      <div class="range-group">
+        Smin <input id="sMin" type="range" min="0" max="100" value="50">
+        Vmin <input id="vMin" type="range" min="0" max="100" value="40">
+      </div>
+      <div class="range-group">
+        靈敏度 <input id="sens" type="range" min="0" max="100" value="60">
+      </div>
+      <div class="range-group">
+        目標密度 <input id="density" type="range" min="1" max="10" value="4">
+      </div>
+      <div class="range-group">
+        速度 <input id="speed" type="range" min="1" max="10" value="5">
+      </div>
+    </div>
 
-    <footer style="padding:.5rem 1rem;border-top:1px solid #16253a;background:#0c1424b3;display:flex;gap:.5rem;flex-wrap:wrap">
-      <span class="small">背景：大坑舞火龍意象（20% 透明）。相機、背景與畫布已合併鏡像顯示。</span>
-    </footer>
+    <div id="hint" class="hint">按「開始」允許相機權限。請以紅色龍公仔在鏡頭前揮動。</div>
   </div>
 
   <script>
-    // --- Simple AR-ish tracking via color threshold (prototype) ---
+    // ========= 基本設定 =========
     const video = document.getElementById('cam');
+    const bgImg = document.getElementById('bg');
+    // 如有實際背景圖，設置 src：bgImg.src = 'your-dahing-photo.jpg';
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d', { alpha: true });
+
     const startBtn = document.getElementById('startBtn');
     const resetBtn = document.getElementById('resetBtn');
-    const retryBtn = document.getElementById('retryBtn');
-    const fallback = document.getElementById('fallback');
     const scoreEl = document.getElementById('score');
+    const comboEl = document.getElementById('combo');
     const timeEl = document.getElementById('time');
-    const sensitivityEl = document.getElementById('sensitivity');
-    const targetCountEl = document.getElementById('targetCount');
-    const durationEl = document.getElementById('duration');
+    const hintEl = document.getElementById('hint');
 
-    // Panel controls
-    const sideWrap = document.getElementById('sideWrap');
-    const floatingToggle = document.getElementById('floatingToggle');
-    const togglePanelBtn = document.getElementById('togglePanelBtn');
-    function togglePanel(force){
-      const willClose = force !== undefined ? !force : sideWrap.classList.contains('closed') === false;
-      if (willClose) {
-        sideWrap.classList.add('closed');
-        sideWrap.setAttribute('aria-expanded','false');
-      } else {
-        sideWrap.classList.remove('closed');
-        sideWrap.setAttribute('aria-expanded','true');
-      }
-    }
-    floatingToggle.addEventListener('click', ()=>togglePanel());
-    togglePanelBtn.addEventListener('click', ()=>togglePanel());
+    const hMinEl = document.getElementById('hMin');
+    const hMaxEl = document.getElementById('hMax');
+    const sMinEl = document.getElementById('sMin');
+    const vMinEl = document.getElementById('vMin');
+    const sensEl = document.getElementById('sens');
+    const densEl = document.getElementById('density');
+    const speedEl = document.getElementById('speed');
 
-    let stream = null;
-    let raf = null;
-    let w = 0, h = 0;
-
-    // Game state
     let running = false;
-    let timeLeft = 60;
-    let score = 0;
+    let gameOver = false;
+    let W = 0, H = 0;
 
-    // Dragon state
-    const dragon = {
-      x: 0, y: 0,
-      vx: 0, vy: 0,
-      trail: [],
-      maxTrail: 28,
-      mouthRadius: 24,
-      color: '#f4c430',
-    };
+    let score = 0, combo = 0, timeLeft = 60;
+    let timerId = null;
 
-    // Target items
-    const GOOD_WORDS = ['福','春','財','喜','發','吉','利','旺','安','順','龍'];
-    const BAD_THINGS = ['🍕','⚽','🎧','⚠️','🧊','🧦','🧽','🖊️','📎','🧱','🧵'];
+    // 追蹤狀態
+    let centroid = { x: 0, y: 0 };
+    let lastCentroid = { x: 0, y: 0 };
+    let direction = { x: 0, y: 0 }; // 單位方向
+    let dragonLen = 80; // 火龍顯示的主體長度（頭尾距）
+    let smoothing = 0.25; // 位置平滑
 
-    let items = [];
+    // 目標物件（賀年詞、非賀年）
+    const goodList = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
+    const badList  = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
 
-    // Offscreen for detection
-    const detectCanvas = document.createElement('canvas');
-    const detectCtx = detectCanvas.getContext('2d', { willReadFrequently: true });
+    const items = [];
+    const MAX_ITEMS = 12;
 
+    // 調整畫布大小
     function resize() {
-      const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      w = Math.floor(rect.width * dpr);
-      h = Math.floor(rect.height * dpr);
-      canvas.width = w;
-      canvas.height = h;
-      canvas.style.width = rect.width + 'px';
-      canvas.style.height = rect.height + 'px';
-      detectCanvas.width = Math.floor(w/3);
-      detectCanvas.height = Math.floor(h/3);
-      ctx.setTransform(dpr,0,0,dpr,0,0);
+      const dpr = Math.min(window.devicePixelRatio || 1.5, 2);
+      W = canvas.clientWidth;
+      H = canvas.clientHeight;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     window.addEventListener('resize', resize);
+    resize();
 
+    // ========= 開相機（後置）=========
     async function initCamera() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        });
-        video.srcObject = stream;
-        await video.play();
-        fallback.classList.remove('active');
-      } catch (e) {
-        console.warn('Camera init failed', e);
-        fallback.classList.add('active');
-      }
-    }
-
-    function spawnItems() {
-      items = [];
-      const count = parseInt(targetCountEl.value, 10);
-      const goodRatio = 0.7;
-      const goodCount = Math.max(1, Math.round(count * goodRatio));
-      const badCount = Math.max(1, count - goodCount);
-
-      const pad = 40;
-      function randPos() {
-        return {
-          x: Math.random() * (w - pad*2) + pad,
-          y: Math.random() * (h - pad*2) + pad
-        };
-      }
-
-      for (let i=0;i<goodCount;i++){
-        const pos = randPos();
-        items.push({
-          type:'good',
-          label: GOOD_WORDS[Math.floor(Math.random()*GOOD_WORDS.length)],
-          x: pos.x, y: pos.y,
-          r: 24 + Math.random()*10,
-          alive: true,
-          vx: (Math.random()-.5)*0.6,
-          vy: (Math.random()-.5)*0.6,
-        });
-      }
-      for (let i=0;i<badCount;i++){
-        const pos = randPos();
-        items.push({
-          type:'bad',
-          label: BAD_THINGS[Math.floor(Math.random()*BAD_THINGS.length)],
-          x: pos.x, y: pos.y,
-          r: 22 + Math.random()*10,
-          alive: true,
-          vx: (Math.random()-.5)*0.6,
-          vy: (Math.random()-.5)*0.6,
-        });
-      }
-    }
-
-    function startGame() {
-      if (running) return;
-      running = true;
-      score = 0;
-      timeLeft = parseInt(durationEl.value, 10);
-      scoreEl.textContent = score;
-      timeEl.textContent = timeLeft;
-      startBtn.disabled = true;
-      resetBtn.disabled = false;
-      spawnItems();
-      loop();
-      countdown();
-      sideWrap.classList.add('closed');
-      sideWrap.setAttribute('aria-expanded','false');
-    }
-
-    function resetGame() {
-      running = false;
-      cancelAnimationFrame(raf);
-      spawnItems();
-      score = 0;
-      scoreEl.textContent = 0;
-      timeLeft = parseInt(durationEl.value, 10);
-      timeEl.textContent = timeLeft;
-      startBtn.disabled = false;
-      resetBtn.disabled = true;
-      dragon.trail = [];
-    }
-
-    function countdown() {
-      const t = setInterval(() => {
-        if (!running) { clearInterval(t); return; }
-        timeLeft--;
-        timeEl.textContent = timeLeft;
-        if (timeLeft <= 0) {
-          running = false;
-          startBtn.disabled = false;
-          resetBtn.disabled = true;
-          clearInterval(t);
-          toast(`時間到！你的分數：${score}`, 2400);
+      const constraints = {
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         }
-      }, 1000);
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = stream;
+      await video.play();
     }
 
-    // Simple toast
-    let toastTimer = null;
-    function toast(msg, ms=1400){
-      const hint = document.querySelector('.hint');
-      const prev = hint.textContent;
-      hint.textContent = msg;
-      hint.style.background = '#1e2b4dcc';
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(()=> {
-        hint.textContent = '提示：把手機後置鏡頭對準你手上用筷子拎住的火龍公仔，輕輕揮動來控制畫面內的火龍方向！';
-        hint.style.background = '#0f1d35cc';
-      }, ms);
+    // ========= 顏色追蹤（簡化 HSV）=========
+    const workCanvas = document.createElement('canvas');
+    const wctx = workCanvas.getContext('2d', { willReadFrequently: true });
+
+    function rgb2hsv(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const d = max - min;
+      let h = 0;
+      if (d !== 0) {
+        if (max === r) h = ((g - b) / d) % 6;
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+        h *= 60;
+      }
+      if (h < 0) h += 360;
+      const s = max === 0 ? 0 : d / max;
+      const v = max;
+      return [h, s * 100, v * 100];
     }
 
-    // Color detection: find largest red-ish area (coordinates already match mirrored stack)
-    function detectControlPoint() {
-      if (!video.videoWidth) return null;
-      detectCtx.drawImage(video, 0, 0, detectCanvas.width, detectCanvas.height);
-      const { data, width, height } = detectCtx.getImageData(0, 0, detectCanvas.width, detectCanvas.height);
+    function inHueRange(h, hMin, hMax) {
+      // 支援跨 0/360 的環狀區間
+      if (hMin <= hMax) return h >= hMin && h <= hMax;
+      return h >= hMin || h <= hMax;
+    }
 
-      const Rmin = 120, Gmax = 110, Bmax = 110;
-      let bestScore = 0, sumX = 0, sumY = 0, count = 0;
+    function trackRedCentroid() {
+      const scale = 0.3; // 低解析加速
+      const w = Math.max(2, Math.round(video.videoWidth * scale));
+      const h = Math.max(2, Math.round(video.videoHeight * scale));
+      workCanvas.width = w; workCanvas.height = h;
+      wctx.drawImage(video, 0, 0, w, h);
+      const { data } = wctx.getImageData(0, 0, w, h);
 
-      for (let y=0; y<height; y++) {
-        for (let x=0; x<width; x++) {
-          const i = (y*width + x)*4;
+      const hMin = parseInt(hMinEl.value, 10);
+      const hMax = parseInt(hMaxEl.value, 10);
+      const sMin = parseInt(sMinEl.value, 10);
+      const vMin = parseInt(vMinEl.value, 10);
+      const sens = parseInt(sensEl.value, 10);
+
+      let sumX = 0, sumY = 0, count = 0;
+
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
+          const i = (y * w + x) * 4;
           const r = data[i], g = data[i+1], b = data[i+2];
-          if (r > Rmin && g < Gmax && b < Bmax && r > g + 30 && r > b + 30) {
-            const wgt = r - Math.max(g,b);
-            bestScore += wgt;
-            sumX += x * wgt;
-            sumY += y * wgt;
-            count++;
+          const [hh, ss, vv] = rgb2hsv(r, g, b);
+          if (inHueRange(hh, hMin, hMax) && ss >= sMin && vv >= vMin) {
+            sumX += x; sumY += y; count++;
           }
         }
       }
-      if (count < 50) return null;
 
-      const cx = sumX / bestScore;
-      const cy = sumY / bestScore;
-
-      const scaleX = w / detectCanvas.width;
-      const scaleY = h / detectCanvas.height;
-      // 因為我們把視覺層整體鏡像，偵測點直接用原座標即可
-      const x = cx * scaleX;
-      const y = cy * scaleY;
-      return { x, y };
-    }
-
-    function updateDragon(target) {
-      const sens = parseFloat(sensitivityEl.value);
-      const maxSpeed = 18 * sens;
-
-      if (target) {
-        const ax = (target.x - dragon.x) * 0.15 * sens;
-        const ay = (target.y - dragon.y) * 0.15 * sens;
-        dragon.vx = (dragon.vx + ax);
-        dragon.vy = (dragon.vy + ay);
-      } else {
-        dragon.vx *= 0.95;
-        dragon.vy *= 0.95;
+      if (count < sens) {
+        return null; // 不足像素，視為未偵測
       }
 
-      const speed = Math.hypot(dragon.vx, dragon.vy);
-      if (speed > maxSpeed) {
-        dragon.vx = dragon.vx / speed * maxSpeed;
-        dragon.vy = dragon.vy / speed * maxSpeed;
-      }
+      const cx = (sumX / count) / w * W;
+      const cy = (sumY / count) / h * H;
 
-      dragon.x += dragon.vx;
-      dragon.y += dragon.vy;
-
-      dragon.x = Math.max(0, Math.min(w, dragon.x));
-      dragon.y = Math.max(0, Math.min(h, dragon.y));
-
-      dragon.trail.push({ x: dragon.x, y: dragon.y });
-      if (dragon.trail.length > dragon.maxTrail) dragon.trail.shift();
+      return { x: cx, y: cy, count };
     }
 
-    function moveItems() {
-      for (const it of items) {
-        if (!it.alive) continue;
+    // ========= 遊戲物件 =========
+    function spawnItem() {
+      const isGood = Math.random() < 0.6;
+      const text = isGood ? goodList[Math.floor(Math.random() * goodList.length)]
+                          : badList[Math.floor(Math.random() * badList.length)];
+      const size = 28 + Math.random() * 18;
+      const x = 30 + Math.random() * (W - 60);
+      const y = 80 + Math.random() * (H - 160);
+      const vx = (Math.random() - 0.5) * parseInt(speedEl.value, 10);
+      const vy = (Math.random() - 0.5) * parseInt(speedEl.value, 10);
+      const ttl = 12 + Math.random() * 10;
+      items.push({ x, y, vx, vy, text, size, isGood, ttl });
+    }
+
+    function ensureItems() {
+      const target = parseInt(densEl.value, 10) * 3;
+      while (items.length < Math.min(MAX_ITEMS, target)) spawnItem();
+    }
+
+    function updateItems(dt) {
+      for (let i = items.length - 1; i >= 0; i--) {
+        const it = items[i];
         it.x += it.vx;
         it.y += it.vy;
-        if (it.x < it.r || it.x > w - it.r) it.vx *= -1;
-        if (it.y < it.r || it.y > h - it.r) it.vy *= -1;
+        it.ttl -= dt;
+        // 邊界彈跳
+        if (it.x < 20 || it.x > W - 20) it.vx *= -1;
+        if (it.y < 60 || it.y > H - 60) it.vy *= -1;
+        if (it.ttl <= 0) items.splice(i, 1);
       }
+      ensureItems();
     }
 
-    function checkCollisions() {
+    function drawItems(ctx) {
       for (const it of items) {
-        if (!it.alive) continue;
-        const d = Math.hypot(it.x - dragon.x, it.y - dragon.y);
-        if (d < (dragon.mouthRadius + it.r)*0.8) {
-          it.alive = false;
-          if (it.type === 'good') {
-            score += 5;
-            flash('#f4c430');
-            toast(`食到「${it.label}」！+5 分`, 800);
-          } else {
-            score -= 3;
-            flash('#9aa4b2');
-            toast(`咦～食錯咗（${it.label}）-3 分`, 1000);
-          }
-          scoreEl.textContent = score;
-        }
-      }
-
-      const aliveCount = items.filter(i=>i.alive).length;
-      if (aliveCount <= 2 && running) {
-        spawnItems();
+        ctx.save();
+        ctx.font = `700 ${it.size}px system-ui, "Noto Color Emoji", "Apple Color Emoji"`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = it.isGood ? 'rgba(255,215,0,0.9)' : 'rgba(255,90,0,0.7)';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = it.isGood ? '#ffd166' : '#ff6b6b';
+        ctx.fillText(it.text, it.x, it.y);
+        ctx.restore();
       }
     }
 
-    let flashAlpha = 0;
-    let flashColor = '#ffffff';
-    function flash(color){
-      flashColor = color;
-      flashAlpha = 0.4;
-    }
-
-    function drawBackground() {
-      // 保留一些細微的動態線條效果，與背景圖疊加
-      const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, 'rgba(12,16,28,0.4)');
-      g.addColorStop(1, 'rgba(10,20,36,0.1)');
-      ctx.fillStyle = g;
-      ctx.fillRect(0,0,w,h);
-
-      for (let i=0;i<24;i++){
-        ctx.strokeStyle = `rgba(244,196,48,${0.05 + Math.random()*0.03})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        const x = (i/24)*w + Math.sin(i)*12;
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x + Math.sin(i*2)*8, h);
-        ctx.stroke();
-      }
-    }
-
-    function drawItems() {
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      for (const it of items) {
-        if (!it.alive) continue;
-        ctx.beginPath();
-        ctx.arc(it.x, it.y, it.r, 0, Math.PI*2);
-        ctx.fillStyle = it.type==='good' ? 'rgba(244,196,48,0.18)' : 'rgba(154,164,178,0.18)';
-        ctx.strokeStyle = it.type==='good' ? '#f4c430' : '#9aa4b2';
-        ctx.lineWidth = 2;
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = it.type==='good' ? '#ffedb2' : '#e4e7ee';
-        ctx.font = `${Math.max(14, it.r)}px system-ui, "Noto Color Emoji", "Apple Color Emoji"`;
-        ctx.fillText(it.label, it.x, it.y+1);
-      }
-    }
-
-    function drawDragon() {
-      for (let i=0;i<dragon.trail.length;i++){
-        const p = dragon.trail[i];
-        const t = i / dragon.trail.length;
-        const r = 8 + t*22;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, r, 0, Math.PI*2);
-        ctx.fillStyle = `rgba(255,120,40,${0.05 + t*0.08})`;
-        ctx.fill();
-      }
-
+    // ========= 火龍繪製 =========
+    function drawDragon(ctx, head, dir) {
+      // 頭部
+      const nx = dir.x, ny = dir.y;
+      const angle = Math.atan2(ny, nx);
+      const headLen = 26;
       ctx.save();
-      ctx.translate(dragon.x, dragon.y);
-      const angle = Math.atan2(dragon.vy, dragon.vx);
+      ctx.translate(head.x, head.y);
       ctx.rotate(angle);
 
-      ctx.beginPath();
-      ctx.arc(0, 0, dragon.mouthRadius, 0, Math.PI*2);
-      ctx.fillStyle = '#f4c430';
-      ctx.fill();
-
-      ctx.fillStyle = '#3a1a0a';
-      ctx.beginPath(); ctx.arc(6, -6, 3, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(6,  6, 3, 0, Math.PI*2); ctx.fill();
-
-      ctx.strokeStyle = '#ffcf6e';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(-8, -16); ctx.lineTo(-16, -26); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-8,  16); ctx.lineTo(-16,  26); ctx.stroke();
-
-      const flame = Math.min(18, Math.hypot(dragon.vx, dragon.vy));
-      const grad = ctx.createLinearGradient(0,0,flame*2,0);
-      grad.addColorStop(0,'#ffda75');
-      grad.addColorStop(1,'#ff6a00');
+      // 火焰光暈
+      const grad = ctx.createRadialGradient(0, 0, 8, 0, 0, 60);
+      grad.addColorStop(0, 'rgba(255,200,80,0.9)');
+      grad.addColorStop(0.6, 'rgba(255,120,0,0.35)');
+      grad.addColorStop(1, 'rgba(255,0,0,0.05)');
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.moveTo(0, -10);
-      ctx.quadraticCurveTo(flame*1.2, 0, 0, 10);
+      ctx.arc(0, 0, 40, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 龍頭
+      ctx.fillStyle = '#ff3b30';
+      ctx.strokeStyle = '#ffee99';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-headLen, -12);
+      ctx.lineTo(-headLen - 6, 0);
+      ctx.lineTo(-headLen, 12);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
+
+      // 眼睛
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(-10, -6, 3, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-10,  6, 3, 0, Math.PI*2); ctx.fill();
+
+      // 身體（波浪）
+      ctx.strokeStyle = '#ff9f1c';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      for (let i = 1; i <= 12; i++) {
+        const t = i / 12;
+        const dx = -t * dragonLen;
+        const dy = Math.sin((performance.now()/200) + i) * 6;
+        ctx.lineTo(dx, dy);
+      }
+      ctx.stroke();
 
       ctx.restore();
     }
 
-    function drawFlash() {
-      if (flashAlpha > 0) {
-        ctx.fillStyle = hexToRgba(flashColor, flashAlpha);
-        ctx.fillRect(0,0,w,h);
-        flashAlpha *= 0.85;
-        if (flashAlpha < 0.02) flashAlpha = 0;
+    // ========= 碰撞與得分 =========
+    function circleHit(ax, ay, bx, by, r) {
+      const dx = ax - bx, dy = ay - by;
+      return (dx*dx + dy*dy) <= r*r;
+    }
+
+    function handleCollisions(head) {
+      for (let i = items.length - 1; i >= 0; i--) {
+        const it = items[i];
+        if (circleHit(head.x, head.y, it.x, it.y, 28)) {
+          if (it.isGood) {
+            combo++;
+            const bonus = 10 + Math.min(50, combo * 2);
+            score += bonus;
+            flash('+ ' + bonus, it.x, it.y, true);
+          } else {
+            combo = 0;
+            score -= 15;
+            flash('− 15', it.x, it.y, false);
+          }
+          items.splice(i, 1);
+          scoreEl.textContent = score;
+          comboEl.textContent = combo;
+        }
       }
     }
 
-    function hexToRgba(hex, a){
-      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      if (!m) return `rgba(255,255,255,${a})`;
-      return `rgba(${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)},${a})`;
+    const floatTexts = [];
+    function flash(text, x, y, ok) {
+      floatTexts.push({ text, x, y, ok, t: 0 });
     }
-
-    function renderFrame() {
-      resize();
-      ctx.clearRect(0,0,w,h);
-
-      // 已不需要在畫布上再鏡像，因為整個視覺層由 .mirror 做水平鏡像
-      drawBackground();
-      drawItems();
-      drawDragon();
-      drawFlash();
-    }
-
-    function loop() {
-      if (!running) { renderFrame(); return; }
-      raf = requestAnimationFrame(loop);
-      step();
-      renderFrame();
-    }
-
-    function step() {
-      const target = detectControlPoint();
-      if (dragon.trail.length === 0) {
-        dragon.x = target ? target.x : w*0.5;
-        dragon.y = target ? target.y : h*0.6;
+    function drawFloatTexts(dt) {
+      for (let i = floatTexts.length - 1; i >= 0; i--) {
+        const f = floatTexts[i];
+        f.t += dt;
+        const alpha = Math.max(0, 1 - f.t / 1.2);
+        const dy = -f.t * 40;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = '800 22px system-ui';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = f.ok ? '#22c55e' : '#f97316';
+        ctx.fillText(f.text, f.x, f.y + dy);
+        ctx.restore();
+        if (alpha <= 0.01) floatTexts.splice(i, 1);
       }
-      updateDragon(target);
-      moveItems();
-      checkCollisions();
     }
 
-    // Wire UI
-    const hintEl = document.querySelector('.hint');
-    startBtn.addEventListener('click', startGame);
-    resetBtn.addEventListener('click', resetGame);
-    retryBtn?.addEventListener('click', initCamera);
-    sensitivityEl.addEventListener('input', ()=>{ toast('已調整靈敏度', 700); });
-    targetCountEl.addEventListener('input', ()=>{ spawnItems(); });
-    durationEl.addEventListener('input', ()=>{
-      timeLeft = parseInt(durationEl.value,10);
+    // ========= 主循環 =========
+    let lastTime = performance.now();
+
+    function tick(now) {
+      const dt = Math.min(0.033, (now - lastTime) / 1000);
+      lastTime = now;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // 追蹤紅色標的
+      const c = trackRedCentroid();
+      if (c) {
+        lastCentroid.x = centroid.x || c.x;
+        lastCentroid.y = centroid.y || c.y;
+        centroid.x = centroid.x + (c.x - centroid.x) * smoothing || c.x;
+        centroid.y = centroid.y + (c.y - centroid.y) * smoothing || c.y;
+
+        // 方向（單位）
+        const dx = centroid.x - lastCentroid.x;
+        const dy = centroid.y - lastCentroid.y;
+        const len = Math.hypot(dx, dy) || 1;
+        direction.x = dx / len;
+        direction.y = dy / len;
+
+        hintEl.textContent = '已偵測到紅色目標，盡情舞動！';
+        hintEl.className = 'hint ok';
+      } else {
+        // 無偵測，用上次方向，提示使用者
+        hintEl.textContent = '未偵測到紅色物件，請調整光線/色域或靠近鏡頭。';
+        hintEl.className = 'hint bad';
+      }
+
+      // 更新與繪製物件
+      updateItems(dt);
+      drawItems(ctx);
+
+      // 畫火龍（用 centroid 作為龍頭）
+      const head = { x: centroid.x || W/2, y: centroid.y || H/2 };
+      drawDragon(ctx, head, direction);
+
+      // 碰撞
+      handleCollisions(head);
+
+      // 飄字
+      drawFloatTexts(dt);
+
+      if (running && !gameOver) requestAnimationFrame(tick);
+    }
+
+    // ========= 遊戲控制 =========
+    function startGameLoop() {
+      if (running) return;
+      running = true; gameOver = false;
+      lastTime = performance.now();
+      ensureItems();
+      // 倒數計時
+      clearInterval(timerId);
+      timeLeft = 60;
       timeEl.textContent = timeLeft;
+      timerId = setInterval(() => {
+        timeLeft--;
+        timeEl.textContent = timeLeft;
+        if (timeLeft <= 0) {
+          clearInterval(timerId);
+          running = false; gameOver = true;
+          hintEl.textContent = `時間到！總分：${score}`;
+          hintEl.className = 'hint';
+        }
+      }, 1000);
+      requestAnimationFrame(tick);
+    }
+
+    async function startAll() {
+      try {
+        await initCamera();
+        // 若需要載入背景圖，這裡可設定 bgImg.src = '...';
+        startGameLoop();
+      } catch (err) {
+        console.error(err);
+        hintEl.textContent = '相機無法啟動，請確認權限與 HTTPS。';
+      }
+    }
+
+    startBtn.addEventListener('click', startAll);
+    resetBtn.addEventListener('click', () => {
+      score = 0; combo = 0; scoreEl.textContent = score; comboEl.textContent = combo;
+      items.length = 0; ensureItems();
+      centroid = { x: W/2, y: H/2 };
+      lastCentroid = { x: W/2, y: H/2 };
+      direction = { x: 1, y: 0 };
+      hintEl.textContent = '重置完成，按「開始」重新啟動相機。';
+      running = false; gameOver = false;
+      clearInterval(timerId);
     });
 
-    // Kick off
-    (async function(){
-      resize();
-      await initCamera();
-      renderFrame();
-      // 如果你打算直接用本次上傳的圖片，也可動態設置背景：
-      // document.getElementById('bgWrap').style.backgroundImage = "url('https://raw.githubusercontent.com/your-account/your-repo/main/assets/taikoo-fire-dragon-bg.jpg')";
-    })();
+    // 初始頭尾方向
+    centroid = { x: W/2, y: H/2 };
+    lastCentroid = { x: W/2 - 10, y: H/2 };
+    direction = { x: 1, y: 0 };
   </script>
 </body>
 </html>
