@@ -140,9 +140,9 @@
 
     // 尺寸改為細一半 + 左上微移對準
     const sprite = {
-      drawWidth: 180,
-      drawHeight: 180,
-      headAnchorX: 0.42 // 往左更多一點
+      drawWidth: 90,
+      drawHeight: 90,
+      headAnchorX: 0.15
     };
 
     // 文字目標
@@ -352,7 +352,7 @@
 
       // 左上移：加大 headAnchorX 與 headOffsetY 的偏移
       const headOffsetX = -imgW * sprite.headAnchorX; // 更向左
-      const headOffsetY = -imgH * 0.24;               // 更向上
+      const headOffsetY = -imgH ;               // 更向上
 
       ctx.translate(headOffsetX, headOffsetY);
 
