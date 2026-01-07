@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>大坑舞火龍 AR 小遊戲（竹龍版）</title>
+  <title>大坑舞火龍 AR 小遊戲（竹龍單張貼圖版）</title>
   <style>
     html, body {
       margin: 0; padding: 0;
@@ -127,7 +127,6 @@
 
     // 追蹤狀態
     let centroid = { x: 0, y: 0 };
-    let lastCentroid = { x: 0, y: 0 };
     let direction = { x: 1, y: 0 };
     let smoothing = 0.28;
 
@@ -135,17 +134,20 @@
     let useEnvironment = true;
     let mirrored = true;
 
-    // 竹龍參數
-    const dragon = {
-      length: 120,      // 龍身長度（畫面單位）
-      thickness: 14,    // 主體粗細
-      segments: 14,     // 竹節數
-      swayAmp: 7,       // 蛇行振幅
-      swayFreq: 220,    // 蛇行頻率（ms）
-      bambooColor: '#c8a76a', // 竹身主色
-      ringColor: '#a07b3f',   // 節環深色
-      rimColor: '#f1d08a',    // 高光描邊
-      incenseCount: 26  // 香束火點密度
+    // ========= 單張竹龍貼圖 =========
+    // 請把路徑換成你的貼圖，例如 'images/bamboo-dragon.png'
+    const dragonImg = new Image();
+    dragonImg.src = 'image_2.png';
+    let dragonImgReady = false;
+    dragonImg.onload = () => { dragonImgReady = true; };
+
+    // 可調參數：繪製大小與擺動
+    const sprite = {
+      drawWidth: 300,   // 繪製寬度（畫面像素）
+      drawHeight: 96,   // 繪製高度（畫面像素）
+      headAnchorX: 0.15,// 頭部相對寬度的對齊點（0=最左; 1=最右）
+      swayAmp: 6,       // 垂直擺動幅度（像素）
+      swayFreqMs: 300   // 擺動頻率（毫秒）
     };
 
     // 目標物件
@@ -314,7 +316,7 @@
           life: 0.45 + Math.random()*0.35,
           age: 0,
           size: 2 + Math.random()*2.5,
-          hue: 20 + Math.random()*20   // 橙紅 20~40
+          hue: 20 + Math.random()*20
         });
       }
     }
@@ -342,122 +344,32 @@
       }
     }
 
-    // ========= 竹龍繪製 =========
-    function drawBambooSegment(ctx, x0, y0, x1, y1, radius, isRing=false) {
-      const dx = x1 - x0, dy = y1 - y0;
-      const angle = Math.atan2(dy, dx);
-      const len = Math.hypot(dx, dy);
-      ctx.save();
-      ctx.translate(x0, y0);
-      ctx.rotate(angle);
-      // 主體
-      ctx.fillStyle = dragon.bambooColor;
-      ctx.strokeStyle = dragon.rimColor;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(0, -radius, len, radius*2, radius);
-      ctx.fill();
-      ctx.stroke();
+    // ========= 單張貼圖繪製的竹龍 =========
+    function drawDragon(ctx, head, dir) {
+      if (!dragonImgReady) return;
 
-      // 節環（凸起）
-      if (isRing) {
-        ctx.fillStyle = dragon.ringColor;
-        ctx.beginPath();
-        ctx.roundRect(len-2.5, -radius*1.1, 5, radius*2.2, 2);
-        ctx.fill();
-      }
+      const baseAngle = Math.atan2(dir.y, dir.x);
+      const sway = Math.sin(performance.now() / sprite.swayFreqMs) * sprite.swayAmp;
 
-      // 竹節紋理（淡條紋）
-      ctx.globalAlpha = 0.25;
-      ctx.strokeStyle = '#6b5b3e';
-      ctx.lineWidth = 1;
-      for (let t=radius*0.4; t<=radius; t+=radius*0.3){
-        ctx.beginPath();
-        ctx.moveTo(3, -t);
-        ctx.lineTo(len-4, -t);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(3, t);
-        ctx.lineTo(len-4, t);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    }
+      const imgW = sprite.drawWidth;
+      const imgH = sprite.drawHeight;
 
-    function drawBambooHead(ctx, head, dir) {
-      const angle = Math.atan2(dir.y, dir.x);
       ctx.save();
       ctx.translate(head.x, head.y);
-      ctx.rotate(angle);
+      ctx.rotate(baseAngle);
 
-      // 竹編頭形（橢圓筐）
-      const w=34, h=22;
-      ctx.fillStyle = '#c8a76a';
-      ctx.strokeStyle = '#f1d08a';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, w*0.75, h*0.75, 0, 0, Math.PI*2);
-      ctx.fill();
-      ctx.stroke();
+      // 調整讓貼圖的「頭部」對準偵測點：
+      // 將畫筆移到頭部錨點（headAnchorX * 寬度），再回拉回來
+      const headOffsetX = -imgW * sprite.headAnchorX;
+      const headOffsetY = sway;
 
-      // 竹編交叉紋（簡化）
-      ctx.strokeStyle = 'rgba(160,123,63,0.9)';
-      ctx.lineWidth = 2;
-      for (let i=-2; i<=2; i++){
-        ctx.beginPath(); ctx.moveTo(-w*0.6, i*4); ctx.lineTo(w*0.6, -i*4); ctx.stroke();
-      }
-      for (let i=-2; i<=2; i++){
-        ctx.beginPath(); ctx.moveTo(-w*0.6, -i*4); ctx.lineTo(w*0.6, i*4); ctx.stroke();
-      }
+      ctx.translate(headOffsetX, headOffsetY);
+      ctx.drawImage(dragonImg, -imgW * 0.0, -imgH * 0.5, imgW, imgH);
 
-      // 口與鬚（細線）
-      ctx.strokeStyle = '#f5e3a3';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(w*0.3, 0); ctx.lineTo(w*0.55, 0); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(w*0.55, 0); ctx.quadraticCurveTo(w*0.7, -6, w*0.9, -2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(w*0.55, 0); ctx.quadraticCurveTo(w*0.7, 6, w*0.9, 2); ctx.stroke();
-
-      // 香束火點從頭部噴出
-      spawnIncenseParticles({x:0,y:0}, {x:1,y:0}, 10);
+      // 在頭部附近噴粒子（面向 +X 方向）
+      spawnIncenseParticles({ x: 0, y: 0 }, { x: 1, y: 0 }, 8);
 
       ctx.restore();
-    }
-
-    function drawDragon(ctx, head, dir) {
-      // 計算身體曲線（多段小線段串成，尾隨頭部方向）
-      const segs = dragon.segments;
-      const length = dragon.length;
-      const step = length / segs;
-      const baseAngle = Math.atan2(dir.y, dir.x);
-      const now = performance.now();
-
-      let prev = { x: head.x, y: head.y };
-      // 先畫頭
-      drawBambooHead(ctx, head, dir);
-
-      for (let i=1; i<=segs; i++){
-        const t = i / segs;
-        const dist = step;
-        // 在頭部方向的反向延伸，加入蛇行
-        const sway = Math.sin(now/dragon.swayFreq + i*0.8) * dragon.swayAmp * (0.6 + 0.4*(1-t));
-        const ang = baseAngle + Math.PI + sway * 0.01;
-        const nx = prev.x + Math.cos(ang) * dist;
-        const ny = prev.y + Math.sin(ang) * dist;
-
-        // 半徑隨距離略變細
-        const radius = dragon.thickness * (1 - t*0.35);
-
-        // 竹節：每段畫一節，並在節尾畫節環
-        drawBambooSegment(ctx, prev.x, prev.y, nx, ny, radius, true);
-
-        // 在身體上沿線撒少量香火粒子
-        if (i % 2 === 0) {
-          spawnIncenseParticles({ x: nx, y: ny }, { x: Math.cos(ang), y: Math.sin(ang) }, 2);
-        }
-
-        prev = { x: nx, y: ny };
-      }
     }
 
     // ========= 碰撞與得分 =========
@@ -468,7 +380,8 @@
     function handleCollisions(head) {
       for (let i=items.length-1; i>=0; i--){
         const it=items[i];
-        const radius = 24 + Math.min(10, it.size*0.2);
+        // 頭部半徑估算：用貼圖高度的一半加緩衝
+        const radius = Math.max(28, sprite.drawHeight * 0.4);
         if (circleHit(head.x, head.y, it.x, it.y, radius)){
           if (it.isGood){
             combo++;
