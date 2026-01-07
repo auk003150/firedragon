@@ -63,11 +63,29 @@
     }
     canvas.overlayCanvas{pointer-events:none}
 
-    /* Side panel (collapsible on mobile) */
+    /* Collapsible Side panel */
+    .sideWrap{
+      position:absolute;right:.5rem;top:.5rem;z-index:5;
+    }
+    .sideToggle{
+      position:absolute; right:0; top:0; transform:translateY(-110%);
+      display:inline-flex; align-items:center; gap:.4rem;
+      padding:.4rem .55rem; border-radius:.6rem;
+      border:1px solid #233452; background:#0f1d35cc; color:#e6eeff; backdrop-filter:blur(6px);
+      cursor:pointer; font-weight:700; font-size:.85rem;
+    }
+    .sideToggle .chev{display:inline-block; transition:.2s transform}
+    .sideWrap.closed .sideToggle .chev{transform:rotate(180deg)} /* flip when closed */
+
     .side{
-      position:absolute;right:.5rem;top:.5rem;display:flex;flex-direction:column;gap:.5rem;
-      width:min(92vw,340px);max-height:90vh;overflow:auto;padding:.5rem;
+      display:flex;flex-direction:column;gap:.5rem;
+      width:min(92vw,340px);max-height:80vh;overflow:auto;padding:.5rem;
       background:var(--panel);border:1px solid #233452;border-radius:.8rem;backdrop-filter:blur(6px);
+      transition: transform .25s ease, opacity .25s ease, visibility 0s linear .25s;
+    }
+    .sideWrap.closed .side{
+      transform:translateY(-8px) translateX(8px) scale(.98);
+      opacity:0; visibility:hidden; transition: transform .25s ease, opacity .25s ease, visibility 0s;
     }
     .side h3{margin:.2rem 0 .4rem;font-size:.95rem}
     .row{display:flex;gap:.5rem;flex-wrap:wrap}
@@ -127,6 +145,7 @@
         <div class="pill">時間：<strong id="time">60</strong>s</div>
         <button class="btn" id="startBtn">開始</button>
         <button class="btn" id="resetBtn" disabled>重設</button>
+        <button class="btn" id="togglePanelBtn" title="開關設定">設定</button>
       </div>
     </header>
 
@@ -148,23 +167,28 @@
         <!-- Clickable overlay UI (for interactions) -->
         <div class="uiOverlay"></div>
 
-        <!-- Side panel -->
-        <aside class="side">
-          <h3>遊戲設定</h3>
-          <div class="kv"><span>偵測模式</span><strong id="modeLabel">手持火龍（筷子）</strong></div>
-          <div class="kv"><span>靈敏度</span><input id="sensitivity" class="slider" type="range" min="0.2" max="2.0" step="0.1" value="1.0"></div>
-          <div class="kv"><span>物件數量</span><input id="targetCount" class="slider" type="range" min="3" max="12" step="1" value="7"></div>
-          <div class="kv"><span>遊戲時長</span><input id="duration" class="slider" type="range" min="30" max="120" step="10" value="60"></div>
-          <div class="legend"><span class="dot good"></span> 新年相關（+分）</div>
-          <div class="legend"><span class="dot bad"></span> 非新年（-分）</div>
-          <div class="row">
-            <span class="tag">恭喜發財</span>
-            <span class="tag">新年快樂</span>
-            <span class="tag">吉祥如意</span>
-            <span class="tag">利是逗來</span>
-          </div>
-          <p class="small">注意：此為瀏覽器原型，使用簡化的顏色追蹤來「跟住」你手上的火龍位置。實際產品可替換為先進的物件追蹤（如 MediaPipe/AR 模型）。</p>
-        </aside>
+        <!-- Side panel (collapsible) -->
+        <div id="sideWrap" class="sideWrap closed" aria-expanded="false">
+          <button id="floatingToggle" class="sideToggle" aria-label="開關遊戲設定">
+            遊戲設定 <span class="chev">▾</span>
+          </button>
+          <aside class="side" role="dialog" aria-label="遊戲設定">
+            <h3>遊戲設定</h3>
+            <div class="kv"><span>偵測模式</span><strong id="modeLabel">手持火龍（筷子）</strong></div>
+            <div class="kv"><span>靈敏度</span><input id="sensitivity" class="slider" type="range" min="0.2" max="2.0" step="0.1" value="1.0"></div>
+            <div class="kv"><span>物件數量</span><input id="targetCount" class="slider" type="range" min="3" max="12" step="1" value="7"></div>
+            <div class="kv"><span>遊戲時長</span><input id="duration" class="slider" type="range" min="30" max="120" step="10" value="60"></div>
+            <div class="legend"><span class="dot good"></span> 新年相關（+分）</div>
+            <div class="legend"><span class="dot bad"></span> 非新年（-分）</div>
+            <div class="row">
+              <span class="tag">恭喜發財</span>
+              <span class="tag">新年快樂</span>
+              <span class="tag">吉祥如意</span>
+              <span class="tag">利是逗來</span>
+            </div>
+            <p class="small">注意：此為瀏覽器原型，使用簡化的顏色追蹤來「跟住」你手上的火龍位置。實際產品可替換為先進的物件追蹤（如 MediaPipe/AR 模型）。</p>
+          </aside>
+        </div>
 
         <!-- Hint -->
         <div class="hint">提示：把手機後置鏡頭對準你手上用筷子拎住的火龍公仔，輕輕揮動來控制畫面內的火龍方向！</div>
@@ -191,10 +215,6 @@
 
   <script>
     // --- Simple AR-ish tracking via color threshold (prototype) ---
-    // Idea: Ask users to put a bright red sticker/tassel on the dragon head.
-    // We detect the largest red-ish blob, treat that as the control point.
-    // Production: replace with MediaPipe/ArUco/AprilTag or custom model.
-
     const video = document.getElementById('cam');
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d', { alpha: true });
@@ -207,6 +227,23 @@
     const sensitivityEl = document.getElementById('sensitivity');
     const targetCountEl = document.getElementById('targetCount');
     const durationEl = document.getElementById('duration');
+
+    // Panel controls
+    const sideWrap = document.getElementById('sideWrap');
+    const floatingToggle = document.getElementById('floatingToggle');
+    const togglePanelBtn = document.getElementById('togglePanelBtn');
+    function togglePanel(force){
+      const willClose = force !== undefined ? !force : sideWrap.classList.contains('closed') === false;
+      if (willClose) {
+        sideWrap.classList.add('closed');
+        sideWrap.setAttribute('aria-expanded','false');
+      } else {
+        sideWrap.classList.remove('closed');
+        sideWrap.setAttribute('aria-expanded','true');
+      }
+    }
+    floatingToggle.addEventListener('click', ()=>togglePanel());
+    togglePanelBtn.addEventListener('click', ()=>togglePanel());
 
     let stream = null;
     let raf = null;
@@ -239,16 +276,21 @@
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
-      w = canvas.width = Math.floor(rect.width);
-      h = canvas.height = Math.floor(rect.height);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = Math.floor(rect.width * dpr);
+      h = Math.floor(rect.height * dpr);
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
       detectCanvas.width = Math.floor(w/3);
       detectCanvas.height = Math.floor(h/3);
+      ctx.setTransform(dpr,0,0,dpr,0,0); // keep drawing scale consistent
     }
     window.addEventListener('resize', resize);
 
     async function initCamera() {
       try {
-        // Prefer environment (rear) camera
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: 'environment' },
@@ -319,6 +361,9 @@
       spawnItems();
       loop();
       countdown();
+      // 自動收起設定，避免遮擋
+      sideWrap.classList.add('closed');
+      sideWrap.setAttribute('aria-expanded','false');
     }
 
     function resetGame() {
@@ -366,22 +411,17 @@
     // Color detection: find largest red-ish area
     function detectControlPoint() {
       if (!video.videoWidth) return null;
-      // Draw downscaled video to detection canvas
       detectCtx.drawImage(video, 0, 0, detectCanvas.width, detectCanvas.height);
       const { data, width, height } = detectCtx.getImageData(0, 0, detectCanvas.width, detectCanvas.height);
 
-      // Threshold params (tunable)
-      // Looking for red tassel: high R, lower G/B
       const Rmin = 120, Gmax = 110, Bmax = 110;
       let bestScore = 0, sumX = 0, sumY = 0, count = 0;
 
-      // Accumulate centroid of red pixels
       for (let y=0; y<height; y++) {
         for (let x=0; x<width; x++) {
           const i = (y*width + x)*4;
           const r = data[i], g = data[i+1], b = data[i+2];
           if (r > Rmin && g < Gmax && b < Bmax && r > g + 30 && r > b + 30) {
-            // weight by redness
             const wgt = r - Math.max(g,b);
             bestScore += wgt;
             sumX += x * wgt;
@@ -390,37 +430,32 @@
           }
         }
       }
-      if (count < 50) return null; // not enough pixels
+      if (count < 50) return null;
 
       const cx = sumX / bestScore;
       const cy = sumY / bestScore;
 
-      // Map back to main canvas coordinates (remember video mirrored)
       const scaleX = w / detectCanvas.width;
       const scaleY = h / detectCanvas.height;
-      const x = (width - cx) * scaleX; // mirror horizontally
+      const x = (width - cx) * scaleX; // mirror
       const y = cy * scaleY;
       return { x, y };
     }
 
     function updateDragon(target) {
       const sens = parseFloat(sensitivityEl.value);
-      const damping = 0.85;
       const maxSpeed = 18 * sens;
 
       if (target) {
-        // Steering towards target control point
         const ax = (target.x - dragon.x) * 0.15 * sens;
         const ay = (target.y - dragon.y) * 0.15 * sens;
         dragon.vx = (dragon.vx + ax);
         dragon.vy = (dragon.vy + ay);
       } else {
-        // No target detected: slow down
         dragon.vx *= 0.95;
         dragon.vy *= 0.95;
       }
 
-      // Clamp speed
       const speed = Math.hypot(dragon.vx, dragon.vy);
       if (speed > maxSpeed) {
         dragon.vx = dragon.vx / speed * maxSpeed;
@@ -430,11 +465,9 @@
       dragon.x += dragon.vx;
       dragon.y += dragon.vy;
 
-      // keep in bounds
       dragon.x = Math.max(0, Math.min(w, dragon.x));
       dragon.y = Math.max(0, Math.min(h, dragon.y));
 
-      // Trail
       dragon.trail.push({ x: dragon.x, y: dragon.y });
       if (dragon.trail.length > dragon.maxTrail) dragon.trail.shift();
     }
@@ -468,14 +501,12 @@
         }
       }
 
-      // Respawn when few remain
       const aliveCount = items.filter(i=>i.alive).length;
       if (aliveCount <= 2 && running) {
         spawnItems();
       }
     }
 
-    // Simple screen flash
     let flashAlpha = 0;
     let flashColor = '#ffffff';
     function flash(color){
@@ -484,14 +515,12 @@
     }
 
     function drawBackground() {
-      // Stylized Tai Hang Fire Dragon trail background
       const g = ctx.createLinearGradient(0, 0, 0, h);
       g.addColorStop(0, 'rgba(12,16,28,0.7)');
       g.addColorStop(1, 'rgba(10,20,36,0.2)');
       ctx.fillStyle = g;
       ctx.fillRect(0,0,w,h);
 
-      // Festive confetti lines (subtle)
       for (let i=0;i<24;i++){
         ctx.strokeStyle = `rgba(244,196,48,${0.06 + Math.random()*0.04})`;
         ctx.lineWidth = 1;
@@ -508,7 +537,6 @@
       ctx.textBaseline = 'middle';
       for (const it of items) {
         if (!it.alive) continue;
-        // Background circle
         ctx.beginPath();
         ctx.arc(it.x, it.y, it.r, 0, Math.PI*2);
         ctx.fillStyle = it.type==='good' ? 'rgba(244,196,48,0.18)' : 'rgba(154,164,178,0.18)';
@@ -517,7 +545,6 @@
         ctx.fill();
         ctx.stroke();
 
-        // Label
         ctx.fillStyle = it.type==='good' ? '#ffedb2' : '#e4e7ee';
         ctx.font = `${Math.max(14, it.r)}px system-ui, "Noto Color Emoji", "Apple Color Emoji"`;
         ctx.fillText(it.label, it.x, it.y+1);
@@ -525,7 +552,6 @@
     }
 
     function drawDragon() {
-      // Trail "fire" effect
       for (let i=0;i<dragon.trail.length;i++){
         const p = dragon.trail[i];
         const t = i / dragon.trail.length;
@@ -536,30 +562,25 @@
         ctx.fill();
       }
 
-      // Dragon head (mouth)
       ctx.save();
       ctx.translate(dragon.x, dragon.y);
       const angle = Math.atan2(dragon.vy, dragon.vx);
       ctx.rotate(angle);
 
-      // head base
       ctx.beginPath();
       ctx.arc(0, 0, dragon.mouthRadius, 0, Math.PI*2);
       ctx.fillStyle = '#f4c430';
       ctx.fill();
 
-      // eyes
       ctx.fillStyle = '#3a1a0a';
       ctx.beginPath(); ctx.arc(6, -6, 3, 0, Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(6,  6, 3, 0, Math.PI*2); ctx.fill();
 
-      // horns
       ctx.strokeStyle = '#ffcf6e';
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(-8, -16); ctx.lineTo(-16, -26); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-8,  16); ctx.lineTo(-16,  26); ctx.stroke();
 
-      // mouth fire
       const flame = Math.min(18, Math.hypot(dragon.vx, dragon.vy));
       const grad = ctx.createLinearGradient(0,0,flame*2,0);
       grad.addColorStop(0,'#ffda75');
@@ -599,7 +620,6 @@
     function step() {
       const target = detectControlPoint();
       if (dragon.trail.length === 0) {
-        // initialize dragon near center to avoid big jumps
         dragon.x = target ? target.x : w*0.5;
         dragon.y = target ? target.y : h*0.6;
       }
