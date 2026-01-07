@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AR舞火龍 - 簡化版原型</title>
+  <style>
+    :root {
+      --bg: #0b0b10;
+      --fg: #f6e7c1;
+      --accent: #ff3b3b;
+      --good: #ffd166;
+      --bad: #6ecbff;
+      --muted: #8a8a99;
+    }
+    html, body {
+      margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--fg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans", "PingFang HK", "Microsoft JhengHei", Arial, sans-serif;
+    }
+    .wrap {
+      max-width: 960px; margin: 0 auto; padding: 12px 12px 24px; display: grid; gap: 12px;
+    }
+    header {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    }
+    h1 { font-size: 1.1rem; margin: 0; color: var(--fg); }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    button, select, input[type="range"], input[type="checkbox"], label {
+      font-size: 14px;
+    }
+    button {
+      background: #1f1f2a; border: 1px solid #2c2c3a; color: var(--fg);
+      padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    }
+    button:hover { border-color: #3d3d52; }
+    .row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .stage {
+      position: relative; background: #12121a; border: 1px solid #232331; border-radius: 10px; overflow: hidden;
+    }
+    canvas { display: block; width: 100%; height: auto; background: radial-gradient(1200px 500px at 50% 120%, #1a1a22, #0b0b10); }
+    .hud {
+      position: absolute; top: 8px; left: 8px; right: 8px; display: flex; justify-content: space-between; pointer-events: none;
+      text-shadow: 0 1px 2px #000;
+    }
+    .pill {
+      background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 4px 10px; margin-right: 8px;
+      display: inline-flex; align-items: center; gap: 8px; font-weight: 600;
+    }
+    .legend { display: flex; gap: 8px; align-items: center; }
+    .legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .status { display: flex; gap: 8px; }
+    .footnote { color: var(--muted); font-size: 12px; }
+    .hidden { display:none; }
+    .video-feed {
+      position: absolute; bottom: 8px; right: 8px; width: 160px; height: 120px; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; overflow: hidden; background: #000;
+    }
+    .video-feed canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+    .bar { height: 6px; background: #1c1c24; border-radius: 999px; overflow: hidden; border: 1px solid #2a2a36; }
+    .bar > div { height: 100%; background: linear-gradient(90deg, #ff7a7a, #ffd166); width: 0%; transition: width 0.2s linear; }
+    .tiny { font-size: 12px; color: var(--muted); }
+    details summary { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>AR舞火龍（簡化版原型）</h1>
+      <div class="controls">
+        <button id="btnStart">開始</button>
+        <button id="btnReset" disabled>重新開始</button>
+        <button id="btnCalib" title="把龍頭放在中央，點擊校準以記錄顏色">校準顏色</button>
+        <label><input type="checkbox" id="chkMirror" checked> 鏡像</label>
+        <label class="tiny">追蹤顏色容差 <input type="range" id="rngTol" min="5" max="40" value="15"></label>
+        <label class="tiny">最小面積 <input type="range" id="rngArea" min="50" max="5000" value="400"></label>
+      </div>
+    </header>
+
+    <div class="row">
+      <div class="stage">
+        <canvas id="game" width="960" height="540"></canvas>
+        <div class="hud">
+          <div>
+            <span class="pill">分數 <span id="score">0</span></span>
+            <span class="pill">連擊 <span id="combo">0</span></span>
+            <span class="pill">時間 <span id="time">60</span>s</span>
+          </div>
+          <div class="legend">
+            <span class="dot" style="background: var(--good)"></span><span class="tiny">可食（新年）</span>
+            <span class="dot" style="background: var(--bad)"></span><span class="tiny">不可食</span>
+            <span class="dot" style="background: var(--accent)"></span><span class="tiny">龍頭</span>
+          </div>
+        </div>
+        <div class="video-feed">
+          <canvas id="camView" width="160" height="120" title="相機畫面（小窗）"></canvas>
+        </div>
+      </div>
+      <div>
+        <div class="bar"><div id="progress"></div></div>
+        <p class="footnote">
+          提示：把龍公仔前端貼紅色貼紙。按「校準顏色」，讓我讀取中央區域的顏色。若追蹤不穩定，調整「容差」或「最小面積」，或改變光線。
+        </p>
+        <details>
+          <summary>技術說明（展開）</summary>
+          <ul class="tiny">
+            <li>Webcam → Canvas → 取樣 + HSV 閾值 → 最大連通區域中心 → 指數平滑 + 簡單預測。</li>
+            <li>碰撞：以龍頭圓半徑與物件中心距離判定。</li>
+            <li>物件：每2秒生成一批，帶簡單上下飄動。</li>
+          </ul>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Utility: Color space
+    function rgbToHsv(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r,g,b), min = Math.min(r,g,b);
+      const d = max - min;
+      let h = 0;
+      if (d !== 0) {
+        if (max === r) h = ((g - b) / d) % 6;
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+        h *= 60; if (h < 0) h += 360;
+      }
+      const s = max === 0 ? 0 : d / max;
+      const v = max;
+      return {h, s, v};
+    }
+
+    // --- DOM
+    const cvGame = document.getElementById('game');
+    const ctx = cvGame.getContext('2d');
+    const camView = document.getElementById('camView');
+    const camCtx = camView.getContext('2d', { willReadFrequently: true });
+
+    const btnStart = document.getElementById('btnStart');
+    const btnReset = document.getElementById('btnReset');
+    const btnCalib = document.getElementById('btnCalib');
+    const chkMirror = document.getElementById('chkMirror');
+    const rngTol = document.getElementById('rngTol');
+    const rngArea = document.getElementById('rngArea');
+    const elScore = document.getElementById('score');
+    const elCombo = document.getElementById('combo');
+    const elTime = document.getElementById('time');
+    const elProg = document.getElementById('progress');
+
+    // --- State
+    const state = {
+      running: false,
+      startedAt: 0,
+      duration: 60, // seconds
+      score: 0,
+      combo: 0,
+      lastHitTime: 0,
+      head: { x: cvGame.width/2, y: cvGame.height/2, r: 18, vx: 0, vy: 0 },
+      trail: [],
+      maxTrail: 24,
+      targets: [],
+      nextSpawnAt: 0,
+      video: null,
+      stream: null,
+      // tracking
+      calibHSV: { h: 0, s: 1, v: 1 },
+      tol: Number(rngTol.value), // hue tolerance
+      minArea: Number(rngArea.value),
+      mirror: chkMirror.checked,
+      tmpCanvas: document.createElement('canvas'),
+      tmpCtx: null,
+    };
+
+    state.tmpCanvas.width = 320;
+    state.tmpCanvas.height = 180;
+    state.tmpCtx = state.tmpCanvas.getContext('2d', { willReadFrequently: true });
+
+    // --- Camera
+    async function initCamera() {
+      if (state.stream) return;
+      const constraints = { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }, audio: false };
+      state.stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const video = document.createElement('video');
+      video.srcObject = state.stream;
+      await video.play();
+      state.video = video;
+    }
+
+    // --- Spawn targets
+    function spawnBatch() {
+      const W = cvGame.width, H = cvGame.height;
+      const batch = [];
+      const n = 4; // total items
+      for (let i=0; i<n; i++) {
+        const good = Math.random() < 0.65; // 65% are "good"
+        batch.push({
+          id: crypto.randomUUID(),
+          x: Math.random() * (W - 120) + 60,
+          y: Math.random() * (H - 160) + 80,
+          r: good ? 20 : 22,
+          good,
+          t0: performance.now(),
+          vx: (Math.random() - 0.5) * 0.4,
+          phase: Math.random() * Math.PI * 2,
+          eaten: false,
+          label: good ? pickGoodLabel() : pickBadLabel(),
+        });
+      }
+      state.targets.push(...batch);
+    }
+
+    const GOOD_LABELS = ["福", "春", "步步高升", "恭喜發財", "年桔", "利是", "龍"];
+    const BAD_LABELS = ["雪糕", "足球", "電鑽", "披薩", "番茄", "膠樽"];
+    function pickGoodLabel(){ return GOOD_LABELS[(Math.random()*GOOD_LABELS.length)|0]; }
+    function pickBadLabel(){ return BAD_LABELS[(Math.random()*BAD_LABELS.length)|0]; }
+
+    // --- Tracking: read frame, find largest blob around calibrated HSV
+    function trackHead(dt) {
+      const video = state.video; if (!video) return null;
+      const tctx = state.tmpCtx, tcv = state.tmpCanvas;
+      // draw video into temp canvas
+      tctx.save();
+      tctx.scale(state.mirror ? -1 : 1, 1);
+      tctx.drawImage(video, state.mirror ? -tcv.width : 0, 0, tcv.width, tcv.height);
+      tctx.restore();
+
+      // also paint to small preview
+      camCtx.save();
+      camCtx.scale(-1,1);
+      camCtx.drawImage(video, -camView.width, 0, camView.width, camView.height);
+      camCtx.restore();
+
+      const img = tctx.getImageData(0,0,tcv.width, tcv.height);
+      const data = img.data;
+
+      const targetH = state.calibHSV.h;
+      const tolH = state.tol; // degrees
+      const minArea = state.minArea;
+
+      // threshold
+      const mask = new Uint8Array(tcv.width * tcv.height);
+      for (let i=0, p=0; i<data.length; i+=4, p++) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        const {h, s, v} = rgbToHsv(r,g,b);
+        // handle red wrap-around around 0/360
+        let dh = Math.abs(h - targetH);
+        dh = Math.min(dh, 360 - dh);
+        const pass = (dh <= tolH) && (s >= 0.35) && (v >= 0.25);
+        mask[p] = pass ? 1 : 0;
+      }
+
+      // find largest blob's centroid and area using a simple scan + bounding moments
+      let sumX=0, sumY=0, count=0;
+      const w = tcv.width, h = tcv.height;
+      for (let y=0, p=0; y<h; y++) {
+        for (let x=0; x<w; x++, p++) {
+          if (mask[p]) { sumX += x; sumY += y; count++; }
+        }
+      }
+      if (count < minArea) return null;
+
+      const cx = sumX / count;
+      const cy = sumY / count;
+
+      // map to game canvas coordinates
+      const gx = (cx / w) * cvGame.width;
+      const gy = (cy / h) * cvGame.height;
+      return { x: gx, y: gy, area: count };
+    }
+
+    // --- Calibrate HSV from center patch of current frame
+    function calibrate() {
+      const tctx = state.tmpCtx, tcv = state.tmpCanvas;
+      if (!state.video) return;
+      tctx.drawImage(state.video, 0, 0, tcv.width, tcv.height);
+      const cx = (tcv.width/2)|0, cy = (tcv.height/2)|0, rad = 12;
+      const img = tctx.getImageData(cx-rad, cy-rad, rad*2, rad*2);
+      let R=0,G=0,B=0,n=0;
+      for (let i=0; i<img.data.length; i+=4) {
+        R+=img.data[i]; G+=img.data[i+1]; B+=img.data[i+2]; n++;
+      }
+      R/=n; G/=n; B/=n;
+      const hsv = rgbToHsv(R,G,B);
+      state.calibHSV = hsv;
+      flashCalibPreview(hsv);
+    }
+
+    function flashCalibPreview(hsv){
+      // draw a small ring on camView to hint calibration region
+      camCtx.save();
+      camCtx.strokeStyle = 'rgba(255,255,255,0.9)';
+      camCtx.lineWidth = 2;
+      camCtx.beginPath();
+      camCtx.arc(camView.width/2, camView.height/2, 18, 0, Math.PI*2);
+      camCtx.stroke();
+      camCtx.restore();
+    }
+
+    // --- Game Loop
+    let rafId = 0, lastT = 0;
+    function loop(t) {
+      rafId = requestAnimationFrame(loop);
+      if (!lastT) lastT = t;
+      const dt = Math.min(0.033, (t - lastT) / 1000); // seconds
+      lastT = t;
+
+      update(dt, t);
+      render(t);
+    }
+
+    function update(dt, now) {
+      // read UI values
+      state.tol = Number(rngTol.value);
+      state.minArea = Number(rngArea.value);
+      state.mirror = chkMirror.checked;
+
+      // timer
+      if (state.running) {
+        const elapsed = (performance.now() - state.startedAt)/1000;
+        const remain = Math.max(0, state.duration - elapsed);
+        elTime.textContent = remain.toFixed(0);
+        const pct = (elapsed / state.duration) * 100;
+        elProg.style.width = Math.min(100, Math.max(0, pct)) + '%';
+        if (remain <= 0) {
+          state.running = false;
+          btnReset.disabled = false;
+        }
+      }
+
+      // spawn
+      if (state.running && performance.now() >= state.nextSpawnAt) {
+        spawnBatch();
+        state.nextSpawnAt = performance.now() + 2000 + Math.random()*500;
+      }
+
+      // tracking
+      const pt = trackHead(dt);
+      const head = state.head;
+
+      // motion smoothing + light prediction
+      if (pt) {
+        const alpha = 0.35; // smoothing
+        const px = head.x, py = head.y;
+        head.x = px + (pt.x - px) * alpha;
+        head.y = py + (pt.y - py) * alpha;
+        // velocity estimate
+        head.vx = (head.x - px) / dt;
+        head.vy = (head.y - py) / dt;
+        // small forward prediction
+        head.x += head.vx * 0.02;
+        head.y += head.vy * 0.02;
+      } else {
+        // decay velocity when lost
+        head.vx *= 0.9; head.vy *= 0.9;
+        head.x = Math.max(0, Math.min(cvGame.width, head.x + head.vx * dt));
+        head.y = Math.max(0, Math.min(cvGame.height, head.y + head.vy * dt));
+      }
+
+      // clamp
+      head.x = Math.max(0, Math.min(cvGame.width, head.x));
+      head.y = Math.max(0, Math.min(cvGame.height, head.y));
+
+      // trail
+      state.trail.push({x: head.x, y: head.y});
+      if (state.trail.length > state.maxTrail) state.trail.shift();
+
+      // targets move and collisions
+      for (const it of state.targets) {
+        const age = (now - it.t0) / 1000;
+        it.y += Math.sin(age*2 + it.phase) * 0.3;
+        it.x += it.vx;
+      }
+
+      if (state.running) checkCollisions();
+      pruneTargets();
+    }
+
+    function checkCollisions() {
+      const head = state.head;
+      for (const it of state.targets) {
+        if (it.eaten) continue;
+        const dx = it.x - head.x, dy = it.y - head.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < head.r + it.r) {
+          it.eaten = true;
+          if (it.good) {
+            state.combo = Math.min(999, state.combo + 1);
+            let gain = 10;
+            if (state.combo >= 3) gain += 5;
+            if (state.combo >= 6) gain += 10;
+            state.score += gain;
+            pulseHUD(true);
+          } else {
+            state.combo = 0;
+            state.score = Math.max(0, state.score - 10);
+            pulseHUD(false);
+          }
+          elScore.textContent = state.score.toString();
+          elCombo.textContent = state.combo.toString();
+          state.lastHitTime = performance.now();
+        }
+      }
+    }
+
+    function pruneTargets() {
+      // remove eaten or out-of-bounds old items
+      state.targets = state.targets.filter(it => {
+        const inside = it.x > -50 && it.x < cvGame.width + 50 && it.y > -50 && it.y < cvGame.height + 50;
+        return !it.eaten && inside;
+      });
+    }
+
+    // --- Render
+    function render(now) {
+      const W = cvGame.width, H = cvGame.height;
+      ctx.clearRect(0,0,W,H);
+
+      // subtle festive background overlay
+      drawFestiveBackdrop(ctx, W, H);
+
+      // targets
+      for (const it of state.targets) {
+        ctx.save();
+        ctx.translate(it.x, it.y);
+        // bubble
+        ctx.fillStyle = it.good ? 'rgba(255,209,102,0.95)' : 'rgba(110,203,255,0.95)';
+        ctx.beginPath();
+        ctx.arc(0,0,it.r,0,Math.PI*2);
+        ctx.fill();
+        // label
+        ctx.fillStyle = '#1a1a22';
+        ctx.font = 'bold 14px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(it.label, 0, 0);
+        ctx.restore();
+      }
+
+      // trail (fire-like)
+      for (let i = state.trail.length - 1; i >= 1; i--) {
+        const p = state.trail[i], q = state.trail[i-1];
+        const t = i / state.trail.length;
+        const rr = 6 + t * 18;
+        const g = Math.floor(120 + 120 * t);
+        ctx.strokeStyle = `rgba(255,${g},80,${0.35*t})`;
+        ctx.lineWidth = rr * 0.35;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+        ctx.stroke();
+      }
+
+      // head
+      const head = state.head;
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,100,0,0.6)';
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = 'rgba(255,60,60,1)';
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, head.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+
+      // hit pulse
+      const pulseAge = (performance.now() - state.lastHitTime) / 1000;
+      if (pulseAge < 0.2) {
+        ctx.save();
+        ctx.globalAlpha = 1 - pulseAge / 0.2;
+        ctx.strokeStyle = '#ffd166';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, head.r + 10, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // if stopped, overlay result
+      if (!state.running) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0,0,W,H);
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 28px system-ui';
+        ctx.fillText('遊戲結束', W/2, H/2 - 16);
+        ctx.font = 'bold 20px system-ui';
+        ctx.fillText(`分數：${state.score}  連擊：${state.combo}`, W/2, H/2 + 16);
+        ctx.restore();
+      }
+    }
+
+    function drawFestiveBackdrop(ctx, W, H) {
+      // gradients
+      const g = ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0, 'rgba(255, 80, 80, 0.06)');
+      g.addColorStop(1, 'rgba(255, 200, 80, 0.02)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0,0,W,H);
+      // lantern dots
+      for (let i=0;i<12;i++){
+        const x = (i+0.5) * (W/12);
+        const y = 60 + Math.sin((performance.now()/1000)+(i*0.5))*4;
+        ctx.fillStyle = 'rgba(255, 80, 80, 0.35)';
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // --- HUD pulse
+    function pulseHUD(good) {
+      const el = good ? elScore : elCombo;
+      el.style.transform = 'scale(1.2)';
+      el.style.transition = 'transform 0.15s';
+      setTimeout(()=>{ el.style.transform=''; }, 160);
+      // flash progress bar briefly
+      elProg.parentElement.style.boxShadow = good ? '0 0 0 2px rgba(255,209,102,0.5) inset' : '0 0 0 2px rgba(110,203,255,0.5) inset';
+      setTimeout(()=>{ elProg.parentElement.style.boxShadow=''; }, 220);
+    }
+
+    // --- Controls
+    btnStart.addEventListener('click', async () => {
+      btnStart.disabled = true;
+      try {
+        await initCamera();
+      } catch (e) {
+        alert('無法開啟攝像頭：' + e.message);
+        btnStart.disabled = false;
+        return;
+      }
+      startGame();
+      if (!rafId) loop(0);
+    });
+
+    btnReset.addEventListener('click', () => {
+      startGame();
+    });
+
+    btnCalib.addEventListener('click', () => {
+      calibrate();
+    });
+
+    function startGame() {
+      state.running = true;
+      state.startedAt = performance.now();
+      state.score = 0; state.combo = 0;
+      elScore.textContent = '0'; elCombo.textContent = '0';
+      elTime.textContent = state.duration.toString();
+      state.targets = [];
+      state.trail = [];
+      state.nextSpawnAt = performance.now() + 500;
+      btnReset.disabled = true;
+    }
+
+    // kick loop for render even before camera ready
+    loop(0);
+
+    // Tidy up on unload
+    window.addEventListener('beforeunload', () => {
+      if (state.stream) state.stream.getTracks().forEach(t => t.stop());
+      cancelAnimationFrame(rafId);
+    });
+  </script>
+</body>
+</html>
