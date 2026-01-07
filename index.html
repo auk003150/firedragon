@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>大坑舞火龍 AR 小遊戲（單張貼圖・旋轉無擺動）</title>
+  <title>大坑舞火龍 AR 小遊戲（單張貼圖・無旋轉）</title>
   <style>
     html, body {
       margin: 0; padding: 0;
@@ -19,7 +19,7 @@
       position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
       transform: scaleX(-1); background: #000;
     }
-    img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0.2; mix-blend-mode: lighten; }
+    img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0.25; mix-blend-mode: lighten; }
     canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
     .ui {
       position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; justify-content: space-between;
@@ -50,7 +50,7 @@
 <body>
   <div class="wrap">
     <video id="cam" playsinline muted autoplay></video>
-    <img id="bg" alt="背景" src="" />
+    <img id="bg" alt="背景" src="image_1.png" />
     <canvas id="game"></canvas>
 
     <div class="ui">
@@ -132,21 +132,20 @@
     let useEnvironment = true;
     let mirrored = true;
 
-    // ========= 單張貼圖（使用你上傳的圖）=========
+    // ========= 單張貼圖（無旋轉）=========
     const dragonImg = new Image();
-    // 請換成你的實際路徑或檔名
     dragonImg.src = 'image_2.png';
     let dragonImgReady = false;
     dragonImg.onload = () => { dragonImgReady = true; };
 
-    // 正方形貼圖建議值：尺寸與錨點
+    // 建議的尺寸與錨點
     const sprite = {
       drawWidth: 360,
       drawHeight: 360,
       headAnchorX: 0.32
     };
 
-    // 目標物件
+    // 文字目標
     const goodList = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
     const badList  = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
     const items = [];
@@ -257,7 +256,7 @@
       return { x: cx, y: cy, count };
     }
 
-    // ========= 物件 =========
+    // ========= 目標物件 =========
     function spawnItem() {
       const isGood = Math.random() < 0.6;
       const text = isGood ? goodList[Math.floor(Math.random()*goodList.length)] : badList[Math.floor(Math.random()*badList.length)];
@@ -298,7 +297,7 @@
       }
     }
 
-    // ========= 粒子（香束火點）=========
+    // ========= 粒子效果 =========
     function spawnIncenseParticles(pos, dir, count=6) {
       for (let i=0; i<count; i++){
         const angle = Math.atan2(dir.y, dir.x) + (Math.random()*0.8 - 0.4);
@@ -340,17 +339,16 @@
       }
     }
 
-    // ========= 單張貼圖繪製（有旋轉、無擺動）=========
-    function drawDragon(ctx, head, dir) {
+    // ========= 單張貼圖繪製（無旋轉）=========
+    function drawDragon(ctx, head) {
       if (!dragonImgReady) return;
 
-      const angle = Math.atan2(dir.y, dir.x);
       const imgW = sprite.drawWidth;
       const imgH = sprite.drawHeight;
 
       ctx.save();
+      // 直接貼在頭部位置，無旋轉
       ctx.translate(head.x, head.y);
-      ctx.rotate(angle);
 
       // 水平對齊到龍頭
       const headOffsetX = -imgW * sprite.headAnchorX;
@@ -358,10 +356,10 @@
       const headOffsetY = -imgH * 0.12;
 
       ctx.translate(headOffsetX, headOffsetY);
-      // 注意：這張圖含背景，會整張一起移動；若用去背 PNG 視覺更佳
+      // 注意：此圖含背景，會整張一起移動；若用去背 PNG 視覺更佳
       ctx.drawImage(dragonImg, 0, -imgH * 0.5, imgW, imgH);
 
-      // 粒子方向與貼圖朝向一致
+      // 粒子往右噴灑
       spawnIncenseParticles({ x: 0, y: 0 }, { x: 1, y: 0 }, 8);
 
       ctx.restore();
@@ -422,12 +420,10 @@
 
       const c = trackRedCentroid();
       if (c) {
-        const prevX = centroid.x || c.x, prevY = centroid.y || c.y;
         centroid.x = centroid.x + (c.x - centroid.x) * smoothing || c.x;
         centroid.y = centroid.y + (c.y - centroid.y) * smoothing || c.y;
-        const dx = centroid.x - prevX, dy = centroid.y - prevY;
-        const len = Math.hypot(dx, dy) || 1;
-        direction.x = dx / len; direction.y = dy / len;
+        // 方向僅用於粒子效果，固定朝右
+        direction.x = 1; direction.y = 0;
         hintEl.textContent = '已偵測到紅色目標，盡情舞動！'; hintEl.className = 'hint ok';
       } else {
         hintEl.textContent = '未偵測到紅色物件，請調整光線/色域或靠近鏡頭。'; hintEl.className = 'hint bad';
@@ -437,7 +433,7 @@
       drawItems(ctx);
 
       const head = { x: centroid.x || W/2, y: centroid.y || H/2 };
-      drawDragon(ctx, head, direction);
+      drawDragon(ctx, head);
 
       updateParticles(dt);
       drawParticles(ctx);
@@ -497,6 +493,7 @@
       await stopStream();
     });
 
+    function applyMirror() { video.style.transform = mirrored ? 'scaleX(-1)' : 'none'; }
     toggleFacingBtn.addEventListener('click', async () => { useEnvironment = !useEnvironment; await initCamera(); });
     toggleMirrorBtn.addEventListener('click', () => { mirrored = !mirrored; applyMirror(); toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`; });
     fullscreenBtn.addEventListener('click', () => {
@@ -508,8 +505,6 @@
     // 初始
     centroid = { x: W/2, y: H/2 };
     direction = { x: 1, y: 0 };
-
-    bgImg.src = 'image_1.png';
   </script>
 </body>
 </html>
