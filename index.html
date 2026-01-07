@@ -17,7 +17,8 @@
     .wrap { position: relative; width: 100%; height: 100%; background: #000; }
     video#cam {
       position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-      transform: scaleX(-1); background: #000;
+      /* 預設鏡像關閉 */
+      transform: none; background: #000;
     }
     img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0.25; mix-blend-mode: lighten; }
     canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
@@ -62,7 +63,7 @@
       </div>
       <div class="top-right">
         <button id="toggleFacing" class="mini">切換鏡頭</button>
-        <button id="toggleMirror" class="mini">鏡像：開</button>
+        <button id="toggleMirror" class="mini">鏡像：關</button>
         <button id="fullscreenBtn" class="mini">全屏</button>
         <button id="resetBtn" class="btn secondary">重置</button>
       </div>
@@ -130,7 +131,8 @@
     let smoothing = 0.28;
 
     let useEnvironment = true;
-    let mirrored = true;
+    // 鏡像預設關閉
+    let mirrored = false;
 
     // ========= 單張貼圖（無旋轉）=========
     const dragonImg = new Image();
@@ -138,11 +140,16 @@
     let dragonImgReady = false;
     dragonImg.onload = () => { dragonImgReady = true; };
 
-    // 尺寸改為細一半 + 左上微移對準
+    // 尺寸細一半（你目前 90×90）+ 左上對準（以錨點控制）
     const sprite = {
       drawWidth: 90,
       drawHeight: 90,
-      headAnchorX: 0.15
+      // 錨點：頭部在貼圖中的相對位置（0=左/上，1=右/下）
+      headAnchorX: 0.6, // 調大會把整體往左移（因為 translate 時是 -imgW*anchorX）
+      headAnchorY: 0.6, // 調大會把整體往上移（因為 translate 時是 -imgH*anchorY）
+      // 微調：X 用像素，Y 用高度比例，方便向上微移
+      fineOffsetX: 0,     // 如需再向左，可設為 -6 等
+      fineOffsetY: -0.1   // -0.1 代表再向上 10% 高度
     };
 
     // 文字目標
@@ -211,7 +218,12 @@
       hintEl.className = 'hint bad';
       return false;
     }
-    function applyMirror() { video.style.transform = mirrored ? 'scaleX(-1)' : 'none'; }
+
+    // 注意：此處覆蓋上方的 applyMirror，並確保按鈕文字也同步
+    function applyMirror() {
+      video.style.transform = mirrored ? 'scaleX(-1)' : 'none';
+      toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`;
+    }
 
     // ========= 顏色追蹤 =========
     const workCanvas = document.createElement('canvas');
@@ -350,13 +362,12 @@
       // 以頭部中心為參考，無旋轉
       ctx.translate(head.x, head.y);
 
-      // 左上移：加大 headAnchorX 與 headOffsetY 的偏移
-      const headOffsetX = -imgW; // 更向左
-      const headOffsetY = -imgH;               // 更向上
-
+      // 使用錨點與微調計算偏移（左上對準）
+      const headOffsetX = -imgW * sprite.headAnchorX + (sprite.fineOffsetX || 0);
+      const headOffsetY = -imgH * sprite.headAnchorY + (sprite.fineOffsetY ? sprite.fineOffsetY * imgH : 0);
       ctx.translate(headOffsetX, headOffsetY);
 
-      // 圖片基準從垂直中心往上 50%（讓圖在頭部上下平均分佈）
+      // 使圖片在本地座標中稍微上提，讓圖在頭點上下更均衡
       ctx.drawImage(dragonImg, 0, -imgH * 0.5, imgW, imgH);
 
       // 粒子依舊向右噴灑
@@ -373,7 +384,7 @@
     function handleCollisions(head) {
       for (let i=items.length-1; i>=0; i--){
         const it=items[i];
-        // 因貼圖縮小，碰撞半徑也稍減
+        // 貼圖縮小後，若命中覺得變難，可把 0.35 調到 0.45
         const radius = Math.max(24, sprite.drawHeight * 0.35);
         if (circleHit(head.x, head.y, it.x, it.y, radius)){
           if (it.isGood){
@@ -493,9 +504,8 @@
       await stopStream();
     });
 
-    function applyMirror() { video.style.transform = mirrored ? 'scaleX(-1)' : 'none'; }
     toggleFacingBtn.addEventListener('click', async () => { useEnvironment = !useEnvironment; await initCamera(); });
-    toggleMirrorBtn.addEventListener('click', () => { mirrored = !mirrored; applyMirror(); toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`; });
+    toggleMirrorBtn.addEventListener('click', () => { mirrored = !mirrored; applyMirror(); });
     fullscreenBtn.addEventListener('click', () => {
       const el = document.documentElement;
       if (!document.fullscreenElement) { (el.requestFullscreen && el.requestFullscreen()) || (el.webkitRequestFullscreen && el.webkitRequestFullscreen()); }
