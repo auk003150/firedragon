@@ -138,11 +138,11 @@
     let dragonImgReady = false;
     dragonImg.onload = () => { dragonImgReady = true; };
 
-    // 建議的尺寸與錨點
+    // 尺寸改為細一半 + 左上微移對準
     const sprite = {
-      drawWidth: 360,
-      drawHeight: 360,
-      headAnchorX: 0.32
+      drawWidth: 180,
+      drawHeight: 180,
+      headAnchorX: 0.42 // 往左更多一點
     };
 
     // 文字目標
@@ -347,19 +347,19 @@
       const imgH = sprite.drawHeight;
 
       ctx.save();
-      // 直接貼在頭部位置，無旋轉
+      // 以頭部中心為參考，無旋轉
       ctx.translate(head.x, head.y);
 
-      // 水平對齊到龍頭
-      const headOffsetX = -imgW * sprite.headAnchorX;
-      // 垂直微調：此圖龍頭略高於中心，往上移 12% 高度
-      const headOffsetY = -imgH * 0.12;
+      // 左上移：加大 headAnchorX 與 headOffsetY 的偏移
+      const headOffsetX = -imgW * sprite.headAnchorX; // 更向左
+      const headOffsetY = -imgH * 0.24;               // 更向上
 
       ctx.translate(headOffsetX, headOffsetY);
-      // 注意：此圖含背景，會整張一起移動；若用去背 PNG 視覺更佳
+
+      // 圖片基準從垂直中心往上 50%（讓圖在頭部上下平均分佈）
       ctx.drawImage(dragonImg, 0, -imgH * 0.5, imgW, imgH);
 
-      // 粒子往右噴灑
+      // 粒子依舊向右噴灑
       spawnIncenseParticles({ x: 0, y: 0 }, { x: 1, y: 0 }, 8);
 
       ctx.restore();
@@ -373,7 +373,8 @@
     function handleCollisions(head) {
       for (let i=items.length-1; i>=0; i--){
         const it=items[i];
-        const radius = Math.max(28, sprite.drawHeight * 0.4);
+        // 因貼圖縮小，碰撞半徑也稍減
+        const radius = Math.max(24, sprite.drawHeight * 0.35);
         if (circleHit(head.x, head.y, it.x, it.y, radius)){
           if (it.isGood){
             combo++;
@@ -422,7 +423,6 @@
       if (c) {
         centroid.x = centroid.x + (c.x - centroid.x) * smoothing || c.x;
         centroid.y = centroid.y + (c.y - centroid.y) * smoothing || c.y;
-        // 方向僅用於粒子效果，固定朝右
         direction.x = 1; direction.y = 0;
         hintEl.textContent = '已偵測到紅色目標，盡情舞動！'; hintEl.className = 'hint ok';
       } else {
