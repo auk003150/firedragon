@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>大坑舞火龍 AR 小遊戲（竹龍單張貼圖版）</title>
+  <title>大坑舞火龍 AR 小遊戲（單張貼圖・旋轉無擺動）</title>
   <style>
     html, body {
       margin: 0; padding: 0;
@@ -50,7 +50,7 @@
 <body>
   <div class="wrap">
     <video id="cam" playsinline muted autoplay></video>
-    <img id="bg" alt="大坑舞火龍背景" src="" />
+    <img id="bg" alt="背景" src="" />
     <canvas id="game"></canvas>
 
     <div class="ui">
@@ -88,11 +88,11 @@
       </div>
     </div>
 
-    <div id="hint" class="hint">按「開始」允許相機權限。請以紅色龍公仔在鏡頭前揮動。</div>
+    <div id="hint" class="hint">按「開始」允許相機權限。請以紅色物件在鏡頭前揮動。</div>
   </div>
 
   <script>
-    // ========= DOM 取得 =========
+    // ========= DOM =========
     const video = document.getElementById('cam');
     const bgImg = document.getElementById('bg');
     const canvas = document.getElementById('game');
@@ -117,7 +117,7 @@
     const densEl = document.getElementById('density');
     const speedEl = document.getElementById('speed');
 
-    // ========= 遊戲狀態 =========
+    // ========= 狀態 =========
     let running = false;
     let gameOver = false;
     let W = 0, H = 0, dpr = 1;
@@ -125,29 +125,25 @@
     let score = 0, combo = 0, timeLeft = 60;
     let timerId = null;
 
-    // 追蹤狀態
     let centroid = { x: 0, y: 0 };
     let direction = { x: 1, y: 0 };
     let smoothing = 0.28;
 
-    // 鏡頭/鏡像
     let useEnvironment = true;
     let mirrored = true;
 
-    // ========= 單張竹龍貼圖 =========
-    // 請把路徑換成你的貼圖，例如 'images/bamboo-dragon.png'
+    // ========= 單張貼圖（使用你上傳的圖）=========
     const dragonImg = new Image();
-    dragonImg.src = 'image_2.png';
+    // 請換成你的實際路徑或檔名
+    dragonImg.src = 'dragon-celebration.png';
     let dragonImgReady = false;
     dragonImg.onload = () => { dragonImgReady = true; };
 
-    // 可調參數：繪製大小與擺動
+    // 正方形貼圖建議值：尺寸與錨點
     const sprite = {
-      drawWidth: 300,   // 繪製寬度（畫面像素）
-      drawHeight: 96,   // 繪製高度（畫面像素）
-      headAnchorX: 0.15,// 頭部相對寬度的對齊點（0=最左; 1=最右）
-      swayAmp: 6,       // 垂直擺動幅度（像素）
-      swayFreqMs: 300   // 擺動頻率（毫秒）
+      drawWidth: 360,
+      drawHeight: 360,
+      headAnchorX: 0.32
     };
 
     // 目標物件
@@ -156,7 +152,7 @@
     const items = [];
     const MAX_ITEMS = 14;
 
-    // 粒子（香火點）
+    // 粒子
     const particles = [];
 
     // ========= 畫布大小 =========
@@ -326,7 +322,7 @@
         p.age += dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
-        p.vy += 20 * dt; // 微重力下沉
+        p.vy += 20 * dt;
         if (p.age >= p.life) particles.splice(i,1);
       }
     }
@@ -344,29 +340,28 @@
       }
     }
 
-    // ========= 單張貼圖繪製的竹龍 =========
+    // ========= 單張貼圖繪製（有旋轉、無擺動）=========
     function drawDragon(ctx, head, dir) {
       if (!dragonImgReady) return;
 
-      const baseAngle = Math.atan2(dir.y, dir.x);
-      const sway = Math.sin(performance.now() / sprite.swayFreqMs) * sprite.swayAmp;
-
+      const angle = Math.atan2(dir.y, dir.x);
       const imgW = sprite.drawWidth;
       const imgH = sprite.drawHeight;
 
       ctx.save();
       ctx.translate(head.x, head.y);
-      ctx.rotate(baseAngle);
+      ctx.rotate(angle);
 
-      // 調整讓貼圖的「頭部」對準偵測點：
-      // 將畫筆移到頭部錨點（headAnchorX * 寬度），再回拉回來
+      // 水平對齊到龍頭
       const headOffsetX = -imgW * sprite.headAnchorX;
-      const headOffsetY = sway;
+      // 垂直微調：此圖龍頭略高於中心，往上移 12% 高度
+      const headOffsetY = -imgH * 0.12;
 
       ctx.translate(headOffsetX, headOffsetY);
-      ctx.drawImage(dragonImg, -imgW * 0.0, -imgH * 0.5, imgW, imgH);
+      // 注意：這張圖含背景，會整張一起移動；若用去背 PNG 視覺更佳
+      ctx.drawImage(dragonImg, 0, -imgH * 0.5, imgW, imgH);
 
-      // 在頭部附近噴粒子（面向 +X 方向）
+      // 粒子方向與貼圖朝向一致
       spawnIncenseParticles({ x: 0, y: 0 }, { x: 1, y: 0 }, 8);
 
       ctx.restore();
@@ -380,7 +375,6 @@
     function handleCollisions(head) {
       for (let i=items.length-1; i>=0; i--){
         const it=items[i];
-        // 頭部半徑估算：用貼圖高度的一半加緩衝
         const radius = Math.max(28, sprite.drawHeight * 0.4);
         if (circleHit(head.x, head.y, it.x, it.y, radius)){
           if (it.isGood){
@@ -454,7 +448,7 @@
       if (running && !gameOver) requestAnimationFrame(tick);
     }
 
-    // ========= 遊戲控制 =========
+    // ========= 控制 =========
     function startGameLoop() {
       if (running) return;
       running = true; gameOver = false;
@@ -511,11 +505,11 @@
       else { (document.exitFullscreen && document.exitFullscreen()) || (document.webkitExitFullscreen && document.webkitExitFullscreen()); }
     });
 
-    // 初始狀態
+    // 初始
     centroid = { x: W/2, y: H/2 };
     direction = { x: 1, y: 0 };
 
-    bgImg.src = 'image_1.png';
+    // 可替換背景：bgImg.src = 'your-dahing-photo.jpg';
   </script>
 </body>
 </html>
