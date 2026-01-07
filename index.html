@@ -58,8 +58,8 @@
       position:absolute;inset:0;
     }
     .videoEl{
-      width:100%;height:100%;object-fit:cover;transform:scaleX(-1); /* mirror for easier control */
-      background:#000;
+      width:100%;height:100%;object-fit:cover;
+      /* 方案A：移除鏡像，保持原始方向 */
     }
     canvas.overlayCanvas{pointer-events:none}
 
@@ -209,7 +209,7 @@
 
     <footer style="padding:.5rem 1rem;border-top:1px solid #16253a;background:#0c1424b3;display:flex;gap:.5rem;flex-wrap:wrap">
       <span class="small">背景：大坑舞火龍意象（示意）。</span>
-      <span class="small">此版本採用鏡像顯示，左右方向與你手勢一致。</span>
+      <span class="small">此版本採用畫布鏡像顯示，左右方向與你手勢一致。</span>
     </footer>
   </div>
 
@@ -408,7 +408,7 @@
       }, ms);
     }
 
-    // Color detection: find largest red-ish area
+    // Color detection: find largest red-ish area (no mirroring here)
     function detectControlPoint() {
       if (!video.videoWidth) return null;
       detectCtx.drawImage(video, 0, 0, detectCanvas.width, detectCanvas.height);
@@ -437,7 +437,7 @@
 
       const scaleX = w / detectCanvas.width;
       const scaleY = h / detectCanvas.height;
-      const x = (width - cx) * scaleX; // mirror
+      const x = cx * scaleX;   // 方案A：不做鏡像換算
       const y = cy * scaleY;
       return { x, y };
     }
@@ -610,6 +610,23 @@
       return `rgba(${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)},${a})`;
     }
 
+    // 方案A：在繪製時，對整個畫布內容做水平鏡像，確保手勢與畫面一致
+    function renderFrame() {
+      resize();
+      ctx.clearRect(0,0,w,h);
+
+      ctx.save();
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+
+      drawBackground();
+      drawItems();
+      drawDragon();
+      drawFlash();
+
+      ctx.restore();
+    }
+
     function loop() {
       if (!running) { renderFrame(); return; }
       raf = requestAnimationFrame(loop);
@@ -628,16 +645,8 @@
       checkCollisions();
     }
 
-    function renderFrame() {
-      resize();
-      ctx.clearRect(0,0,w,h);
-      drawBackground();
-      drawItems();
-      drawDragon();
-      drawFlash();
-    }
-
     // Wire UI
+    const hintEl = document.querySelector('.hint');
     startBtn.addEventListener('click', startGame);
     resetBtn.addEventListener('click', resetGame);
     retryBtn?.addEventListener('click', initCamera);
