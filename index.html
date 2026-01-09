@@ -28,7 +28,8 @@
     body.bg-off { background: #000; }
     a-scene {
       position: fixed !important;
-      top: 0; left: 0; width: 100vw; height: 100vh;
+      inset: 0;
+      width: 100vw; height: 100vh;
       z-index: 0;
     }
     .hud {
@@ -159,8 +160,8 @@
     <div class="card">
       <div class="flex-gap" style="margin-bottom:6px;">
         <strong>碰撞規則：</strong>
-        <span class="tag good">+1</span> 撞「福春財安旺吉祥賀龍年」
-        <span class="tag bad">-1</span> 撞「⚽ 🍔 🎧 🧊 🧼 🍺 💡 📎 🧽 🧯」
+        <span class="tag good">+15</span> 撞「福春財安旺吉祥賀龍年」
+        <span class="tag bad">-5</span> 撞「⚽ 🍔 🎧 🧊 🧼 🍺 💡 📎 🧽 🧯」
       </div>
       <div class="flex-gap">
         <div>好字：福、春、財、安、旺、吉、祥、賀、龍、年</div>
@@ -169,7 +170,7 @@
     </div>
 
     <div class="card bottom-note">
-      說明：在 60 秒內移動「hiro」marker 讓火龍去撞紅色好字得分，撞灰色壞字會扣分。建議在光線充足的地方使用 HTTPS（GitHub Pages 預設支援）。
+      說明：在 60 秒內移動「hiro」marker 讓火龍去撞紅色好字得分 (+15)，撞灰色壞字會扣分 (-5)。建議在光線充足的地方使用 HTTPS（GitHub Pages 預設支援）。
     </div>
   </div>
 
@@ -188,6 +189,10 @@
     <a-marker preset="hiro" id="marker">
       <a-entity id="dragon" position="0 0 0" scale="1 1 1"></a-entity>
     </a-marker>
+
+    <!-- Lights to make geometry visible -->
+    <a-entity light="type: ambient; color: #ffffff; intensity: 0.9"></a-entity>
+    <a-entity light="type: directional; color: #ffffff; intensity: 0.6" position="1 2 1"></a-entity>
 
     <a-entity camera></a-entity>
   </a-scene>
@@ -218,6 +223,35 @@
       }
     });
 
+    // Slow drift component
+    AFRAME.registerComponent('drift', {
+      schema: { speed: {default: 0.08} }, // meters per second
+      init: function () {
+        const theta = Math.random()*Math.PI*2;
+        const phi = Math.random()*Math.PI;
+        const s = this.data.speed;
+        this.v = new THREE.Vector3(
+          Math.cos(theta)*Math.sin(phi)*s,
+          (Math.random()*0.4 - 0.2)*s,
+          Math.sin(theta)*Math.sin(phi)*s
+        );
+        this.last = null;
+      },
+      tick: function (t, dt) {
+        if (!this.last) this.last = t;
+        const dts = dt/1000;
+        const p = this.el.object3D.position;
+        p.x += this.v.x * dts;
+        p.y += this.v.y * dts;
+        p.z += this.v.z * dts;
+        // keep within bounds
+        p.x = Math.max(-2.0, Math.min(2.0, p.x));
+        p.y = Math.max(0.2, Math.min(2.0, p.y));
+        p.z = Math.max(-3.0, Math.min(-0.6, p.z));
+        this.el.object3D.position.set(p.x, p.y, p.z);
+      }
+    });
+
     // ---------- Fire Dragon model: single upright bamboo + spiky incense ball ----------
     function buildFireDragon() {
       const dragon = document.getElementById('dragon');
@@ -237,7 +271,7 @@
       pole.setAttribute('roughness', 1);
       dragon.appendChild(pole);
 
-      // Small handle base
+      // Handle base
       const base = document.createElement('a-cylinder');
       base.setAttribute('position', '0 0 0');
       base.setAttribute('radius', 0.06);
@@ -313,7 +347,6 @@
       return arCanvas;
     }
 
-    // Show toast
     function showToast(msg) {
       toast.textContent = msg;
       toast.classList.add('show');
@@ -352,16 +385,16 @@
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = 'bold 170px "Noto Sans TC","Microsoft JhengHei","PingFang TC","Heiti TC",sans-serif';
+      ctx.font = 'bold 170px "Noto Sans TC","Microsoft JhengHei","PingFang TC","Heiti TC","Segoe UI Emoji",sans-serif';
       let fsize = 170;
       while (true) {
         const metrics = ctx.measureText(word);
         const w = metrics.width;
         if (w < size - 60 || fsize < 80) break;
         fsize -= 10;
-        ctx.font = `bold ${fsize}px "Noto Sans TC","Microsoft JhengHei","PingFang TC","Heiti TC",sans-serif`;
+        ctx.font = `bold ${fsize}px "Noto Sans TC","Microsoft JhengHei","PingFang TC","Heiti TC","Segoe UI Emoji",sans-serif`;
       }
-      ctx.fillText(word, size/2, size/2 + 8);
+      ctx.fillText(word, size/2, size/2 + 6);
 
       const url = c.toDataURL('image/png');
       texCache[key] = url;
@@ -382,9 +415,10 @@
 
       const el = document.createElement('a-entity');
       el.setAttribute('geometry', 'primitive: plane; width: 0.5; height: 0.5');
-      el.setAttribute('material', `src: ${tex}; transparent: true; side: double; alphaTest: 0.01;`);
+      el.setAttribute('material', `shader: flat; src: ${tex}; transparent: true; side: double; alphaTest: 0.01;`);
       el.setAttribute('face-camera', '');
       el.setAttribute('floaty', `amp: 0.04; speed: ${rand(0.6,1.2)}`);
+      el.setAttribute('drift', `speed: ${rand(0.05,0.1)}`);
 
       const x = rand(-1.4, 1.4);
       const y = rand(0.4, 1.6);
@@ -403,7 +437,7 @@
           scene.removeChild(el);
           targets.delete(id);
         }
-      }, 6000);
+      }, 7000);
     }
 
     // Collision detection each tick
@@ -426,13 +460,15 @@
           const dist = markerWorld.distanceTo(pos);
           if (dist < 0.35) {
             const isGood = obj.isGood;
-            score += isGood ? 1 : -1;
+            score += isGood ? 15 : -5;
             scoreText.textContent = score;
-            showToast(isGood ? '+1 得分！' : '-1 扣分！');
-            obj.el.setAttribute('material', 'color', isGood ? '#ffeb3b' : '#000');
+            showToast(isGood ? '+15 得分！' : '-5 扣分！');
+
+            // Small pop animation (scale)
+            obj.el.object3D.scale.set(0.01,0.01,0.01);
             setTimeout(() => {
               if (obj.el.parentNode) scene.removeChild(obj.el);
-            }, 80);
+            }, 60);
             targets.delete(id);
           }
         });
