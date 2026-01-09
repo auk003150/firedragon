@@ -11,11 +11,18 @@
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; height: 100%; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "PingFang HK", "Heiti TC", Arial, sans-serif; overflow: hidden; -webkit-font-smoothing: antialiased; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: #000; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "PingFang HK", "Heiti TC", Arial, sans-serif;
+      overflow: hidden; -webkit-font-smoothing: antialiased;
+    }
     .wrap { position: relative; width: 100%; height: 100%; background: #000; }
+
     /* A-Frame scene fills the view */
     a-scene.arscene { position: absolute !important; inset: 0; z-index: 0; }
     a-scene canvas, a-scene video { position: absolute; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover; }
+
     canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; z-index: 2; }
 
     /* UI */
@@ -89,7 +96,7 @@
       embedded
       renderer="logarithmicDepthBuffer: true; antialias: true; alpha: true;"
       arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; patternRatio: 0.9;">
-      <a-marker id="hiroMarker" preset="hiro"></a-marker>
+      <a-marker id="hiroMarker" preset="hiro" emitevents="true"></a-marker>
       <a-entity camera></a-entity>
     </a-scene>
 
@@ -180,6 +187,10 @@
     const sceneEl = document.getElementById('scene');
     const markerEl = document.getElementById('hiroMarker');
     let markerVisible = false;
+    let cameraReady = false;
+
+    // THREE reference
+    const THREE = (window.AFRAME && window.AFRAME.THREE) ? window.AFRAME.THREE : window.THREE;
 
     // ========= 狀態 =========
     let running = false;
@@ -244,9 +255,12 @@
       hintEl.textContent = '未偵測到 Hiro Marker，請把標記放入鏡頭中。';
       hintEl.className = 'hint bad';
     });
+    sceneEl.addEventListener('camera-set-active', () => { cameraReady = true; });
+    sceneEl.addEventListener('render-target-loaded', () => { cameraReady = true; });
 
     function getMarkerScreenPos() {
-      if (!markerVisible || !sceneEl || !sceneEl.camera) return null;
+      if (!markerVisible) return null;
+      if (!cameraReady || !sceneEl || !sceneEl.camera || !THREE) return null;
       const cam = sceneEl.camera;
       const pos = new THREE.Vector3();
       markerEl.object3D.getWorldPosition(pos);
@@ -459,6 +473,7 @@
     function startAll() {
       startBtn.disabled = true;
       hintEl.textContent = '若未出現鏡頭畫面，請允許相機權限並將 Hiro Marker 放入畫面。';
+      hintEl.className = 'hint';
       startGameLoop();
     }
 
