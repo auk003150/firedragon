@@ -5,10 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>大坑舞火龍 AR 遊戲（Hiro Marker）</title>
 
-  <!-- MindAR + Three.js (no A-Frame) -->
+  <!-- Three.js UMD 全域版 -->
   <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js" type="module"></script>
-  <script src="https://unpkg.com/mind-ar@1.2.5/dist/mindar-face-three.prod.js"></script>
+  <!-- MindAR Image + Three UMD 全域版 -->
   <script src="https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
 
   <style>
@@ -21,8 +20,6 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "PingFang HK", "Heiti TC", Arial, sans-serif;
       color: #fff;
     }
-
-    /* HUD overlay */
     .hud {
       position: fixed;
       top: 0; left: 0; right: 0;
@@ -59,7 +56,6 @@
     }
     .btn:hover { opacity: 0.9; }
     .btn:active { transform: scale(0.98); }
-
     .center-overlay {
       position: fixed;
       left: 50%;
@@ -72,37 +68,22 @@
       text-align: center;
       backdrop-filter: blur(6px);
     }
-    .small {
-      font-size: 12px;
-      opacity: 0.85;
-    }
-
-    /* Canvas sizing */
+    .small { font-size: 12px; opacity: 0.85; }
     #ar-container {
       position: fixed;
       inset: 0;
-      background: #000 url("./image_1.png") center/cover no-repeat; /* custom background */
+      background: #000 url("./image_1.png") center/cover no-repeat;
     }
-    canvas {
-      display: block;
-    }
-
-    /* Bottom tips */
+    canvas { display: block; }
     .bottom-bar {
       position: fixed;
       left: 0; right: 0; bottom: 0;
       padding: 8px 12px;
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
+      display: flex; justify-content: space-between; gap: 12px; align-items: center;
       background: linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0));
       pointer-events: none;
     }
-    .legend {
-      display: flex; gap: 8px; flex-wrap: wrap;
-      pointer-events: auto;
-    }
+    .legend { display: flex; gap: 8px; flex-wrap: wrap; pointer-events: auto; }
     .chip {
       background: rgba(255,255,255,0.08);
       border: 1px solid rgba(255,255,255,0.2);
@@ -112,12 +93,8 @@
     }
     .good { border-color: #66bb6a; color: #a5d6a7; }
     .bad { border-color: #ef5350; color: #ef9a9a; }
-
-    /* Mobile hint (optional) */
     .mobile-hint {
-      position: fixed;
-      top: 60px;
-      right: 10px;
+      position: fixed; top: 60px; right: 10px;
       background: rgba(0,0,0,0.55);
       border: 1px solid rgba(255,255,255,0.2);
       border-radius: 12px;
@@ -125,9 +102,7 @@
       font-size: 12px;
       max-width: 50vw;
     }
-    @media (min-width: 768px) {
-      .mobile-hint { display: none; }
-    }
+    @media (min-width: 768px) { .mobile-hint { display: none; } }
   </style>
 </head>
 <body>
@@ -155,21 +130,18 @@
 
   <div class="mobile-hint">提示：如看不到相機畫面，請到瀏覽器允許鏡頭。</div>
 
-  <script type="module">
-    import { MindARThree } from "https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-three.prod.js";
+  <script>
+    // 取用 MindAR UMD 全域
+    const MindARThree = window.MINDAR.IMAGE.MindARThree;
 
-    // Game config
+    // 遊戲設定
     const RELATED = ["福","春","財","安","旺","吉","祥","賀","龍","年"];
     const UNRELATED = ["⚽","🍔","🎧","🧊","🧼","🍺","💡","📎","🧽","🧯"];
-    const GAME_DURATION = 60; // seconds
-    const MAX_ITEMS = 10; // concurrent floating items
-    const SPAWN_AREA = { // relative space around marker anchor
-      x: [-0.6, 0.6],
-      y: [ 0.0, 0.8],
-      z: [-0.6, 0.6],
-    };
-    const ITEM_SPEED = 0.25; // m/s toward marker center
-    const ITEM_RADIUS = 0.08; // for collision approx
+    const GAME_DURATION = 60;
+    const MAX_ITEMS = 10;
+    const SPAWN_AREA = { x: [-0.6, 0.6], y: [0.0, 0.8], z: [-0.6, 0.6] };
+    const ITEM_SPEED = 0.25;
+    const ITEM_RADIUS = 0.08;
 
     const statusText = document.getElementById("statusText");
     const timerText = document.getElementById("timerText");
@@ -185,14 +157,12 @@
     let items = [];
     let lastSpawnTime = 0;
     let clock = new THREE.Clock();
-    let dragon; // bamboo dragon root
-    let rafId = null;
+    let dragon = null;
+    let started = false;
 
-    // Create bamboo dragon from simple primitives
     function createBambooDragon() {
       const root = new THREE.Group();
 
-      // Bamboo body (series of green cylinders)
       const body = new THREE.Group();
       const segCount = 10;
       const cylMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.8, metalness: 0.05 });
@@ -200,10 +170,9 @@
         const cylGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.16, 16);
         const segment = new THREE.Mesh(cylGeo, cylMat);
         segment.position.set(0, 0.02, i * 0.14);
-        // slight wave
         segment.rotation.z = Math.sin(i * 0.5) * 0.15;
         body.add(segment);
-        // ring joints
+
         const ringGeo = new THREE.TorusGeometry(0.055, 0.01, 10, 20);
         const ringMat = new THREE.MeshStandardMaterial({ color: 0x558b2f, roughness: 0.9 });
         const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -213,7 +182,6 @@
       }
       root.add(body);
 
-      // Head (torus + cones to evoke dragon head)
       const headGroup = new THREE.Group();
       const snoutGeo = new THREE.ConeGeometry(0.08, 0.16, 16);
       const snoutMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.7 });
@@ -229,7 +197,6 @@
       noseRing.position.set(0, 0.02, -0.16);
       headGroup.add(noseRing);
 
-      // Eyes
       const eyeGeo = new THREE.SphereGeometry(0.02, 16, 16);
       const eyeWhite = new THREE.MeshStandardMaterial({ color: 0xffffff });
       const eyeL = new THREE.Mesh(eyeGeo, eyeWhite);
@@ -237,6 +204,7 @@
       eyeL.position.set(-0.05, 0.08, -0.07);
       eyeR.position.set( 0.05, 0.08, -0.07);
       headGroup.add(eyeL, eyeR);
+
       const pupilGeo = new THREE.SphereGeometry(0.008, 12, 12);
       const pupilMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
       const pupilL = new THREE.Mesh(pupilGeo, pupilMat);
@@ -248,7 +216,6 @@
       headGroup.position.set(0, 0.02, -0.15);
       root.add(headGroup);
 
-      // Incense/fire (glow billboards)
       const fireGroup = new THREE.Group();
       const flameMat = new THREE.MeshBasicMaterial({ color: 0xff6f00, transparent: true, opacity: 0.8 });
       for (let i = 0; i < 6; i++) {
@@ -258,58 +225,51 @@
       }
       root.add(fireGroup);
 
-      // Simple movement animation parameters
       root.userData.update = (t) => {
         headGroup.position.y = 0.015 + Math.sin(t * 3.0) * 0.01;
         headGroup.rotation.z = Math.sin(t * 2.5) * 0.1;
         body.children.forEach((seg, idx) => {
-          seg.rotation.z = Math.sin(t * 2.0 + idx * 0.4) * 0.15;
+          if (seg.type === "Mesh") {
+            seg.rotation.z = Math.sin(t * 2.0 + idx * 0.4) * 0.15;
+          }
         });
         fireGroup.children.forEach((f, i) => {
           f.material.opacity = 0.6 + 0.4 * Math.sin(t * 8 + i);
         });
       };
 
-      // Approx collision radius
       root.userData.radius = 0.12;
       return root;
     }
 
-    // Create a floating text sprite (emoji or Chinese char)
     function createTextBillboard(text, color, isRelated) {
       const size = 256;
       const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
+      canvas.width = size; canvas.height = size;
       const ctx = canvas.getContext("2d");
 
-      // Background with subtle rounded rect
       ctx.clearRect(0, 0, size, size);
       ctx.fillStyle = "rgba(0,0,0,0.35)";
-      const r = 36;
-      roundedRect(ctx, 8, 8, size-16, size-16, r);
+      roundedRect(ctx, 8, 8, size-16, size-16, 36);
       ctx.fill();
 
-      // Border color by type
       ctx.lineWidth = 6;
       ctx.strokeStyle = isRelated ? "#66bb6a" : "#ef5350";
       ctx.stroke();
 
-      // Text
       ctx.fillStyle = isRelated ? "#c8e6c9" : "#ffcdd2";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      // Dynamic font size for emojis vs CJK
       const isEmoji = /\p{Extended_Pictographic}/u.test(text);
       const fontSize = isEmoji ? 160 : 180;
-      ctx.font = `bold ${fontSize}px "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", "Noto Sans CJK TC", "PingFang HK", "Microsoft JhengHei", sans-serif`;
+      ctx.font = `bold ${fontSize}px "Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji","Noto Sans CJK TC","PingFang HK","Microsoft JhengHei",sans-serif`;
       ctx.fillText(text, size/2, size/2 + (isEmoji ? 6 : 0));
 
       const tex = new THREE.CanvasTexture(canvas);
       tex.anisotropy = 4;
       const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
       const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(0.24, 0.24, 0.24); // meters
+      sprite.scale.set(0.24, 0.24, 0.24);
       sprite.userData = { isRelated, text };
       return sprite;
     }
@@ -324,23 +284,19 @@
       ctx.closePath();
     }
 
-    // Spawn a random item around the anchor
     function spawnItem() {
       const isRelated = Math.random() < 0.5;
       const char = isRelated
         ? RELATED[Math.floor(Math.random() * RELATED.length)]
         : UNRELATED[Math.floor(Math.random() * UNRELATED.length)];
 
-      const color = isRelated ? 0x66bb6a : 0xef5350;
-      const sprite = createTextBillboard(char, color, isRelated);
+      const sprite = createTextBillboard(char, isRelated ? 0x66bb6a : 0xef5350, isRelated);
 
-      // random pos in a box relative to anchor
       const x = THREE.MathUtils.lerp(SPAWN_AREA.x[0], SPAWN_AREA.x[1], Math.random());
       const y = THREE.MathUtils.lerp(SPAWN_AREA.y[0], SPAWN_AREA.y[1], Math.random());
       const z = THREE.MathUtils.lerp(SPAWN_AREA.z[0], SPAWN_AREA.z[1], Math.random());
       sprite.position.set(x, y, z);
 
-      // give it a slight drift velocity toward center
       const dir = new THREE.Vector3(-x, -y, -z).normalize().multiplyScalar(ITEM_SPEED);
       sprite.userData.velocity = dir;
       sprite.userData.radius = ITEM_RADIUS;
@@ -350,7 +306,6 @@
     }
 
     function resetGameState() {
-      // Remove old items
       items.forEach(it => anchor.group.remove(it));
       items = [];
       score = 0;
@@ -358,7 +313,7 @@
       scoreText.textContent = score;
       timerText.textContent = timeLeft;
       lastSpawnTime = 0;
-      clock.getDelta(); // reset
+      clock.getDelta();
       overlay.style.display = "none";
     }
 
@@ -372,33 +327,25 @@
     function updateGame(dt, elapsed) {
       if (!running) return;
 
-      // Spawn logic: up to MAX_ITEMS, spawn every ~0.8s
       if (items.length < MAX_ITEMS && elapsed - lastSpawnTime > 0.8) {
         spawnItem();
         lastSpawnTime = elapsed;
       }
 
-      // Update items movement
       items.forEach(it => {
         const v = it.userData.velocity;
         it.position.addScaledVector(v, dt);
-        // gentle bob
         it.position.y += Math.sin(elapsed * 2 + it.position.x * 3) * 0.001;
-        // face camera slightly
         it.lookAt(camera.position);
       });
 
-      // Update dragon animation
       if (dragon && dragon.userData.update) {
         dragon.userData.update(elapsed);
       }
 
-      // Collision check (sphere-sphere)
       if (dragon) {
         const dPos = new THREE.Vector3();
         dragon.getWorldPosition(dPos);
-
-        // Convert item world positions to compare (items are in anchor space)
         const toRemove = [];
         items.forEach(it => {
           const iPos = new THREE.Vector3();
@@ -406,11 +353,8 @@
           const dist = dPos.distanceTo(iPos);
           const r = (dragon.userData.radius || 0.12) + (it.userData.radius || ITEM_RADIUS);
           if (dist <= r) {
-            if (it.userData.isRelated) score += 1;
-            else score -= 1;
+            score += it.userData.isRelated ? 1 : -1;
             scoreText.textContent = score;
-
-            // hit feedback: flash and scale
             it.scale.multiplyScalar(1.4);
             it.material.opacity = 0.0;
             anchor.group.remove(it);
@@ -420,7 +364,6 @@
         items = items.filter(it => !toRemove.includes(it));
       }
 
-      // Timer
       timeLeft -= dt;
       if (timeLeft < 0) timeLeft = 0;
       timerText.textContent = Math.ceil(timeLeft);
@@ -430,18 +373,9 @@
     }
 
     async function initAR() {
-      // Use built-in Hiro marker (pattern-hiro)
-      // MindAR image pipeline requires an image target file (.mind)
-      // We'll generate a lightweight one via the CDN preset for Hiro.
-      // Note: MindAR provides example targets; here we host a minimal hiro target.
-      // Fallback: we can reference a data URL, but we’ll use a static hosted file.
-      // For reliability, we use an existing example .mind file for Hiro marker:
-      const HIRO_TARGET = "https://raw.githubusercontent.com/hiukim/mind-ar-js/master/examples/image-tracking/assets/card.mind"; 
-      // The above is not Hiro; MindAR image uses arbitrary images, not AR.js hiro pattern.
-      // To emulate "hiro marker", we’ll use the well-known Hiro image as the target texture.
-      // If you prefer the AR.js pattern marker specifically, MindAR-Image doesn't consume .patt.
-      // This setup uses an image target file; please replace with your own .mind if desired.
-
+      // 重要：MindAR-Image 使用 .mind 目標檔，而不是 AR.js 的 .patt
+      // 先用官方示例目標檔（你可換成自己的 ./hiro.mind）
+      const HIRO_TARGET = "https://raw.githubusercontent.com/hiukim/mind-ar-js/master/examples/image-tracking/assets/card.mind";
       mindarThree = new MindARThree({
         container: document.querySelector("#ar-container"),
         imageTargetSrc: HIRO_TARGET,
@@ -451,32 +385,30 @@
         filterBeta: 0.01,
         warmupTolerance: 5,
       });
-      const { renderer: r, scene: s, camera: c } = mindarThree;
-      renderer = r; scene = s; camera = c;
+      const res = mindarThree;
+      renderer = res.renderer;
+      scene = res.scene;
+      camera = res.camera;
 
-      // Lighting
       const hemi = new THREE.HemisphereLight(0xffffff, 0x223344, 0.6);
       scene.add(hemi);
       const dir = new THREE.DirectionalLight(0xffffff, 0.8);
       dir.position.set(0.5, 1, 0.5);
       scene.add(dir);
 
-      // Anchor for target 0
       anchor = mindarThree.addAnchor(0);
 
-      // Bamboo dragon on anchor
       dragon = createBambooDragon();
-      dragon.position.set(0, 0, 0); // at anchor origin
-      dragon.scale.set(1, 1, 1);
+      dragon.position.set(0, 0, 0);
       anchor.group.add(dragon);
 
-      // Status events
       anchor.onTargetFound = () => { statusText.textContent = "已偵測到標記"; };
       anchor.onTargetLost  = () => { statusText.textContent = "尋找標記中…"; };
 
       await mindarThree.start();
       renderer.setAnimationLoop(loop);
       statusText.textContent = "準備就緒";
+      started = true;
     }
 
     function loop() {
@@ -486,15 +418,13 @@
       renderer.render(scene, camera);
     }
 
-    // Start/Restart
-    startBtn.addEventListener("click", () => {
-      if (!mindarThree) return; // wait until init
+    document.getElementById("startBtn").addEventListener("click", () => {
+      if (!started) return;
       resetGameState();
       running = true;
       statusText.textContent = "遊戲進行中";
     });
 
-    // Boot
     (async () => {
       try {
         await initAR();
