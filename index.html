@@ -326,7 +326,6 @@
         canvas.width = Math.round(W * dpr);
         canvas.height = Math.round(H * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        // 同步 AR 畫面尺寸
         resizeAR();
       };
       clearTimeout(resizeTimer);
@@ -374,6 +373,12 @@
     sceneEl.addEventListener('arjs-video-loaded', () => {
       cameraReady = true;
       if (arStarted) setCameraStatus(true, 'Camera：已就緒');
+    });
+    sceneEl.addEventListener('loaded', () => {
+      // scene loaded; try to mark arjs ready
+      waitForARSystem(2000).then(() => {
+        /* no-op, just confirming ready */
+      }).catch(() => {});
     });
 
     function getMarkerScreenPos() {
@@ -640,9 +645,27 @@
     bindVal(densEl, densityVal);
     bindVal(speedEl, speedVal);
 
+    // ======== AR 就緒輪詢 ========
+    function getARSystem() {
+      return sceneEl.systems && sceneEl.systems['arjs'];
+    }
+
+    function waitForARSystem(timeout = 6000) {
+      const start = performance.now();
+      return new Promise((resolve, reject) => {
+        const check = () => {
+          const sys = getARSystem();
+          if (sys && sys.arToolkitSource) { resolve(sys); return; }
+          if (performance.now() - start > timeout) { reject(new Error('arjs system timeout')); return; }
+          setTimeout(check, 120);
+        };
+        check();
+      });
+    }
+
     // ======== AR 相機啟動與尺寸同步 ========
     function resizeAR() {
-      const arSystem = sceneEl.systems && sceneEl.systems['arjs'];
+      const arSystem = getARSystem();
       if (!arSystem || !arSystem.arToolkitSource) return;
       const src = arSystem.arToolkitSource;
       if (!src.ready) return;
@@ -658,24 +681,28 @@
         cameraMsg.textContent = '需在 HTTPS (或 localhost) 下才能啟用相機。';
         return false;
       }
-      const arSystem = sceneEl.systems && sceneEl.systems['arjs'];
-      if (!arSystem) {
-        cameraMsg.textContent = 'AR.js 尚未就緒，請稍後重試。';
+      cameraBtn.disabled = true;
+      cameraMsg.textContent = '正在等待 AR.js 就緒…';
+      let arSystem;
+      try {
+        arSystem = await waitForARSystem();
+      } catch (e) {
+        cameraMsg.textContent = 'AR.js 尚未就緒，請稍後重試或重新整理。';
+        cameraBtn.disabled = false;
         return false;
       }
+
       if (arSystem.arToolkitSource?.ready) {
-        // 已啟動
         arStarted = true;
         cameraReady = true;
         cameraOverlay.classList.add('hidden');
         setCameraStatus(true, 'Camera：已就緒');
         resizeAR();
+        cameraMsg.textContent = '';
         return true;
       }
 
-      cameraBtn.disabled = true;
       cameraMsg.textContent = '正在啟動相機，請允許瀏覽器的相機權限…';
-
       return new Promise((resolve, reject) => {
         arSystem.arToolkitSource.init(() => {
           arStarted = true;
@@ -712,7 +739,6 @@
         const status = await navigator.permissions.query({ name: 'camera' });
         const sync = () => {
           if (status.state === 'granted') {
-            // 已授權，直接啟動相機
             startARCamera();
           } else if (status.state === 'prompt') {
             cameraOverlay.classList.remove('hidden');
