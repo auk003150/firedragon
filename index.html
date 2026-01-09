@@ -45,7 +45,7 @@
     .hud { display: flex; gap: 10px; align-items: center; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,0.6); flex-wrap: wrap; }
     .chip { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 6px 10px; font-size: 14px; }
 
-    /* Marker status pill */
+    /* Status pills */
     .status {
       display: inline-flex;
       align-items: center;
@@ -66,6 +66,8 @@
     }
     .status.ok { border-color: rgba(34,197,94,0.4); color: #dcfce7; }
     .status.ok .status-dot { background: #22c55e; box-shadow: 0 0 0 4px rgba(34,197,94,0.18); }
+    .status.warn { border-color: rgba(248,180,0,0.4); color: #fde68a; }
+    .status.warn .status-dot { background: #fbbf24; box-shadow: 0 0 0 4px rgba(251,191,36,0.18); }
 
     .hint {
       position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
@@ -159,8 +161,10 @@
       vr-mode-ui="enabled: false"
       embedded
       renderer="logarithmicDepthBuffer: true; antialias: true; alpha: true;"
-      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; patternRatio: 0.9;">
-      <a-marker id="hiroMarker" preset="hiro" emitevents="true"></a-marker>
+      arjs="sourceType: webcam; facingMode: environment; trackingMethod: best; detectionMode: mono; patternRatio: 0.75; debugUIEnabled: false;">
+      <a-marker id="hiroMarker" type="pattern" preset="hiro" emitevents="true" smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="2">
+        <a-entity id="markerAnchor"></a-entity>
+      </a-marker>
       <a-entity camera></a-entity>
     </a-scene>
 
@@ -176,6 +180,10 @@
             <span class="status-dot"></span>
             <span class="status-text">Marker：未偵測</span>
           </div>
+          <div id="cameraStatus" class="status warn">
+            <span class="status-dot"></span>
+            <span class="status-text">Camera：初始化中</span>
+          </div>
         </div>
         <button id="menuBtn" class="btn ghost">≡ 選單</button>
       </div>
@@ -188,7 +196,7 @@
       </div>
     </div>
 
-    <div id="hint" class="hint">按「允許相機」授權後，再按「開始」，並將 Hiro Marker 放入鏡頭畫面。</div>
+    <div id="hint" class="hint">按「允許相機」授權後，再按「開始」，並將 Hiro Marker 放入鏡頭畫面（保持光線充足）。</div>
 
     <!-- Panel -->
     <div id="panelBackdrop" class="panel-backdrop"></div>
@@ -258,9 +266,11 @@
     const cameraBtn = document.getElementById('cameraBtn');
     const cameraMsg = document.getElementById('cameraMsg');
 
-    // Marker status DOM
+    // Status DOM
     const markerStatusEl = document.getElementById('markerStatus');
     const markerStatusText = markerStatusEl.querySelector('.status-text');
+    const cameraStatusEl = document.getElementById('cameraStatus');
+    const cameraStatusText = cameraStatusEl.querySelector('.status-text');
 
     // A-Frame / AR.js
     const sceneEl = document.getElementById('scene');
@@ -324,13 +334,20 @@
     window.addEventListener('orientationchange', () => setTimeout(resize, 150), { passive: true });
     resize();
 
-    // ========= Marker 事件 =========
+    // ========= 狀態 UI =========
     function setMarkerStatus(visible) {
       markerStatusEl.classList.toggle('ok', visible);
       markerStatusText.textContent = visible ? 'Marker：已偵測' : 'Marker：未偵測';
     }
+    function setCameraStatus(ok, text) {
+      cameraStatusEl.classList.toggle('ok', ok);
+      cameraStatusEl.classList.toggle('warn', !ok);
+      cameraStatusText.textContent = text;
+    }
     setMarkerStatus(false);
+    setCameraStatus(false, 'Camera：初始化中');
 
+    // ========= Marker 事件 =========
     markerEl.addEventListener('markerFound', () => {
       markerVisible = true;
       setMarkerStatus(true);
@@ -340,11 +357,22 @@
     markerEl.addEventListener('markerLost', () => {
       markerVisible = false;
       setMarkerStatus(false);
-      hintEl.textContent = '未偵測到 Hiro Marker，請把標記放入鏡頭中。';
+      hintEl.textContent = '未偵測到 Hiro Marker，請把標記放入鏡頭中並保持光線充足。';
       hintEl.className = 'hint bad';
     });
-    sceneEl.addEventListener('camera-set-active', () => { cameraReady = true; });
-    sceneEl.addEventListener('render-target-loaded', () => { cameraReady = true; });
+
+    sceneEl.addEventListener('camera-set-active', () => {
+      cameraReady = true;
+      setCameraStatus(true, 'Camera：已就緒');
+    });
+    sceneEl.addEventListener('render-target-loaded', () => {
+      cameraReady = true;
+      setCameraStatus(true, 'Camera：已就緒');
+    });
+    sceneEl.addEventListener('arjs-video-loaded', () => {
+      cameraReady = true;
+      setCameraStatus(true, 'Camera：已就緒');
+    });
 
     function getMarkerScreenPos() {
       if (!markerVisible) return null;
@@ -610,7 +638,30 @@
     bindVal(densEl, densityVal);
     bindVal(speedEl, speedVal);
 
-    // ======== 相機權限處理 ========
+    // ======== 相機權限處理與 AR 重新啟動 ========
+    function restartARSourceIfNeeded() {
+      const arSystem = sceneEl.systems && sceneEl.systems['arjs'];
+      if (!arSystem || !arSystem.arToolkitSource) return;
+      const src = arSystem.arToolkitSource;
+      if (src.ready) {
+        // 尺寸同步
+        src.onResizeElement();
+        src.copyElementSizeTo(sceneEl.canvas);
+        if (arSystem.arToolkitContext && arSystem.arToolkitContext.arController) {
+          src.copyElementSizeTo(arSystem.arToolkitContext.arController.canvas);
+        }
+        return;
+      }
+      // 未 ready 時重新初始化
+      src.init(function onReady() {
+        src.onResizeElement();
+        src.copyElementSizeTo(sceneEl.canvas);
+        if (arSystem.arToolkitContext && arSystem.arToolkitContext.arController) {
+          src.copyElementSizeTo(arSystem.arToolkitContext.arController.canvas);
+        }
+      });
+    }
+
     async function requestCameraAccess() {
       if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
         cameraMsg.textContent = '需在 HTTPS (或 localhost) 下才能啟用相機。';
@@ -624,14 +675,18 @@
       cameraMsg.textContent = '正在請求相機權限…';
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
+          video: { facingMode: { ideal: 'environment' } }
         });
         cameraGranted = true;
-        // 立即停止臨時串流，AR.js 會自行開啟
         stream.getTracks().forEach(t => t.stop());
         cameraOverlay.classList.add('hidden');
         hintEl.textContent = '已取得相機權限，將 Hiro Marker 放入畫面。';
         hintEl.className = 'hint';
+        setCameraStatus(false, 'Camera：啟動中…');
+        // 嘗試重新啟動 AR 視源
+        setTimeout(() => {
+          restartARSourceIfNeeded();
+        }, 100);
         return true;
       } catch (err) {
         console.error(err);
@@ -653,6 +708,17 @@
             cameraOverlay.classList.add('hidden');
             hintEl.textContent = '相機已授權，將 Hiro Marker 放入畫面。';
             hintEl.className = 'hint';
+            setCameraStatus(false, 'Camera：啟動中…');
+            setTimeout(() => {
+              restartARSourceIfNeeded();
+            }, 50);
+          } else if (status.state === 'prompt') {
+            cameraOverlay.classList.remove('hidden');
+            setCameraStatus(false, 'Camera：等待授權');
+          } else {
+            cameraOverlay.classList.remove('hidden');
+            cameraMsg.textContent = '相機被封鎖，請在瀏覽器設定中允許。';
+            setCameraStatus(false, 'Camera：被封鎖');
           }
         };
         sync();
@@ -662,7 +728,7 @@
 
     cameraBtn.addEventListener('click', requestCameraAccess);
 
-    // 改寫開始按鈕：若未授權相機，先請求；成功後才開始遊戲
+    // 開始按鈕：若未授權相機，先請求；成功後才開始遊戲
     startBtn.addEventListener('click', async () => {
       if (!cameraGranted) {
         const ok = await requestCameraAccess();
