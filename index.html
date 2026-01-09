@@ -2,77 +2,367 @@
 <html lang="zh-HK">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>本機 AR.js / THREEx 載入測試</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>大坑舞火龍 AR（Hiro Marker）</title>
+
+  <!-- A-Frame + AR.js -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.2/aframe/build/aframe-ar.js"></script>
+
   <style>
-    body { margin:0; font-family: system-ui, -apple-system, "Noto Sans", Arial, sans-serif; background:#0b1220; color:#e5e7eb; }
-    main { max-width: 720px; margin: 0 auto; padding: 16px; }
-    h1 { font-size: 20px; margin-bottom: 12px; }
-    .card { background:#111827; border:1px solid #1f2937; border-radius:12px; padding:12px 14px; margin-bottom:10px; }
-    .status { font-variant-numeric: tabular-nums; }
-    .ok { color:#22c55e; font-weight:700; }
-    .fail { color:#f97316; font-weight:700; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace; font-size: 13px; }
-    button { padding:10px 14px; border:none; border-radius:10px; background:#2563eb; color:#fff; font-weight:700; cursor:pointer; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      background: #000; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "Noto Sans CJK", "PingFang HK", "Heiti TC", Arial, sans-serif;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      touch-action: manipulation;
+    }
+    a-scene {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+    .ui {
+      position: fixed;
+      left: 0; right: 0; top: 0;
+      display: grid; gap: 6px; padding: 10px 12px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0));
+      user-select: none; z-index: 20;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .hudbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .btn { background: #e11d48; border: none; color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(225,29,72,0.35); }
+    .btn.ghost { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; box-shadow: none; }
+    .btn:disabled { opacity: 0.6; }
+    .btn:active { transform: translateY(1px); }
+    .hud { display: flex; gap: 10px; align-items: center; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,0.6); flex-wrap: wrap; }
+    .chip { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 6px 10px; font-size: 14px; }
+    .hint {
+      position: fixed; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+      text-align: center; padding: 0 16px; color: #ffd166; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.7); z-index: 5;
+    }
+    .ok { color: #22c55e; }
+    .bad { color: #f97316; }
+    .panel-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 30;
+      opacity: 0; pointer-events: none; transition: opacity .2s ease;
+    }
+    .panel-backdrop.open { opacity: 1; pointer-events: auto; }
+    .panel {
+      position: fixed; top: 0; right: 0; height: 100%;
+      background: rgba(17,24,39,0.9); backdrop-filter: blur(10px);
+      border-left: 1px solid rgba(255,255,255,0.12);
+      width: min(360px, 92vw);
+      transform: translateX(100%);
+      transition: transform .25s ease;
+      z-index: 31; color: #fff; overflow: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .panel.open { transform: translateX(0); }
+    .panel header {
+      position: sticky; top: 0; background: rgba(17,24,39,0.95);
+      padding: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .panel h2 { margin: 0; font-size: 16px; }
+    .panel .section { padding: 12px; display: grid; gap: 12px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .row .label { font-size: 14px; color: #e5e7eb; }
+    .mini { padding: 8px 10px; font-weight: 600; font-size: 12px; border-radius: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; }
   </style>
 </head>
 <body>
-  <main>
-    <h1>本機 AR.js / THREEx 載入測試</h1>
-    <div class="card">
-      <div class="status">three.js：<span id="threeStatus">等待...</span></div>
-      <div class="status">THREEx (ar-threex.js)：<span id="threexStatus">等待...</span></div>
+  <!-- UI -->
+  <div class="ui">
+    <div class="topbar">
+      <button id="startBtn" class="btn">開始</button>
+      <button id="menuBtn" class="btn ghost">≡ 選單</button>
     </div>
-    <div class="card">
-      <div>錯誤訊息：</div>
-      <div id="errLog" class="mono" style="white-space:pre-wrap;"></div>
+    <div class="hudbar">
+      <div class="hud">
+        <div class="chip">分數：<span id="score">0</span></div>
+        <div class="chip">Combo：<span id="combo">0</span></div>
+        <div class="chip">時間：<span id="time">60</span>s</div>
+      </div>
     </div>
-    <button id="runBtn">開始測試</button>
-  </main>
+  </div>
 
-  <!-- 改為本機檔案，不走 CDN -->
-  <script src="./vendor/three.min.js"></script>
-  <script src="./vendor/ar-threex.js"></script>
+  <div id="hint" class="hint">按「開始」，將 Hiro marker 放入鏡頭視野。</div>
+
+  <!-- 側邊設定面板 -->
+  <div id="panelBackdrop" class="panel-backdrop"></div>
+  <aside id="panel" class="panel" aria-hidden="true">
+    <header>
+      <h2>設定</h2>
+      <button id="closePanel" class="btn ghost" aria-label="關閉">✕</button>
+    </header>
+    <div class="section">
+      <div class="row">
+        <div class="label">螢幕</div>
+        <button id="fullscreenBtn" class="mini">全屏</button>
+      </div>
+      <div class="row">
+        <div class="label">遊戲</div>
+        <button id="resetBtn" class="mini">重置</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- A-Frame AR Scene -->
+  <a-scene
+    vr-mode-ui="enabled: false"
+    embedded
+    renderer="antialias: true; alpha: true; logarithmicDepthBuffer: true;"
+    arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
+  >
+    <!-- Hiro marker -->
+    <a-marker id="hiroMarker" preset="hiro">
+      <!-- 火龍頭（使用現有 image_2.png 貼圖） -->
+      <a-image id="dragonHead" src="image_2.png" position="0 0 0" width="0.4" height="0.4"></a-image>
+    </a-marker>
+
+    <!-- 物件容器（動態插入） -->
+    <a-entity id="itemsRoot"></a-entity>
+
+    <!-- 相機 -->
+    <a-entity camera></a-entity>
+  </a-scene>
 
   <script>
-    const threeStatus = document.getElementById('threeStatus');
-    const threexStatus = document.getElementById('threexStatus');
-    const errLog = document.getElementById('errLog');
-    const runBtn = document.getElementById('runBtn');
+    // ========= 狀態 =========
+    const state = {
+      running: false,
+      gameOver: false,
+      score: 0,
+      combo: 0,
+      timeLeft: 60,
+      timerId: null,
+      markerVisible: false,
+      items: [],
+      targetCount: 12,
+      collisionRadius: 0.25, // 約 25cm
+    };
 
-    function logErr(msg) { errLog.textContent += msg + "\\n"; }
+    // ========= DOM =========
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const scoreEl = document.getElementById('score');
+    const comboEl = document.getElementById('combo');
+    const timeEl = document.getElementById('time');
+    const hintEl = document.getElementById('hint');
 
-    function testLoad() {
-      errLog.textContent = '';
-      threeStatus.textContent = '檢查中...';
-      threexStatus.textContent = '檢查中...';
-      threeStatus.className = '';
-      threexStatus.className = '';
+    const menuBtn = document.getElementById('menuBtn');
+    const panel = document.getElementById('panel');
+    const panelBackdrop = document.getElementById('panelBackdrop');
+    const closePanelBtn = document.getElementById('closePanel');
 
-      if (typeof THREE === 'undefined') {
-        threeStatus.textContent = '失敗（THREE 未定義）';
-        threeStatus.className = 'fail';
-        logErr('three.min.js 未正確載入，請確認路徑 ./vendor/three.min.js 及伺服器可讀。');
-        return;
-      } else {
-        threeStatus.textContent = '成功（本機）';
-        threeStatus.className = 'ok';
-      }
+    const sceneEl = document.querySelector('a-scene');
+    const markerEl = document.getElementById('hiroMarker');
+    const itemsRoot = document.getElementById('itemsRoot');
 
-      if (typeof THREEx === 'undefined') {
-        threexStatus.textContent = '失敗（THREEx 未定義）';
-        threexStatus.className = 'fail';
-        logErr('ar-threex.js 未正確載入，請確認路徑 ./vendor/ar-threex.js 及伺服器可讀。');
-        return;
-      } else {
-        threexStatus.textContent = '成功（本機）';
-        threexStatus.className = 'ok';
+    // ========= 文字列表 =========
+    const goodList = ['福','春','財','安','旺','吉','祥','賀','龍','年'];
+    const badList  = ['⚽','🍔','🎧','🧊','🍺','💡','📎','🧯','🧽','🎲'];
+
+    // ========= 工具 =========
+    function randRange(min, max) { return min + Math.random() * (max - min); }
+    function choose(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function updateHUD() {
+      scoreEl.textContent = state.score;
+      comboEl.textContent = state.combo;
+      timeEl.textContent = state.timeLeft;
+    }
+
+    function setHint(text, cls='') {
+      hintEl.textContent = text;
+      hintEl.className = 'hint' + (cls ? ' ' + cls : '');
+    }
+
+    // ========= 物件生成 =========
+    function spawnItem() {
+      const isGood = Math.random() < 0.65;
+      const text = isGood ? choose(goodList) : choose(badList);
+      const size = randRange(0.32, 0.46); // 公尺（文字大小影響 scale）
+      const r = randRange(0.35, 1.0); // 離原點半徑（公尺）
+      const ang = randRange(0, Math.PI * 2);
+      const x = Math.cos(ang) * r;
+      const z = Math.sin(ang) * r;
+      const y = randRange(0.05, 0.55);
+
+      const el = document.createElement('a-entity');
+      el.setAttribute('text', {
+        value: text,
+        color: isGood ? '#ffd166' : '#ff6b6b',
+        align: 'center',
+        baseline: 'center',
+        font: 'mozillavr',
+        width: 1.5
+      });
+      el.setAttribute('position', { x, y, z });
+      el.setAttribute('scale', `${size} ${size} ${size}`);
+      itemsRoot.appendChild(el);
+
+      state.items.push({
+        el,
+        isGood,
+        expireAt: performance.now() + randRange(8000, 14000) // 8~14 秒
+      });
+    }
+
+    function ensureItems() {
+      while (state.items.length < state.targetCount) spawnItem();
+    }
+
+    function removeItem(idx) {
+      const it = state.items[idx];
+      if (it && it.el && it.el.parentNode) it.el.parentNode.removeChild(it.el);
+      state.items.splice(idx, 1);
+    }
+
+    // ========= 碰撞與得分 =========
+    const tmpV1 = new THREE.Vector3();
+    const tmpV2 = new THREE.Vector3();
+
+    function handleCollisions() {
+      if (!state.markerVisible) return;
+
+      markerEl.object3D.getWorldPosition(tmpV1);
+
+      for (let i = state.items.length - 1; i >= 0; i--) {
+        const it = state.items[i];
+        if (!it.el.object3D) continue;
+        it.el.object3D.getWorldPosition(tmpV2);
+        const dist = tmpV1.distanceTo(tmpV2);
+        if (dist <= state.collisionRadius) {
+          if (it.isGood) {
+            state.combo += 1;
+            const bonus = 10 + Math.min(60, state.combo * 2);
+            state.score += bonus;
+          } else {
+            state.combo = 0;
+            state.score = Math.max(0, state.score - 15);
+          }
+          updateHUD();
+          removeItem(i);
+        }
       }
     }
 
-    runBtn.addEventListener('click', testLoad);
-    // 進頁面自動跑一次
-    testLoad();
+    // ========= 計時 =========
+    function startTimer() {
+      clearInterval(state.timerId);
+      state.timerId = setInterval(() => {
+        state.timeLeft -= 1;
+        updateHUD();
+        if (state.timeLeft <= 0) {
+          clearInterval(state.timerId);
+          state.running = false;
+          state.gameOver = true;
+          setHint(`時間到！總分：${state.score}`);
+          startBtn.disabled = false;
+        }
+      }, 1000);
+    }
+
+    // ========= 遊戲控制 =========
+    function startGame() {
+      if (state.running) return;
+      state.running = true;
+      state.gameOver = false;
+      state.score = 0;
+      state.combo = 0;
+      state.timeLeft = 60;
+      updateHUD();
+      setHint('請將 Hiro marker 放入鏡頭視野。');
+      startBtn.disabled = true;
+      // 清空舊物件
+      state.items.forEach(it => it.el.parentNode && it.el.parentNode.removeChild(it.el));
+      state.items = [];
+      ensureItems();
+      startTimer();
+    }
+
+    function resetGame() {
+      state.running = false;
+      state.gameOver = false;
+      clearInterval(state.timerId);
+      state.timeLeft = 60;
+      state.score = 0;
+      state.combo = 0;
+      updateHUD();
+      startBtn.disabled = false;
+      state.items.forEach(it => it.el.parentNode && it.el.parentNode.removeChild(it.el));
+      state.items = [];
+      setHint('已重置，按「開始」再玩一次。');
+    }
+
+    // ========= AR 事件 =========
+    markerEl.addEventListener('markerFound', () => {
+      state.markerVisible = true;
+      if (state.running) setHint('偵測到 Hiro marker，開始舞動！', 'ok');
+    });
+    markerEl.addEventListener('markerLost', () => {
+      state.markerVisible = false;
+      if (state.running) setHint('找不到 Hiro marker，請重新對準。', 'bad');
+    });
+
+    // ========= 主循環 (A-Frame component) =========
+    AFRAME.registerComponent('game-loop', {
+      tick: function (time, dt) {
+        if (!state.running || state.gameOver) return;
+
+        // 移除過期物件
+        const now = performance.now();
+        for (let i = state.items.length - 1; i >= 0; i--) {
+          if (now > state.items[i].expireAt) removeItem(i);
+        }
+        ensureItems();
+        handleCollisions();
+      }
+    });
+    // 掛到場景
+    sceneEl.setAttribute('game-loop', '');
+
+    // ========= UI 事件 =========
+    startBtn.addEventListener('click', startGame);
+    resetBtn.addEventListener('click', resetGame);
+
+    fullscreenBtn.addEventListener('click', () => {
+      const el = document.documentElement;
+      if (!document.fullscreenElement) {
+        (el.requestFullscreen && el.requestFullscreen()) || (el.webkitRequestFullscreen && el.webkitRequestFullscreen());
+      } else {
+        (document.exitFullscreen && document.exitFullscreen()) || (document.webkitExitFullscreen && document.webkitExitFullscreen());
+      }
+    });
+
+    function openPanel() {
+      panel.classList.add('open');
+      panelBackdrop.classList.add('open');
+      panel.setAttribute('aria-hidden', 'false');
+    }
+    function closePanel() {
+      panel.classList.remove('open');
+      panelBackdrop.classList.remove('open');
+      panel.setAttribute('aria-hidden', 'true');
+    }
+    menuBtn.addEventListener('click', openPanel);
+    closePanelBtn.addEventListener('click', closePanel);
+    panelBackdrop.addEventListener('click', closePanel);
+
+    // ========= 初始提示 =========
+    setHint('按「開始」，將 Hiro marker 放入鏡頭視野。');
   </script>
 </body>
 </html>
