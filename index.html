@@ -108,7 +108,7 @@
     const menuBtn = document.getElementById('menuBtn');
     const panel = document.getElementById('panel');
     const panelBackdrop = document.getElementById('panelBackdrop');
-    const closePanel = document.getElementById('closePanel');
+    const closePanelBtn = document.getElementById('closePanel');
 
     const toggleFacingBtn = document.getElementById('toggleFacing');
     const toggleMirrorBtn = document.getElementById('toggleMirror');
@@ -154,6 +154,8 @@
     const goodList = ['福','春','財','安','旺','吉','祥','賀','龍','年'];
     const badList  = ['⚽','🍔','🎧','🧊','🧼','🍺','💡','📎','🧽','🧯'];
     const items=[]; const MAX_ITEMS=14;
+
+    // 粒子（單一定義，避免重複宣告）
     const particles=[]; const MAX_PARTICLES=1200;
 
     // 畫布尺寸
@@ -210,54 +212,37 @@
 
     // 初始化 ARController 與載入 HIRO Pattern
     async function initAR() {
-      // 用 video 畫面動態尺寸初始化
       const vw = video.videoWidth|0, vh = video.videoHeight|0;
       if (vw===0 || vh===0) return false;
 
-      // 設定工作畫布（給 ARToolKit 灰階二值化使用）
-      const processScale = 0.75; // 保守比例，提高穩定性
+      const processScale = 0.9; // 提高穩定性
       workCanvas.width = Math.max(320, Math.round(vw*processScale));
       workCanvas.height = Math.max(240, Math.round(vh*processScale));
 
       return new Promise((resolve) => {
-        // 參數說明：
-        // ARCameraParamURL 可留空使用預設；第 2、3 參數是處理解析度（非螢幕解析度）
         const cameraParam = new ARCameraParam();
         cameraParam.onload = function() {
           arController = new ARController(workCanvas.width, workCanvas.height, cameraParam);
-          // 載入內建 HIRO 樣式（jsartoolkit5 內含的標準 pattern）
-          // 注意：某些發行版需要用 loadMarker('Data/patt.hiro', cb) 並提供檔案；此 CDN 版本提供 API 模擬
-          if (!arController.loadMarker || !arController.trackPatternMarkerId) {
-            // 後備方案：使用 URL 的 pattern 檔（CDN 提供）
-            arController.loadMarker('https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/data/patt.hiro', function(id) {
-              hiroPatternId = id;
-              arController.setPatternDetectionMode(artoolkit.AR_TEMPLATE_MATCHING_COLOR);
-              resolve(true);
-            });
-          } else {
-            // 若環境支援直接取得 HIRO pattern
-            arController.loadMarker('https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/data/patt.hiro', function(id) {
-              hiroPatternId = id;
-              arController.setPatternDetectionMode(artoolkit.AR_TEMPLATE_MATCHING_COLOR);
-              resolve(true);
-            });
-          }
+          arController.setPatternDetectionMode(artoolkit.AR_TEMPLATE_MATCHING_COLOR); // HIRO 用彩色模板匹配較穩
+          // 以 CDN 提供的 HIRO pattern
+          arController.loadMarker('https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/data/patt.hiro', function(id) {
+            hiroPatternId = id;
+            resolve(true);
+          });
         };
-        cameraParam.load(); // 載入預設相機參數
+        cameraParam.load();
       });
     }
 
-    // 將 HIRO 的 4 個角映射到畫面，取中心
+    // 偵測 HIRO 中心
     function detectHiroCenter() {
       const vw = video.videoWidth|0, vh = video.videoHeight|0;
       if (vw===0 || vh===0 || !arController || hiroPatternId<0) return null;
 
-      // 將 video 畫面縮放後送入 ARToolKit
       wctx.drawImage(video, 0, 0, workCanvas.width, workCanvas.height);
       const imageData = wctx.getImageData(0, 0, workCanvas.width, workCanvas.height);
       arController.process(imageData);
 
-      // track 一次 pattern（門檻值與遺失幀數可做調整）
       const markerCount = arController.getMarkerNum();
       let best = null;
 
@@ -273,27 +258,23 @@
           break;
         }
       }
-
       if (!best) return null;
 
-      // 計算中心
       let cx = 0, cy = 0;
       for (const p of best.corners) { cx += p.x; cy += p.y; }
-      cx /= 4; cy /= 4;
-
-      // 鏡像校正
+      cx/=4; cy/=4;
       if (mirrored) cx = workCanvas.width - cx;
 
-      // 映射至主 Canvas
       const px = cx / workCanvas.width * W;
       const py = cy / workCanvas.height * H;
       return { x: px, y: py };
     }
 
-    // 遊戲：目標、粒子、繪製（沿用你既有邏輯）
+    // 遊戲：目標、粒子、繪製
     function spawnItem(){
       const isGood = Math.random()<0.6;
-      const text = (isGood?goodList:badList)[Math.floor(Math.random()*10)];
+      const src = isGood ? goodList : badList;
+      const text = src[Math.floor(Math.random()*src.length)];
       const size = 28 + Math.random()*18;
       const margin = 28 + size;
       const x = margin + Math.random()*(W - margin*2);
@@ -308,7 +289,8 @@
     function updateItems(dt){
       for(let i=items.length-1;i>=0;i--){
         const it=items[i]; it.x+=it.vx; it.y+=it.vy; it.ttl-=dt;
-        if(it.x<20||it.x>W-20) it.vx*=-1; if(it.y<60||it.y>H-60) it.vy*=-1;
+        if(it.x<20||it.x>W-20) it.vx*=-1;
+        if(it.y<60||it.y>H-60) it.vy*=-1;
         if(it.ttl<=0) items.splice(i,1);
       } ensureItems();
     }
@@ -325,25 +307,37 @@
       }
     }
 
-    const particles=[]; const MAX_PARTICLES=1200;
     function spawnIncenseParticles(pos, dir, count=6){
       for(let i=0;i<count;i++){
-        if(particles.length>=MAX_PARTICLES) break;
-        const angle=Math.atan2(dir.y,dir.x)+(Math.random()*0.8-0.4);
-        const speed=40+Math.random()*120;
-        particles.push({ x:pos.x+(Math.random()*6-3), y:pos.y+(Math.random()*6-3), vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed - Math.random()*20, life:0.45+Math.random()*0.35, age:0, size:2+Math.random()*2.5, hue:20+Math.random()*20 });
+        if(particles.length >= MAX_PARTICLES) break;
+        const angle=Math.atan2(dir.y,dir.x) + (Math.random()*0.8 - 0.4);
+        const speed=40 + Math.random()*120;
+        const vx=Math.cos(angle)*speed;
+        const vy=Math.sin(angle)*speed - Math.random()*20;
+        particles.push({
+          x: pos.x + (Math.random()*6-3),
+          y: pos.y + (Math.random()*6-3),
+          vx, vy,
+          life: 0.45 + Math.random()*0.35,
+          age: 0,
+          size: 2 + Math.random()*2.5,
+          hue: 20 + Math.random()*20
+        });
       }
     }
     function updateParticles(dt){
       for(let i=particles.length-1;i>=0;i--){
-        const p=particles[i]; p.age+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=20*dt; if(p.age>=p.life) particles.splice(i,1);
+        const p=particles[i];
+        p.age += dt; p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 20*dt;
+        if(p.age >= p.life) particles.splice(i,1);
       }
     }
     function drawParticles(ctx){
       ctx.save(); ctx.globalCompositeOperation='lighter';
       for(const p of particles){
-        const t=p.age/p.life, alpha=1-t, size=p.size*(0.8+0.4*(1-t));
-        ctx.fillStyle=`hsla(${p.hue},90%,${60-t*30}%,${alpha})`;
+        const t=p.age/p.life; const alpha=1-t;
+        const size=p.size*(0.8+0.4*(1-t));
+        ctx.fillStyle=`hsla(${p.hue},90%,${60 - t*30}%,${alpha})`;
         ctx.beginPath(); ctx.arc(p.x,p.y,size,0,Math.PI*2); ctx.fill();
       }
       ctx.restore();
@@ -373,6 +367,7 @@
         }
       }
     }
+
     const floatTexts=[];
     function flash(text,x,y,ok){ floatTexts.push({text,x,y,ok,t:0}); }
     function drawFloatTexts(dt){
@@ -387,6 +382,7 @@
     let lastTime=performance.now();
     let headPos={x:0,y:0}, headSmooth={x:0,y:0};
     const smoothing=0.28;
+
     function tick(now){
       const dt = Math.min(0.033, (now-lastTime)/1000); lastTime=now;
       ctx.clearRect(0,0,W,H);
@@ -416,7 +412,9 @@
       running=true; gameOver=false; lastTime=performance.now();
       ensureItems();
       clearInterval(timerId); timeLeft=60; timeEl.textContent=timeLeft;
-      timerId=setInterval(()=>{ timeLeft--; timeEl.textContent=timeLeft; if(timeLeft<=0){ clearInterval(timerId); running=false; gameOver=true; hintEl.textContent=`時間到！總分：${score}`; hintEl.className='hint'; startBtn.disabled=false; } },1000);
+      timerId=setInterval(()=>{ timeLeft--; timeEl.textContent=timeLeft;
+        if(timeLeft<=0){ clearInterval(timerId); running=false; gameOver=true; hintEl.textContent=`時間到！總分：${score}`; hintEl.className='hint'; startBtn.disabled=false; }
+      },1000);
       requestAnimationFrame(tick);
     }
 
@@ -426,7 +424,7 @@
       try{
         const okCam = await initCamera();
         if(!okCam){ startBtn.disabled=false; return; }
-        // 等待 video 有尺寸
+        // 等待 video 取得尺寸
         await new Promise(r => {
           const chk=()=> (video.videoWidth>0? r(): setTimeout(chk,50));
           chk();
@@ -463,16 +461,19 @@
     });
 
     function openPanel(){ panel.classList.add('open'); panelBackdrop.classList.add('open'); panel.setAttribute('aria-hidden','false'); panelBackdrop.setAttribute('aria-hidden','false'); }
-    function closePanelFn(){ panel.classList.remove('open'); panelBackdrop.classList.remove('open'); panel.setAttribute('aria-hidden','true'); panelBackdrop.setAttribute('aria-hidden','true'); }
+    function closePanel(){ panel.classList.remove('open'); panelBackdrop.classList.remove('open'); panel.setAttribute('aria-hidden','true'); panelBackdrop.setAttribute('aria-hidden','true'); }
     menuBtn.addEventListener('click', openPanel);
-    closePanel.addEventListener('click', closePanelFn);
-    panelBackdrop.addEventListener('click', closePanelFn);
+    panelBackdrop.addEventListener('click', closePanel);
+    closePanelBtn.addEventListener('click', closePanel);
 
     function bindVal(input, labelEl){ const sync=()=> labelEl.textContent=input.value; input.addEventListener('input', sync); sync(); }
     bindVal(densEl, densityVal); bindVal(speedEl, speedVal);
 
     // 初始頭部位置
-    headPos={x:W/2,y:H/2}; headSmooth={x:headPos.x,y:headPos.y};
+    let headPosInit = {x: W/2, y: H/2};
+    let headSmoothInit = {x: headPosInit.x, y: headPosInit.y};
+    headPos = headPosInit;
+    headSmooth = headSmoothInit;
   </script>
 </body>
 </html>
