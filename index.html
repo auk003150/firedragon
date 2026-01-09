@@ -40,7 +40,7 @@
       flex-direction: column;
       padding: 12px;
       gap: 8px;
-      z-index: 5; /* 讓 HUD 在最上層 */
+      z-index: 5;
     }
     .row {
       display: flex;
@@ -152,7 +152,7 @@
       <div class="row" style="gap:6px;">
         <button class="btn" id="startBtn">開始 / 暫停</button>
         <button class="btn" id="resetBtn">重置</button>
-        <button class="btn" id="videoBtn">影像開關</button>
+        <button class="btn" id="mirrorBtn">鏡像開關</button>
         <button class="btn" id="bgBtn">背景開關</button>
       </div>
     </div>
@@ -255,6 +255,13 @@
     const scene = document.getElementById('scene');
     const marker = document.getElementById('marker');
 
+    let arCanvas = null;
+    function getCanvas() {
+      if (arCanvas && arCanvas.isConnected) return arCanvas;
+      arCanvas = scene.canvas || document.querySelector('canvas');
+      return arCanvas;
+    }
+
     // Show toast
     function showToast(msg) {
       toast.textContent = msg;
@@ -352,7 +359,6 @@
     // Timer logic
     function startGame() {
       if (running) { pauseGame(); return; }
-      // reset timers to avoid duplicates
       clearInterval(countdownTimer);
       clearInterval(spawnTimer);
 
@@ -406,16 +412,15 @@
     document.getElementById('startBtn').addEventListener('click', startGame);
     document.getElementById('resetBtn').addEventListener('click', resetGame);
 
-    // Camera video toggle
-    let videoOn = true;
-    document.getElementById('videoBtn').addEventListener('click', () => {
-      const vid = document.querySelector('video');
-      if (!vid) { showToast('等待相機啟動…'); return; }
-      videoOn = !videoOn;
-      vid.style.display = videoOn ? 'block' : 'none';
-      if (videoOn) { vid.play?.().catch(()=>{}); }
-      else { vid.pause?.(); }
-      showToast(videoOn ? '相機影像：開' : '相機影像：關');
+    // Mirror toggle (鏡像開關)
+    let mirrorOn = false;
+    document.getElementById('mirrorBtn').addEventListener('click', () => {
+      const c = getCanvas();
+      if (!c) { showToast('等待畫面初始化…'); return; }
+      mirrorOn = !mirrorOn;
+      c.style.transformOrigin = 'center center';
+      c.style.transform = mirrorOn ? 'scaleX(-1)' : 'scaleX(1)';
+      showToast(mirrorOn ? '鏡像：開' : '鏡像：關');
     });
 
     // Background toggle
