@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>大坑舞火龍 AR 小遊戲</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js/AR.js/master/aframe/build/aframe-ar.min.js"></script>
   <style>
     html, body {
       margin: 0; padding: 0;
@@ -18,6 +16,10 @@
       touch-action: manipulation;
     }
     .wrap { position: relative; width: 100%; height: 100%; background: #000; }
+    video#cam {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      transform: none; background: #000;
+    }
     img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 1; mix-blend-mode: lighten; }
     canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
 
@@ -92,16 +94,11 @@
 
     /* 隱藏原底部 bar（改放到面板內） */
     .bar { display: none; }
-
-    /* A-Frame 樣式調整 */
-    a-scene { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <a-scene id="scene" embedded vr-mode-ui="enabled: false">
-      <a-marker id="marker" preset="hiro"></a-marker>
-    </a-scene>
+    <video id="cam" playsinline autoplay muted></video>
     <img id="bg" alt="背景" src="image_1.png" />
     <canvas id="game"></canvas>
 
@@ -135,6 +132,12 @@
           </div>
         </div>
         <div class="row">
+          <div class="label">鏡像</div>
+          <div class="controls">
+            <button id="toggleMirror" class="mini">鏡像：關</button>
+          </div>
+        </div>
+        <div class="row">
           <div class="label">螢幕</div>
           <div class="controls">
             <button id="fullscreenBtn" class="mini">全屏</button>
@@ -148,6 +151,41 @@
         </div>
       </div>
       <div class="section" style="border-top:1px solid rgba(255,255,255,0.1)">
+        <div class="sliderRow">
+          <div class="label">Hmin</div>
+          <div class="controls">
+            <input id="hMin" type="range" min="0" max="360" value="330">
+            <span id="hMinVal" class="val">330</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">Hmax</div>
+          <div class="controls">
+            <input id="hMax" type="range" min="0" max="360" value="20">
+            <span id="hMaxVal" class="val">20</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">Smin</div>
+          <div class="controls">
+            <input id="sMin" type="range" min="0" max="100" value="50">
+            <span id="sMinVal" class="val">50</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">Vmin</div>
+          <div class="controls">
+            <input id="vMin" type="range" min="0" max="100" value="40">
+            <span id="vMinVal" class="val">40</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">靈敏度</div>
+          <div class="controls">
+            <input id="sens" type="range" min="0" max="300" value="80">
+            <span id="sensVal" class="val">80</span>
+          </div>
+        </div>
         <div class="sliderRow">
           <div class="label">目標密度</div>
           <div class="controls">
@@ -165,16 +203,15 @@
       </div>
     </aside>
 
-    <div id="hint" class="hint">按「開始」允許相機權限。請將 Hiro marker 在鏡頭前移動。如果鏡頭未開，請檢查權限或瀏覽器。</div>
+    <div id="hint" class="hint">按「開始」允許相機權限。請以紅色物件在鏡頭前揮動。</div>
   </div>
 
   <script>
     // ========= DOM =========
+    const video = document.getElementById('cam');
     const bgImg = document.getElementById('bg');
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d', { alpha: true });
-    const scene = document.getElementById('scene');
-    const marker = document.getElementById('marker');
 
     const startBtn = document.getElementById('startBtn');
 
@@ -186,6 +223,7 @@
 
     const resetBtn = document.getElementById('resetBtn');
     const toggleFacingBtn = document.getElementById('toggleFacing');
+    const toggleMirrorBtn = document.getElementById('toggleMirror');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
 
     const scoreEl = document.getElementById('score');
@@ -194,8 +232,18 @@
     const hintEl = document.getElementById('hint');
 
     // 滑桿與數值
+    const hMinEl = document.getElementById('hMin');
+    const hMaxEl = document.getElementById('hMax');
+    const sMinEl = document.getElementById('sMin');
+    const vMinEl = document.getElementById('vMin');
+    const sensEl = document.getElementById('sens');
     const densEl = document.getElementById('density');
     const speedEl = document.getElementById('speed');
+    const hMinVal = document.getElementById('hMinVal');
+    const hMaxVal = document.getElementById('hMaxVal');
+    const sMinVal = document.getElementById('sMinVal');
+    const vMinVal = document.getElementById('vMinVal');
+    const sensVal = document.getElementById('sensVal');
     const densityVal = document.getElementById('densityVal');
     const speedVal = document.getElementById('speedVal');
 
@@ -212,6 +260,7 @@
     const smoothing = 0.28;
 
     let useEnvironment = true;
+    let mirrored = false;
 
     // ========= 單張貼圖（無旋轉）=========
     const dragonImg = new Image();
@@ -268,6 +317,103 @@
         hintEl.className = 'hint bad';
       }
       return ok;
+    }
+
+    // ========= 相機 =========
+    let currentStream = null;
+    async function stopStream() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+        currentStream = null;
+      }
+    }
+    async function initCamera() {
+      const kinds = [
+        { width: { ideal: 1280 }, height: { ideal: 720 } },
+        { width: { ideal: 960 }, height: { ideal: 540 } },
+        { width: { ideal: 640 }, height: { ideal: 480 } }
+      ];
+      const facing = useEnvironment ? { ideal: 'environment' } : { ideal: 'user' };
+      let lastErr = null;
+      await stopStream();
+      for (const res of kinds) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { ...res, facingMode: facing }
+          });
+          currentStream = stream;
+          video.srcObject = stream;
+          video.playsInline = true;
+          await video.play().catch(()=>{});
+          applyMirror();
+          return true;
+        } catch (err) { lastErr = err; }
+      }
+      console.error('Camera init failed:', lastErr);
+      hintEl.textContent = '相機無法啟動，請檢查權限/瀏覽器設定或改用其他裝置。';
+      hintEl.className = 'hint bad';
+      return false;
+    }
+
+    function applyMirror() {
+      video.style.transform = mirrored ? 'scaleX(-1)' : 'none';
+      toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`;
+    }
+
+    // ========= 顏色追蹤 =========
+    const workCanvas = document.createElement('canvas');
+    const wctx = workCanvas.getContext('2d', { willReadFrequently: true });
+
+    function rgb2hsv(r,g,b){
+      r/=255; g/=255; b/=255;
+      const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+      let h=0; if(d!==0){ if(max===r) h=((g-b)/d)%6; else if(max===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; }
+      if(h<0) h+=360; const s=max===0?0:d/max; const v=max; return [h,s*100,v*100];
+    }
+    function inHueRange(h, hMin, hMax){
+      return hMin<=hMax ? (h>=hMin && h<=hMax) : (h>=hMin || h<=hMax);
+    }
+
+    function trackRedCentroid() {
+      const vw = video.videoWidth|0, vh = video.videoHeight|0;
+      if (vw === 0 || vh === 0) return null;
+
+      const scale = 0.22;
+      const w = Math.max(2, Math.round(vw * scale));
+      const h = Math.max(2, Math.round(vh * scale));
+      if (w < 2 || h < 2) return null;
+
+      workCanvas.width = w; workCanvas.height = h;
+
+      try {
+        wctx.drawImage(video, 0, 0, w, h);
+      } catch (e) {
+        return null;
+      }
+
+      const { data } = wctx.getImageData(0, 0, w, h);
+
+      const hMin = parseInt(hMinEl.value, 10);
+      const hMax = parseInt(hMaxEl.value, 10);
+      const sMin = parseInt(sMinEl.value, 10);
+      const vMin = parseInt(vMinEl.value, 10);
+      const sens = parseInt(sensEl.value, 10);
+
+      let sumX=0,sumY=0,count=0;
+      const step=2;
+      for (let y=0; y<h; y+=step){
+        for (let x=0; x<w; x+=step){
+          const i=(y*w+x)*4;
+          const r=data[i], g=data[i+1], b=data[i+2];
+          const [hh,ss,vv]=rgb2hsv(r,g,b);
+          if (inHueRange(hh,hMin,hMax) && ss>=sMin && vv>=vMin){ sumX+=x; sumY+=y; count++; }
+        }
+      }
+      if (count < sens) return null;
+      const cx = (sumX / count) / w * W;
+      const cy = (sumY / count) / h * H;
+      return { x: cx, y: cy, count };
     }
 
     // ========= 目標物件 =========
@@ -427,23 +573,15 @@
 
       ctx.clearRect(0, 0, W, H);
 
-      // 使用 A-Frame AR.js 偵測 Hiro marker
-      let detected = false;
-      if (marker.object3D.visible) {
-        const position = new THREE.Vector3();
-        marker.object3D.getWorldPosition(position);
-        position.project(scene.camera);
-        const cx = (position.x * 0.5 + 0.5) * W;
-        const cy = (-position.y * 0.5 + 0.5) * H;
-        centroid.x = centroid.x + (cx - centroid.x) * smoothing || cx;
-        centroid.y = centroid.y + (cy - centroid.y) * smoothing || cy;
+      const c = trackRedCentroid();
+      if (c) {
+        centroid.x = centroid.x + (c.x - centroid.x) * smoothing || c.x;
+        centroid.y = centroid.y + (c.y - centroid.y) * smoothing || c.y;
         direction.x = 1; direction.y = 0;
-        hintEl.textContent = '已偵測到 Hiro marker，盡情舞動！';
+        hintEl.textContent = '已偵測到紅色目標，盡情舞動！';
         hintEl.className = 'hint ok';
-        detected = true;
-      }
-      if (!detected) {
-        hintEl.textContent = '未偵測到 Hiro marker，請將 Hiro marker 放在鏡頭前並調整光線。如果鏡頭未開，請檢查權限。';
+      } else {
+        hintEl.textContent = '未偵測到紅色物件，請調整光線/色域或靠近鏡頭。';
         hintEl.className = 'hint bad';
       }
 
@@ -487,18 +625,12 @@
     async function startAll() {
       if (!supported()) return;
       startBtn.disabled = true;
-      hintEl.textContent = '正在啟動相機...';
-      hintEl.className = 'hint';
       try {
-        // 等待 A-Frame 載入
-        await new Promise(resolve => scene.addEventListener('loaded', resolve, { once: true }));
-        scene.setAttribute('arjs', `sourceType: webcam; facingMode: ${useEnvironment ? 'environment' : 'user'}; detectionMode: mono; debugUIEnabled: false;`);
-        hintEl.textContent = '相機已啟動，請將 Hiro marker 放在鏡頭前。';
-        hintEl.className = 'hint ok';
-        startGameLoop();
+        const ok = await initCamera();
+        if (ok) startGameLoop(); else startBtn.disabled = false;
       } catch (err) {
-        console.error('相機啟動錯誤:', err);
-        hintEl.textContent = '相機無法啟動：' + (err.message || '未知錯誤') + '。請確認權限、HTTPS，並重試。';
+        console.error(err);
+        hintEl.textContent = '相機無法啟動，請確認權限與 HTTPS。';
         hintEl.className = 'hint bad';
         startBtn.disabled = false;
       }
@@ -506,7 +638,7 @@
 
     startBtn.addEventListener('click', startAll);
 
-    resetBtn.addEventListener('click', () => {
+    resetBtn.addEventListener('click', async () => {
       score = 0; combo = 0; scoreEl.textContent = score; comboEl.textContent = combo;
       items.length = 0; ensureItems();
       centroid = { x: W/2, y: H/2 };
@@ -517,32 +649,17 @@
       clearInterval(timerId);
       timeLeft = 60; timeEl.textContent = timeLeft;
       startBtn.disabled = false;
-      const system = scene.systems.arjs;
-      if (system) {
-        system.pause();
-        const video = system._arSource ? system._arSource.domElement : null;
-        if (video && video.srcObject) {
-          video.srcObject.getTracks().forEach(t => t.stop());
-        }
-      }
-      scene.removeAttribute('arjs');
+      await stopStream();
     });
 
-    toggleFacingBtn.addEventListener('click', () => {
+    toggleFacingBtn.addEventListener('click', async () => {
       useEnvironment = !useEnvironment;
-      const system = scene.systems.arjs;
-      if (system) {
-        system.pause();
-        const video = system._arSource ? system._arSource.domElement : null;
-        if (video && video.srcObject) {
-          video.srcObject.getTracks().forEach(t => t.stop());
-          video.srcObject = null;
-        }
-      }
-      scene.setAttribute('arjs', `sourceType: webcam; facingMode: ${useEnvironment ? 'environment' : 'user'}; detectionMode: mono; debugUIEnabled: false;`);
-      if (system) system.play();
+      await initCamera();
     });
-
+    toggleMirrorBtn.addEventListener('click', () => {
+      mirrored = !mirrored;
+      applyMirror();
+    });
     fullscreenBtn.addEventListener('click', () => {
       const el = document.documentElement;
       if (!document.fullscreenElement) {
@@ -573,6 +690,11 @@
       input.addEventListener('input', sync);
       sync();
     }
+    bindVal(hMinEl, hMinVal);
+    bindVal(hMaxEl, hMaxVal);
+    bindVal(sMinEl, sMinVal);
+    bindVal(vMinEl, vMinVal);
+    bindVal(sensEl, sensVal);
     bindVal(densEl, densityVal);
     bindVal(speedEl, speedVal);
 
