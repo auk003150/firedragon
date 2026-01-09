@@ -32,7 +32,8 @@
       background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0));
       user-select: none; z-index: 5;
     }
-    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .top-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .hudbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
     .btn { background: #e11d48; border: none; color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(225,29,72,0.35); cursor: pointer; }
@@ -43,6 +44,28 @@
 
     .hud { display: flex; gap: 10px; align-items: center; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,0.6); flex-wrap: wrap; }
     .chip { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 6px 10px; font-size: 14px; }
+
+    /* Marker status pill */
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,0,0,0.45);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 1;
+      color: #e5e7eb;
+    }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 999px;
+      background: #f97316;
+      box-shadow: 0 0 0 4px rgba(249,115,22,0.18);
+    }
+    .status.ok { border-color: rgba(34,197,94,0.4); color: #dcfce7; }
+    .status.ok .status-dot { background: #22c55e; box-shadow: 0 0 0 4px rgba(34,197,94,0.18); }
 
     .hint {
       position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
@@ -106,7 +129,13 @@
     <!-- UI -->
     <div class="ui">
       <div class="topbar">
-        <button id="startBtn" class="btn">開始</button>
+        <div class="top-left">
+          <button id="startBtn" class="btn">開始</button>
+          <div id="markerStatus" class="status">
+            <span class="status-dot"></span>
+            <span class="status-text">Marker：未偵測</span>
+          </div>
+        </div>
         <button id="menuBtn" class="btn ghost">≡ 選單</button>
       </div>
       <div class="hudbar">
@@ -183,6 +212,10 @@
     const densityVal = document.getElementById('densityVal');
     const speedVal = document.getElementById('speedVal');
 
+    // Marker status DOM
+    const markerStatusEl = document.getElementById('markerStatus');
+    const markerStatusText = markerStatusEl.querySelector('.status-text');
+
     // A-Frame / AR.js
     const sceneEl = document.getElementById('scene');
     const markerEl = document.getElementById('hiroMarker');
@@ -245,13 +278,21 @@
     resize();
 
     // ========= Marker 事件 =========
+    function setMarkerStatus(visible) {
+      markerStatusEl.classList.toggle('ok', visible);
+      markerStatusText.textContent = visible ? 'Marker：已偵測' : 'Marker：未偵測';
+    }
+    setMarkerStatus(false);
+
     markerEl.addEventListener('markerFound', () => {
       markerVisible = true;
+      setMarkerStatus(true);
       hintEl.textContent = '已偵測到 Hiro Marker，盡情舞動！';
       hintEl.className = 'hint ok';
     });
     markerEl.addEventListener('markerLost', () => {
       markerVisible = false;
+      setMarkerStatus(false);
       hintEl.textContent = '未偵測到 Hiro Marker，請把標記放入鏡頭中。';
       hintEl.className = 'hint bad';
     });
