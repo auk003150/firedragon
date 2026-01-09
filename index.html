@@ -146,10 +146,10 @@
       <div class="camera-card">
         <div class="camera-title">需要相機權限</div>
         <div class="camera-desc">
-          請允許相機以啟動 AR 偵測（建議使用後鏡頭）。<br>
+          按下方按鈕啟動相機並進行 AR 偵測（建議使用後鏡頭）。<br>
           若先前拒絕，請到瀏覽器設定開啟相機權限並重新整理。
         </div>
-        <button id="cameraBtn" class="btn">允許相機</button>
+        <button id="cameraBtn" class="btn">允許／啟動相機</button>
         <div id="cameraMsg" class="camera-msg"></div>
       </div>
     </div>
@@ -161,8 +161,8 @@
       vr-mode-ui="enabled: false"
       embedded
       renderer="logarithmicDepthBuffer: true; antialias: true; alpha: true;"
-      arjs="sourceType: webcam; facingMode: environment; trackingMethod: best; detectionMode: mono; patternRatio: 0.75; debugUIEnabled: false;">
-      <a-marker id="hiroMarker" type="pattern" preset="hiro" emitevents="true" smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="2">
+      arjs="sourceType: webcam; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; trackingMethod: best; detectionMode: mono; patternRatio: 0.75; debugUIEnabled: false;">
+      <a-marker id="hiroMarker" preset="hiro" emitevents="true" smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="2">
         <a-entity id="markerAnchor"></a-entity>
       </a-marker>
       <a-entity camera></a-entity>
@@ -182,7 +182,7 @@
           </div>
           <div id="cameraStatus" class="status warn">
             <span class="status-dot"></span>
-            <span class="status-text">Camera：初始化中</span>
+            <span class="status-text">Camera：未啟動</span>
           </div>
         </div>
         <button id="menuBtn" class="btn ghost">≡ 選單</button>
@@ -196,7 +196,7 @@
       </div>
     </div>
 
-    <div id="hint" class="hint">按「允許相機」授權後，再按「開始」，並將 Hiro Marker 放入鏡頭畫面（保持光線充足）。</div>
+    <div id="hint" class="hint">按「允許／啟動相機」，授權後再按「開始」，並將 Hiro Marker 放入鏡頭畫面（保持光線充足）。</div>
 
     <!-- Panel -->
     <div id="panelBackdrop" class="panel-backdrop"></div>
@@ -277,7 +277,7 @@
     const markerEl = document.getElementById('hiroMarker');
     let markerVisible = false;
     let cameraReady = false;
-    let cameraGranted = false;
+    let arStarted = false;
 
     // THREE reference
     const THREE = (window.AFRAME && window.AFRAME.THREE) ? window.AFRAME.THREE : window.THREE;
@@ -326,6 +326,8 @@
         canvas.width = Math.round(W * dpr);
         canvas.height = Math.round(H * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        // 同步 AR 畫面尺寸
+        resizeAR();
       };
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(doResize, 50);
@@ -345,7 +347,7 @@
       cameraStatusText.textContent = text;
     }
     setMarkerStatus(false);
-    setCameraStatus(false, 'Camera：初始化中');
+    setCameraStatus(false, 'Camera：未啟動');
 
     // ========= Marker 事件 =========
     markerEl.addEventListener('markerFound', () => {
@@ -363,15 +365,15 @@
 
     sceneEl.addEventListener('camera-set-active', () => {
       cameraReady = true;
-      setCameraStatus(true, 'Camera：已就緒');
+      if (arStarted) setCameraStatus(true, 'Camera：已就緒');
     });
     sceneEl.addEventListener('render-target-loaded', () => {
       cameraReady = true;
-      setCameraStatus(true, 'Camera：已就緒');
+      if (arStarted) setCameraStatus(true, 'Camera：已就緒');
     });
     sceneEl.addEventListener('arjs-video-loaded', () => {
       cameraReady = true;
-      setCameraStatus(true, 'Camera：已就緒');
+      if (arStarted) setCameraStatus(true, 'Camera：已就緒');
     });
 
     function getMarkerScreenPos() {
@@ -638,80 +640,80 @@
     bindVal(densEl, densityVal);
     bindVal(speedEl, speedVal);
 
-    // ======== 相機權限處理與 AR 重新啟動 ========
-    function restartARSourceIfNeeded() {
+    // ======== AR 相機啟動與尺寸同步 ========
+    function resizeAR() {
       const arSystem = sceneEl.systems && sceneEl.systems['arjs'];
       if (!arSystem || !arSystem.arToolkitSource) return;
       const src = arSystem.arToolkitSource;
-      if (src.ready) {
-        // 尺寸同步
-        src.onResizeElement();
-        src.copyElementSizeTo(sceneEl.canvas);
-        if (arSystem.arToolkitContext && arSystem.arToolkitContext.arController) {
-          src.copyElementSizeTo(arSystem.arToolkitContext.arController.canvas);
-        }
-        return;
+      if (!src.ready) return;
+      src.onResizeElement();
+      src.copyElementSizeTo(sceneEl.canvas);
+      if (arSystem.arToolkitContext && arSystem.arToolkitContext.arController) {
+        src.copyElementSizeTo(arSystem.arToolkitContext.arController.canvas);
       }
-      // 未 ready 時重新初始化
-      src.init(function onReady() {
-        src.onResizeElement();
-        src.copyElementSizeTo(sceneEl.canvas);
-        if (arSystem.arToolkitContext && arSystem.arToolkitContext.arController) {
-          src.copyElementSizeTo(arSystem.arToolkitContext.arController.canvas);
-        }
-      });
     }
 
-    async function requestCameraAccess() {
+    async function startARCamera() {
       if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
         cameraMsg.textContent = '需在 HTTPS (或 localhost) 下才能啟用相機。';
         return false;
       }
-      if (!navigator.mediaDevices?.getUserMedia) {
-        cameraMsg.textContent = '瀏覽器不支援相機存取。';
+      const arSystem = sceneEl.systems && sceneEl.systems['arjs'];
+      if (!arSystem) {
+        cameraMsg.textContent = 'AR.js 尚未就緒，請稍後重試。';
         return false;
       }
-      cameraBtn.disabled = true;
-      cameraMsg.textContent = '正在請求相機權限…';
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } }
-        });
-        cameraGranted = true;
-        stream.getTracks().forEach(t => t.stop());
+      if (arSystem.arToolkitSource?.ready) {
+        // 已啟動
+        arStarted = true;
+        cameraReady = true;
         cameraOverlay.classList.add('hidden');
-        hintEl.textContent = '已取得相機權限，將 Hiro Marker 放入畫面。';
-        hintEl.className = 'hint';
-        setCameraStatus(false, 'Camera：啟動中…');
-        // 嘗試重新啟動 AR 視源
-        setTimeout(() => {
-          restartARSourceIfNeeded();
-        }, 100);
+        setCameraStatus(true, 'Camera：已就緒');
+        resizeAR();
         return true;
-      } catch (err) {
-        console.error(err);
-        cameraMsg.textContent = '相機被拒絕，請在瀏覽器設定中允許相機後重試。';
-        cameraBtn.disabled = false;
-        return false;
       }
+
+      cameraBtn.disabled = true;
+      cameraMsg.textContent = '正在啟動相機，請允許瀏覽器的相機權限…';
+
+      return new Promise((resolve, reject) => {
+        arSystem.arToolkitSource.init(() => {
+          arStarted = true;
+          cameraReady = true;
+          cameraOverlay.classList.add('hidden');
+          setCameraStatus(true, 'Camera：已就緒');
+
+          // 嘗試播放影片（避免自動播放被阻擋）
+          const video = arSystem.arToolkitSource.domElement;
+          if (video && video.tagName === 'VIDEO') {
+            video.muted = true;
+            video.setAttribute('playsinline', 'true');
+            const p = video.play();
+            if (p && p.catch) p.catch(() => {});
+          }
+
+          resizeAR();
+          cameraMsg.textContent = '';
+          resolve(true);
+        }, (err) => {
+          console.error(err);
+          cameraMsg.textContent = '無法啟動相機，請確認權限並重試。';
+          cameraBtn.disabled = false;
+          setCameraStatus(false, 'Camera：啟動失敗');
+          reject(err);
+        });
+      });
     }
 
+    // 權限狀態檢查（若已授權，直接啟動）
     async function checkCameraPermission() {
-      if (!navigator.permissions || !navigator.permissions.query) {
-        return;
-      }
+      if (!navigator.permissions || !navigator.permissions.query) return;
       try {
         const status = await navigator.permissions.query({ name: 'camera' });
         const sync = () => {
           if (status.state === 'granted') {
-            cameraGranted = true;
-            cameraOverlay.classList.add('hidden');
-            hintEl.textContent = '相機已授權，將 Hiro Marker 放入畫面。';
-            hintEl.className = 'hint';
-            setCameraStatus(false, 'Camera：啟動中…');
-            setTimeout(() => {
-              restartARSourceIfNeeded();
-            }, 50);
+            // 已授權，直接啟動相機
+            startARCamera();
           } else if (status.state === 'prompt') {
             cameraOverlay.classList.remove('hidden');
             setCameraStatus(false, 'Camera：等待授權');
@@ -726,12 +728,14 @@
       } catch (e) { /* ignore */ }
     }
 
-    cameraBtn.addEventListener('click', requestCameraAccess);
+    cameraBtn.addEventListener('click', () => {
+      startARCamera();
+    });
 
-    // 開始按鈕：若未授權相機，先請求；成功後才開始遊戲
+    // 開始按鈕：若未啟動相機，先啟動；成功後才開始遊戲
     startBtn.addEventListener('click', async () => {
-      if (!cameraGranted) {
-        const ok = await requestCameraAccess();
+      if (!arStarted || !cameraReady) {
+        const ok = await startARCamera().catch(() => false);
         if (!ok) return;
       }
       startAll();
