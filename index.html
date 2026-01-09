@@ -2,9 +2,8 @@
 <html lang="zh-HK">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>大坑舞火龍 AR 小遊戲</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>大坑舞火龍 AR 小遊戲（單張貼圖・無旋轉）</title>
   <style>
     html, body {
       margin: 0; padding: 0;
@@ -18,190 +17,76 @@
     .wrap { position: relative; width: 100%; height: 100%; background: #000; }
     video#cam {
       position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-      transform: none; background: #000;
+      transform: scaleX(-1); background: #000;
     }
-    img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 1; mix-blend-mode: lighten; }
+    img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0.25; mix-blend-mode: lighten; }
     canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
-
-    /* 頂部：改為兩行（第一行：開始 + 選單；第二行：分數 HUD） */
     .ui {
-      position: absolute; left: 0; right: 0; top: 0;
-      display: grid; gap: 6px; padding: 10px 12px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0));
-      user-select: none; z-index: 20;
+      position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; gap: 8px; background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0)); user-select: none; z-index: 10;
     }
-    .topbar {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      flex-wrap: nowrap;
-    }
-    .hudbar {
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    }
-
     .btn { background: #e11d48; border: none; color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(225,29,72,0.35); }
     .btn.secondary { background:#334155; box-shadow: 0 4px 12px rgba(15,23,42,0.35); }
-    .btn.ghost { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; box-shadow: none; }
     .btn:disabled { opacity: 0.6; }
     .btn:active { transform: translateY(1px); }
-
     .hud { display: flex; gap: 10px; align-items: center; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,0.6); flex-wrap: wrap; }
     .chip { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 6px 10px; font-size: 14px; }
-
-    /* 底部提示 */
+    .bar {
+      position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px; z-index: 10;
+    }
+    .range-group { display: flex; align-items: center; gap: 8px; color: #ddd; font-size: 12px; }
+    input[type="range"] { width: 120px; }
     .hint {
       position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
       text-align: center; padding: 0 16px; color: #ffd166; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.7); z-index: 5;
     }
     .ok { color: #22c55e; }
     .bad { color: #f97316; }
-
-    /* 選單觸發鈕（移入 topbar，不再使用絕對定位） */
-    .menuBtn { padding: 8px 12px; font-weight: 700; border-radius: 10px; }
-
-    /* 面板與遮罩 */
-    .panel-backdrop {
-      position: absolute; inset: 0; background: rgba(0,0,0,0.4); z-index: 30;
-      opacity: 0; pointer-events: none; transition: opacity .2s ease;
-    }
-    .panel {
-      position: absolute; top: 0; right: 0; height: 100%;
-      background: rgba(17,24,39,0.9); backdrop-filter: blur(10px);
-      border-left: 1px solid rgba(255,255,255,0.12);
-      width: min(420px, 92vw);
-      transform: translateX(100%);
-      transition: transform .25s ease;
-      z-index: 31; color: #fff; overflow: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .panel.open { transform: translateX(0); }
-    .panel-backdrop.open { opacity: 1; pointer-events: auto; }
-
-    .panel header {
-      position: sticky; top: 0; background: rgba(17,24,39,0.95);
-      padding: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .panel h2 { margin: 0; font-size: 16px; }
-    .panel .section { padding: 12px; display: grid; gap: 12px; }
-    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .row .label { font-size: 14px; color: #e5e7eb; }
-    .row .controls { display: flex; align-items: center; gap: 8px; }
+    .top-right { position: absolute; top: 10px; right: 8px; display: flex; gap: 8px; z-index: 11; }
     .mini { padding: 8px 10px; font-weight: 600; font-size: 12px; border-radius: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; }
-    .danger { background: #7f1d1d; border-color: rgba(255,255,255,0.25); }
-
-    input[type="range"] { width: 160px; }
-    .sliderRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
-    .val { font-variant-numeric: tabular-nums; color: #fcd34d; min-width: 40px; text-align: right; }
-
-    /* 隱藏原底部 bar（改放到面板內） */
-    .bar { display: none; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <video id="cam" playsinline autoplay muted></video>
+    <video id="cam" playsinline muted autoplay></video>
     <img id="bg" alt="背景" src="image_1.png" />
     <canvas id="game"></canvas>
 
-    <!-- 頂部：分兩行 -->
     <div class="ui">
-      <div class="topbar">
-        <button id="startBtn" class="btn">開始</button>
-        <button id="menuBtn" class="btn ghost menuBtn">≡ 選單</button>
+      <button id="startBtn" class="btn">開始</button>
+      <div class="hud">
+        <div class="chip">分數：<span id="score">0</span></div>
+        <div class="chip">Combo：<span id="combo">0</span></div>
+        <div class="chip">時間：<span id="time">60</span>s</div>
       </div>
-      <div class="hudbar">
-        <div class="hud">
-          <div class="chip">分數：<span id="score">0</span></div>
-          <div class="chip">Combo：<span id="combo">0</span></div>
-          <div class="chip">時間：<span id="time">60</span>s</div>
-        </div>
+      <div class="top-right">
+        <button id="toggleFacing" class="mini">切換鏡頭</button>
+        <button id="toggleMirror" class="mini">鏡像：開</button>
+        <button id="fullscreenBtn" class="mini">全屏</button>
+        <button id="resetBtn" class="btn secondary">重置</button>
       </div>
     </div>
 
-    <!-- 面板與遮罩 -->
-    <div id="panelBackdrop" class="panel-backdrop"></div>
-    <aside id="panel" class="panel" aria-hidden="true">
-      <header>
-        <h2>設定</h2>
-        <button id="closePanel" class="btn ghost" aria-label="關閉">✕</button>
-      </header>
-      <div class="section">
-        <div class="row">
-          <div class="label">鏡頭</div>
-          <div class="controls">
-            <button id="toggleFacing" class="mini">切換鏡頭</button>
-          </div>
-        </div>
-        <div class="row">
-          <div class="label">鏡像</div>
-          <div class="controls">
-            <button id="toggleMirror" class="mini">鏡像：關</button>
-          </div>
-        </div>
-        <div class="row">
-          <div class="label">螢幕</div>
-          <div class="controls">
-            <button id="fullscreenBtn" class="mini">全屏</button>
-          </div>
-        </div>
-        <div class="row">
-          <div class="label">遊戲</div>
-          <div class="controls">
-            <button id="resetBtn" class="mini danger">重置</button>
-          </div>
-        </div>
+    <div class="bar">
+      <div class="range-group">
+        Hmin <input id="hMin" type="range" min="0" max="360" value="330">
+        Hmax <input id="hMax" type="range" min="0" max="360" value="20">
       </div>
-      <div class="section" style="border-top:1px solid rgba(255,255,255,0.1)">
-        <div class="sliderRow">
-          <div class="label">Hmin</div>
-          <div class="controls">
-            <input id="hMin" type="range" min="0" max="360" value="330">
-            <span id="hMinVal" class="val">330</span>
-          </div>
-        </div>
-        <div class="sliderRow">
-          <div class="label">Hmax</div>
-          <div class="controls">
-            <input id="hMax" type="range" min="0" max="360" value="20">
-            <span id="hMaxVal" class="val">20</span>
-          </div>
-        </div>
-        <div class="sliderRow">
-          <div class="label">Smin</div>
-          <div class="controls">
-            <input id="sMin" type="range" min="0" max="100" value="50">
-            <span id="sMinVal" class="val">50</span>
-          </div>
-        </div>
-        <div class="sliderRow">
-          <div class="label">Vmin</div>
-          <div class="controls">
-            <input id="vMin" type="range" min="0" max="100" value="40">
-            <span id="vMinVal" class="val">40</span>
-          </div>
-        </div>
-        <div class="sliderRow">
-          <div class="label">靈敏度</div>
-          <div class="controls">
-            <input id="sens" type="range" min="0" max="300" value="80">
-            <span id="sensVal" class="val">80</span>
-          </div>
-        </div>
-        <div class="sliderRow">
-          <div class="label">目標密度</div>
-          <div class="controls">
-            <input id="density" type="range" min="1" max="10" value="4">
-            <span id="densityVal" class="val">4</span>
-          </div>
-        </div>
-        <div class="sliderRow">
-          <div class="label">速度</div>
-          <div class="controls">
-            <input id="speed" type="range" min="1" max="10" value="5">
-            <span id="speedVal" class="val">5</span>
-          </div>
-        </div>
+      <div class="range-group">
+        Smin <input id="sMin" type="range" min="0" max="100" value="50">
+        Vmin <input id="vMin" type="range" min="0" max="100" value="40">
       </div>
-    </aside>
+      <div class="range-group">
+        靈敏度 <input id="sens" type="range" min="0" max="300" value="80">
+      </div>
+      <div class="range-group">
+        目標密度 <input id="density" type="range" min="1" max="10" value="4">
+      </div>
+      <div class="range-group">
+        速度 <input id="speed" type="range" min="1" max="10" value="5">
+      </div>
+    </div>
 
     <div id="hint" class="hint">按「開始」允許相機權限。請以紅色物件在鏡頭前揮動。</div>
   </div>
@@ -214,13 +99,6 @@
     const ctx = canvas.getContext('2d', { alpha: true });
 
     const startBtn = document.getElementById('startBtn');
-
-    // 面板 DOM
-    const menuBtn = document.getElementById('menuBtn');
-    const panel = document.getElementById('panel');
-    const panelBackdrop = document.getElementById('panelBackdrop');
-    const closePanelBtn = document.getElementById('closePanel');
-
     const resetBtn = document.getElementById('resetBtn');
     const toggleFacingBtn = document.getElementById('toggleFacing');
     const toggleMirrorBtn = document.getElementById('toggleMirror');
@@ -231,7 +109,6 @@
     const timeEl = document.getElementById('time');
     const hintEl = document.getElementById('hint');
 
-    // 滑桿與數值
     const hMinEl = document.getElementById('hMin');
     const hMaxEl = document.getElementById('hMax');
     const sMinEl = document.getElementById('sMin');
@@ -239,13 +116,6 @@
     const sensEl = document.getElementById('sens');
     const densEl = document.getElementById('density');
     const speedEl = document.getElementById('speed');
-    const hMinVal = document.getElementById('hMinVal');
-    const hMaxVal = document.getElementById('hMaxVal');
-    const sMinVal = document.getElementById('sMinVal');
-    const vMinVal = document.getElementById('vMinVal');
-    const sensVal = document.getElementById('sensVal');
-    const densityVal = document.getElementById('densityVal');
-    const speedVal = document.getElementById('speedVal');
 
     // ========= 狀態 =========
     let running = false;
@@ -257,10 +127,10 @@
 
     let centroid = { x: 0, y: 0 };
     let direction = { x: 1, y: 0 };
-    const smoothing = 0.28;
+    let smoothing = 0.28;
 
     let useEnvironment = true;
-    let mirrored = false;
+    let mirrored = true;
 
     // ========= 單張貼圖（無旋轉）=========
     const dragonImg = new Image();
@@ -268,13 +138,11 @@
     let dragonImgReady = false;
     dragonImg.onload = () => { dragonImgReady = true; };
 
+    // 尺寸改為細一半 + 左上微移對準
     const sprite = {
       drawWidth: 90,
       drawHeight: 90,
-      headAnchorX: 0.6,
-      headAnchorY: 0.6,
-      fineOffsetX: 0,
-      fineOffsetY: -0.1
+      headAnchorX: 0.15
     };
 
     // 文字目標
@@ -285,24 +153,18 @@
 
     // 粒子
     const particles = [];
-    const MAX_PARTICLES = 1200;
 
     // ========= 畫布大小 =========
-    let resizeTimer = null;
     function resize() {
-      const doResize = () => {
-        dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const rect = canvas.getBoundingClientRect();
-        W = rect.width; H = rect.height;
-        canvas.width = Math.round(W * dpr);
-        canvas.height = Math.round(H * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      };
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(doResize, 50);
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      W = rect.width; H = rect.height;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    window.addEventListener('resize', resize, { passive: true });
-    window.addEventListener('orientationchange', () => setTimeout(resize, 150), { passive: true });
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => setTimeout(resize, 150));
     resize();
 
     // ========= 能力檢查 =========
@@ -322,10 +184,7 @@
     // ========= 相機 =========
     let currentStream = null;
     async function stopStream() {
-      if (currentStream) {
-        currentStream.getTracks().forEach(t => t.stop());
-        currentStream = null;
-      }
+      if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); currentStream = null; }
     }
     async function initCamera() {
       const kinds = [
@@ -338,14 +197,11 @@
       await stopStream();
       for (const res of kinds) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: { ...res, facingMode: facing }
-          });
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...res, facingMode: facing } });
           currentStream = stream;
           video.srcObject = stream;
+          await video.play();
           video.playsInline = true;
-          await video.play().catch(()=>{});
           applyMirror();
           return true;
         } catch (err) { lastErr = err; }
@@ -355,11 +211,7 @@
       hintEl.className = 'hint bad';
       return false;
     }
-
-    function applyMirror() {
-      video.style.transform = mirrored ? 'scaleX(-1)' : 'none';
-      toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`;
-    }
+    function applyMirror() { video.style.transform = mirrored ? 'scaleX(-1)' : 'none'; }
 
     // ========= 顏色追蹤 =========
     const workCanvas = document.createElement('canvas');
@@ -371,27 +223,15 @@
       let h=0; if(d!==0){ if(max===r) h=((g-b)/d)%6; else if(max===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; }
       if(h<0) h+=360; const s=max===0?0:d/max; const v=max; return [h,s*100,v*100];
     }
-    function inHueRange(h, hMin, hMax){
-      return hMin<=hMax ? (h>=hMin && h<=hMax) : (h>=hMin || h<=hMax);
-    }
+    function inHueRange(h, hMin, hMax){ return hMin<=hMax ? (h>=hMin && h<=hMax) : (h>=hMin || h<=hMax); }
 
     function trackRedCentroid() {
-      const vw = video.videoWidth|0, vh = video.videoHeight|0;
-      if (vw === 0 || vh === 0) return null;
-
+      if (video.videoWidth===0 || video.videoHeight===0) return null;
       const scale = 0.22;
-      const w = Math.max(2, Math.round(vw * scale));
-      const h = Math.max(2, Math.round(vh * scale));
-      if (w < 2 || h < 2) return null;
-
+      const w = Math.max(2, Math.round(video.videoWidth * scale));
+      const h = Math.max(2, Math.round(video.videoHeight * scale));
       workCanvas.width = w; workCanvas.height = h;
-
-      try {
-        wctx.drawImage(video, 0, 0, w, h);
-      } catch (e) {
-        return null;
-      }
-
+      wctx.drawImage(video, 0, 0, w, h);
       const { data } = wctx.getImageData(0, 0, w, h);
 
       const hMin = parseInt(hMinEl.value, 10);
@@ -460,7 +300,6 @@
     // ========= 粒子效果 =========
     function spawnIncenseParticles(pos, dir, count=6) {
       for (let i=0; i<count; i++){
-        if (particles.length >= MAX_PARTICLES) break;
         const angle = Math.atan2(dir.y, dir.x) + (Math.random()*0.8 - 0.4);
         const speed = 40 + Math.random()*120;
         const vx = Math.cos(angle)*speed;
@@ -487,17 +326,17 @@
       }
     }
     function drawParticles(ctx) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
       for (const p of particles){
         const t = p.age / p.life;
         const alpha = 1 - t;
         const size = p.size * (0.8 + 0.4*(1-t));
         const col = `hsla(${p.hue}, 90%, ${60 - t*30}%, ${alpha})`;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
         ctx.fillStyle = col;
         ctx.beginPath(); ctx.arc(p.x, p.y, size, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
       }
-      ctx.restore();
     }
 
     // ========= 單張貼圖繪製（無旋轉）=========
@@ -508,15 +347,21 @@
       const imgH = sprite.drawHeight;
 
       ctx.save();
+      // 以頭部中心為參考，無旋轉
       ctx.translate(head.x, head.y);
 
-      const headOffsetX = -imgW * sprite.headAnchorX + (sprite.fineOffsetX || 0);
-      const headOffsetY = -imgH * sprite.headAnchorY + (sprite.fineOffsetY ? sprite.fineOffsetY * imgH : 0);
+      // 左上移：加大 headAnchorX 與 headOffsetY 的偏移
+      const headOffsetX = -imgW; // 更向左
+      const headOffsetY = -imgH;               // 更向上
+
       ctx.translate(headOffsetX, headOffsetY);
 
+      // 圖片基準從垂直中心往上 50%（讓圖在頭部上下平均分佈）
       ctx.drawImage(dragonImg, 0, -imgH * 0.5, imgW, imgH);
 
+      // 粒子依舊向右噴灑
       spawnIncenseParticles({ x: 0, y: 0 }, { x: 1, y: 0 }, 8);
+
       ctx.restore();
     }
 
@@ -528,6 +373,7 @@
     function handleCollisions(head) {
       for (let i=items.length-1; i>=0; i--){
         const it=items[i];
+        // 因貼圖縮小，碰撞半徑也稍減
         const radius = Math.max(24, sprite.drawHeight * 0.35);
         if (circleHit(head.x, head.y, it.x, it.y, radius)){
           if (it.isGood){
@@ -578,11 +424,9 @@
         centroid.x = centroid.x + (c.x - centroid.x) * smoothing || c.x;
         centroid.y = centroid.y + (c.y - centroid.y) * smoothing || c.y;
         direction.x = 1; direction.y = 0;
-        hintEl.textContent = '已偵測到紅色目標，盡情舞動！';
-        hintEl.className = 'hint ok';
+        hintEl.textContent = '已偵測到紅色目標，盡情舞動！'; hintEl.className = 'hint ok';
       } else {
-        hintEl.textContent = '未偵測到紅色物件，請調整光線/色域或靠近鏡頭。';
-        hintEl.className = 'hint bad';
+        hintEl.textContent = '未偵測到紅色物件，請調整光線/色域或靠近鏡頭。'; hintEl.className = 'hint bad';
       }
 
       updateItems(dt);
@@ -616,7 +460,6 @@
           running = false; gameOver = true;
           hintEl.textContent = `時間到！總分：${score}`;
           hintEl.className = 'hint';
-          startBtn.disabled = false;
         }
       }, 1000);
       requestAnimationFrame(tick);
@@ -644,59 +487,20 @@
       centroid = { x: W/2, y: H/2 };
       direction = { x: 1, y: 0 };
       hintEl.textContent = '重置完成，按「開始」重新啟動相機。';
-      hintEl.className = 'hint';
       running = false; gameOver = false;
       clearInterval(timerId);
-      timeLeft = 60; timeEl.textContent = timeLeft;
       startBtn.disabled = false;
       await stopStream();
     });
 
-    toggleFacingBtn.addEventListener('click', async () => {
-      useEnvironment = !useEnvironment;
-      await initCamera();
-    });
-    toggleMirrorBtn.addEventListener('click', () => {
-      mirrored = !mirrored;
-      applyMirror();
-    });
+    function applyMirror() { video.style.transform = mirrored ? 'scaleX(-1)' : 'none'; }
+    toggleFacingBtn.addEventListener('click', async () => { useEnvironment = !useEnvironment; await initCamera(); });
+    toggleMirrorBtn.addEventListener('click', () => { mirrored = !mirrored; applyMirror(); toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`; });
     fullscreenBtn.addEventListener('click', () => {
       const el = document.documentElement;
-      if (!document.fullscreenElement) {
-        (el.requestFullscreen && el.requestFullscreen()) || (el.webkitRequestFullscreen && el.webkitRequestFullscreen());
-      } else {
-        (document.exitFullscreen && document.exitFullscreen()) || (document.webkitExitFullscreen && document.webkitExitFullscreen());
-      }
+      if (!document.fullscreenElement) { (el.requestFullscreen && el.requestFullscreen()) || (el.webkitRequestFullscreen && el.webkitRequestFullscreen()); }
+      else { (document.exitFullscreen && document.exitFullscreen()) || (document.webkitExitFullscreen && document.webkitExitFullscreen()); }
     });
-
-    // ======== 面板開關 ========
-    function openPanel() {
-      panel.classList.add('open');
-      panelBackdrop.classList.add('open');
-      panel.setAttribute('aria-hidden', 'false');
-    }
-    function closePanel() {
-      panel.classList.remove('open');
-      panelBackdrop.classList.remove('open');
-      panel.setAttribute('aria-hidden', 'true');
-    }
-    menuBtn.addEventListener('click', openPanel);
-    closePanelBtn.addEventListener('click', closePanel);
-    panelBackdrop.addEventListener('click', closePanel);
-
-    // ======== 滑桿數值同步 ========
-    function bindVal(input, labelEl) {
-      const sync = () => labelEl.textContent = input.value;
-      input.addEventListener('input', sync);
-      sync();
-    }
-    bindVal(hMinEl, hMinVal);
-    bindVal(hMaxEl, hMaxVal);
-    bindVal(sMinEl, sMinVal);
-    bindVal(vMinEl, vMinVal);
-    bindVal(sensEl, sensVal);
-    bindVal(densEl, densityVal);
-    bindVal(speedEl, speedVal);
 
     // 初始
     centroid = { x: W/2, y: H/2 };
