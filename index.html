@@ -14,133 +14,74 @@
       margin: 0; padding: 0; overflow: hidden; height: 100%; background: #000;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, 'PingFang HK', 'PingFang SC', 'Microsoft JhengHei', Arial, sans-serif;
     }
-    /* UI Overlay */
-    .hud {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-    }
+    .hud { position: fixed; inset: 0; pointer-events: none; }
     .hud-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 12px;
-      color: #fff;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-      font-weight: 700;
-      letter-spacing: 0.5px;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      font-weight: 700; letter-spacing: 0.5px;
     }
     .badge {
-      background: rgba(0,0,0,0.55);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 10px;
-      padding: 8px 12px;
-      font-size: 16px;
-      min-width: 110px;
-      text-align: center;
+      background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px; padding: 8px 12px; font-size: 16px; min-width: 110px; text-align: center;
     }
     .center-msg {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      color: #fff;
-      background: rgba(0,0,0,0.55);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 12px;
-      padding: 12px 16px;
-      font-size: 20px;
-      text-align: center;
-      pointer-events: none;
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      color: #fff; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px; padding: 12px 16px; font-size: 20px; text-align: center; pointer-events: none;
     }
     .controls {
-      position: fixed;
-      left: 50%;
-      bottom: 10px;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 8px;
-      pointer-events: auto;
+      position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%);
+      display: flex; gap: 8px; pointer-events: auto;
     }
     .btn {
-      background: rgba(0,0,0,0.65);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 10px;
-      padding: 8px 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform .1s ease, background .2s ease;
-      user-select: none;
+      background: rgba(0,0,0,0.65); color: #fff; border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 10px; padding: 8px 12px; font-weight: 600; cursor: pointer;
+      transition: transform .1s ease, background .2s ease; user-select: none;
     }
     .btn:hover { background: rgba(255,255,255,0.12); }
     .btn:active { transform: scale(0.98); }
     .legend {
-      position: fixed;
-      right: 8px;
-      bottom: 60px;
-      color: #fff;
-      font-size: 12px;
-      background: rgba(0,0,0,0.55);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 8px;
-      padding: 8px 10px;
-      line-height: 1.4;
-      pointer-events: none;
-      max-width: 50ch;
+      position: fixed; right: 8px; bottom: 60px; color: #fff; font-size: 12px;
+      background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px; padding: 8px 10px; line-height: 1.4; pointer-events: none; max-width: 50ch;
     }
   </style>
 </head>
 <body>
-  <!-- 背景覆蓋層：使用自定背景 image_1.png -->
   <div id="bg" style="
       position: fixed; inset:0;
       background: url('image_1.png') center/cover no-repeat;
       opacity: 0.22; pointer-events:none; filter: saturate(1.05) contrast(1.05);
     "></div>
 
-  <!-- A-Frame 場景（啟用 AR.js，使用 webcam 源） -->
   <a-scene
     embedded
     renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true"
     vr-mode-ui="enabled: false"
     arjs="sourceType: webcam; debugUIEnabled: false; patternRatio: 0.9;"
   >
-    <!-- 環境光與方向光，讓竹龍更立體 -->
     <a-entity light="type: ambient; intensity: 0.7; color: #ffffff"></a-entity>
     <a-entity light="type: directional; intensity: 0.85; color: #fff" position="1 1 0.5"></a-entity>
 
-    <!-- 相機（AR.js 會接管攝像頭） -->
     <a-entity camera></a-entity>
 
-    <!-- hiro marker：在 marker 上顯示竹龍 -->
     <a-marker type="hiro" id="hiroMarker">
-      <!-- 竹龍：用多段圓柱 + 橢球 + 小刺 模擬「竹節龍身」 -->
       <a-entity id="bambooDragon" position="0 0 0" rotation="0 0 0">
-        <!-- 龍頭（橢球） -->
         <a-sphere radius="0.18" color="#8B5A2B" position="0 0.12 0.0" scale="1 0.7 1"></a-sphere>
-        <!-- 龍鬚（細圓柱） -->
         <a-cylinder radius="0.005" height="0.14" color="#C19A6B" position="0.12 0.10 0.08" rotation="0 0 70"></a-cylinder>
         <a-cylinder radius="0.005" height="0.14" color="#C19A6B" position="0.12 0.10 -0.08" rotation="0 0 -70"></a-cylinder>
 
-        <!-- 龍身：多段竹節 -->
-        <a-entity id="dragonBody" position="0 0 0">
-          <!-- 以 JS 動態生成 10 節 -->
-        </a-entity>
-
-        <!-- 紅繩/火花（細小球體） -->
+        <a-entity id="dragonBody" position="0 0 0"></a-entity>
         <a-entity id="sparks"></a-entity>
       </a-entity>
     </a-marker>
 
-    <!-- 牌卡容器（在世界座標，非 marker 內，方便被撞到） -->
     <a-entity id="cardsRoot" position="0 0 0"></a-entity>
 
-    <!-- 必需：AR.js 控制 -->
     <a-entity arjs-anchor></a-entity>
     <a-entity arjs-hit-test></a-entity>
   </a-scene>
 
-  <!-- HUD -->
   <div class="hud">
     <div class="hud-top">
       <div class="badge" id="scoreBadge">分數：0</div>
@@ -163,6 +104,9 @@
   </div>
 
   <script>
+    // 補上本地 clamp，避免依賴 AFRAME.utils.math.clamp
+    const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+
     // 配置
     const GOOD_TEXTS = ['福','春','財','安','旺','吉','祥','賀','龍','年'];
     const BAD_TEXTS  = ['⚽','🍔','🎧','🧊','🧼','🍺','💡','📎','🧽','🧯'];
@@ -170,10 +114,10 @@
     const GAME_DURATION = 60; // 秒
     const CARD_COUNT_GOOD = 8;
     const CARD_COUNT_BAD = 8;
-    const CARD_SPAWN_RADIUS = 1.2; // 生成半徑（以 AR 世界單位米）
+    const CARD_SPAWN_RADIUS = 1.2;
     const CARD_MIN_Y = 0.2, CARD_MAX_Y = 1.4;
-    const CARD_SIZE = 0.22; // 每張牌寬度
-    const COLLIDE_DISTANCE = 0.22; // 碰撞距離閾值（marker 位置到牌中心）
+    const CARD_SIZE = 0.22;
+    const COLLIDE_DISTANCE = 0.22;
 
     let score = 0;
     let remaining = GAME_DURATION;
@@ -188,13 +132,11 @@
 
     const scene = document.querySelector('a-scene');
     const cardsRoot = document.getElementById('cardsRoot');
-    const hiro = document.getElementById('hiroMarker');
+    const hiro = document.getElementById('hiroMarker'); // 只宣告一次
     const dragonBody = document.getElementById('dragonBody');
     const sparks = document.getElementById('sparks');
 
-    // 建構竹龍身體（10 節竹）
     function buildDragonBody() {
-      // 清空
       while (dragonBody.firstChild) dragonBody.removeChild(dragonBody.firstChild);
       const count = 10;
       for (let i = 0; i < count; i++) {
@@ -203,12 +145,16 @@
         seg.setAttribute('height', 0.18);
         seg.setAttribute('color', i % 2 === 0 ? '#9C6B3D' : '#7D4F2A');
         seg.setAttribute('position', `${-0.2 - i*0.16} 0.10 0`);
-        seg.setAttribute('rotation', `${AFRAME.utils.math.clamp(-10+ i*1.2, -15, 8)} ${i*2} ${i%3===0?5:-5}`);
+
+        const rx = clamp(-10 + i*1.2, -15, 8);
+        const ry = i * 2;
+        const rz = (i % 3 === 0) ? 5 : -5;
+        seg.setAttribute('rotation', `${rx} ${ry} ${rz}`);
+
         seg.setAttribute('segments-radial', 12);
         seg.setAttribute('segments-height', 1);
         dragonBody.appendChild(seg);
 
-        // 小刺/香枝
         if (i % 2 === 0) {
           const spike = document.createElement('a-cone');
           spike.setAttribute('radius-bottom', 0.01);
@@ -221,7 +167,6 @@
         }
       }
 
-      // 簡單火花粒子
       while (sparks.firstChild) sparks.removeChild(sparks.firstChild);
       for (let s=0; s<20; s++){
         const p = document.createElement('a-sphere');
@@ -233,18 +178,16 @@
       }
     }
 
-    // 建立牌卡（返回 a-entity）
     function createCard(label, isGood) {
       const card = document.createElement('a-entity');
       const plane = document.createElement('a-plane');
-      const bgColor = isGood ? '#c62828' : '#37474f'; // 紅色=吉祥, 灰藍=無關
+      const bgColor = isGood ? '#c62828' : '#37474f';
       const txtColor = '#fff';
 
       plane.setAttribute('width', CARD_SIZE);
       plane.setAttribute('height', CARD_SIZE);
       plane.setAttribute('color', bgColor);
       plane.setAttribute('material', `shader: flat; opacity: 0.95`);
-      plane.setAttribute('radius', 0.02); // 圓角（aframe 圓角需要 aframe-rounded，這裡忽略效果）
 
       const text = document.createElement('a-text');
       text.setAttribute('value', label);
@@ -257,25 +200,21 @@
       card.appendChild(plane);
       card.appendChild(text);
 
-      // 初始位置：在玩家前方某範圍內
       const angle = Math.random() * Math.PI * 2;
       const radius = 0.4 + Math.random() * CARD_SPAWN_RADIUS;
       const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius - 0.6; // 略偏前方
+      const z = Math.sin(angle) * radius - 0.6;
       const y = CARD_MIN_Y + Math.random() * (CARD_MAX_Y - CARD_MIN_Y);
       card.setAttribute('position', `${x} ${y} ${z}`);
 
-      // 隨機旋轉
-      card.setAttribute('rotation', `${0} ${Math.random()*360} ${0}`);
+      card.setAttribute('rotation', `0 ${Math.random()*360} 0`);
 
-      // 漂浮與旋轉動畫
       const floatAmp = 0.08 + Math.random()*0.06;
       const floatDur = 2000 + Math.random()*1500;
       const rotDur = 2500 + Math.random()*2000;
       card.setAttribute('animation__float', `property: position; dir: alternate; dur: ${floatDur}; easing: easeInOutSine; loop: true; to: ${x} ${y+floatAmp} ${z}`);
       card.setAttribute('animation__rot', `property: rotation; dir: normal; dur: ${rotDur}; easing: linear; loop: true; to: 0 ${Math.random()<0.5?360:-360} 0`);
 
-      // 屬性
       card.setAttribute('class', isGood ? 'good-card' : 'bad-card');
       card.dataset.good = isGood ? '1' : '0';
       card.dataset.active = '1';
@@ -283,15 +222,12 @@
       return card;
     }
 
-    // 生成一批卡
     function spawnCards() {
       while (cardsRoot.firstChild) cardsRoot.removeChild(cardsRoot.firstChild);
 
-      // 隨機挑字
       const pick = (arr, n) => {
-        const cp = arr.slice();
-        const out = [];
-        for (let i=0; i<n; i++) {
+        const cp = arr.slice(); const out = [];
+        for (let i=0; i<n && cp.length>0; i++) {
           out.push(cp.splice(Math.floor(Math.random()*cp.length),1)[0]);
         }
         return out;
@@ -303,7 +239,6 @@
       badLabels.forEach(label => cardsRoot.appendChild(createCard(label, false)));
     }
 
-    // 碰撞檢測：以 hiro marker 的世界位置為中心
     function checkCollisions() {
       if (!running) return;
       const markerObj3D = hiro.object3D;
@@ -312,7 +247,7 @@
       const markerWorldPos = new THREE.Vector3();
       markerObj3D.getWorldPosition(markerWorldPos);
 
-      cardsRoot.childNodes.forEach?.(node => {
+      Array.from(cardsRoot.children).forEach(node => {
         if (!node.dataset || node.dataset.active !== '1') return;
         const obj = node.object3D;
         if (!obj) return;
@@ -322,20 +257,15 @@
 
         const dist = markerWorldPos.distanceTo(cardWorldPos);
         if (dist <= COLLIDE_DISTANCE) {
-          // 命中
           const isGood = node.dataset.good === '1';
           score += isGood ? 1 : -1;
           updateScore();
-
-          // 播放命中效果
           hitEffect(node, isGood);
 
-          // 失效此卡
           node.dataset.active = '0';
           node.setAttribute('animation__fade', 'property: components.material.material.opacity; to: 0; dur: 250; easing: easeOutQuad');
           setTimeout(() => {
             if (node.parentNode) node.parentNode.removeChild(node);
-            // 若卡片過少，補充新的
             maybeRespawn();
           }, 260);
         }
@@ -343,7 +273,6 @@
     }
 
     function hitEffect(cardEntity, isGood) {
-      // 在卡片位置生成小爆光
       const pos = new THREE.Vector3();
       cardEntity.object3D.getWorldPosition(pos);
 
@@ -355,10 +284,10 @@
         p.setAttribute('color', isGood ? '#FFD54F' : '#90CAF9');
         p.setAttribute('position', '0 0 0');
         const angle = Math.random()*Math.PI*2;
-        const r = 0.08 + Math.random()*0.08;
-        const toX = Math.cos(angle)*r;
-        const toY = (Math.random()-0.3)*r;
-        const toZ = Math.sin(angle)*r;
+        theR = 0.08 + Math.random()*0.08;
+        const toX = Math.cos(angle)*theR;
+        const toY = (Math.random()-0.3)*theR;
+        const toZ = Math.sin(angle)*theR;
         p.setAttribute('animation__go', `property: position; to: ${toX} ${toY} ${toZ}; dur: 240; easing: easeOutQuad`);
         p.setAttribute('animation__fade', `property: components.material.material.opacity; to: 0; delay: 120; dur: 240`);
         fx.appendChild(p);
@@ -371,7 +300,6 @@
       const activeCount = Array.from(cardsRoot.children).filter(n => n.dataset?.active === '1').length;
       const target = CARD_COUNT_GOOD + CARD_COUNT_BAD;
       if (activeCount < target) {
-        // 以 50% 機率補一張好或壞
         const addGood = Math.random() < 0.5;
         const label = addGood
               ? GOOD_TEXTS[Math.floor(Math.random()*GOOD_TEXTS.length)]
@@ -380,31 +308,23 @@
       }
     }
 
-    function updateScore() {
-      scoreBadge.textContent = `分數：${score}`;
-    }
-    function updateTime() {
-      timeBadge.textContent = `時間：${remaining}s`;
-    }
+    function updateScore() { scoreBadge.textContent = `分數：${score}`; }
+    function updateTime() { timeBadge.textContent = `時間：${remaining}s`; }
 
     function startGame() {
       if (running) return;
       running = true;
       score = 0;
       remaining = GAME_DURATION;
-      updateScore();
-      updateTime();
+      updateScore(); updateTime();
       centerMsg.textContent = '遊戲開始！移動 hiro marker 去撞牌卡！';
-
       spawnCards();
 
       if (timerId) clearInterval(timerId);
       timerId = setInterval(() => {
         remaining -= 1;
         updateTime();
-        if (remaining <= 0) {
-          endGame();
-        }
+        if (remaining <= 0) endGame();
       }, 1000);
     }
 
@@ -412,28 +332,24 @@
       running = false;
       if (timerId) { clearInterval(timerId); timerId = null; }
       centerMsg.textContent = `時間到！最終分數：${score}`;
-      // 清除剩餘卡片
       while (cardsRoot.firstChild) cardsRoot.removeChild(cardsRoot.firstChild);
     }
 
     function resetGame() {
       running = false;
       if (timerId) { clearInterval(timerId); timerId = null; }
-      score = 0;
-      remaining = GAME_DURATION;
-      updateScore();
-      updateTime();
+      score = 0; remaining = GAME_DURATION;
+      updateScore(); updateTime();
       centerMsg.textContent = '已重置。按「開始遊戲」重新開始。';
       while (cardsRoot.firstChild) cardsRoot.removeChild(cardsRoot.firstChild);
     }
 
-    // 主迴圈：每幀檢查碰撞
     function tick() {
       checkCollisions();
       requestAnimationFrame(tick);
     }
 
-    // 監聽 marker 可見性，提供引導
+    // 使用同一個 hiro 變數掛事件
     hiro.addEventListener('markerFound', () => {
       if (!running) centerMsg.textContent = '已偵測到 hiro marker，按「開始遊戲」！';
     });
@@ -442,21 +358,12 @@
       else centerMsg.textContent = '找不到 marker，請將 hiro marker 對準鏡頭。';
     });
 
-    // 綁定按鈕
     startBtn.addEventListener('click', startGame);
     resetBtn.addEventListener('click', resetGame);
 
-    // 初始化
     buildDragonBody();
     requestAnimationFrame(tick);
 
-    // 改善部分瀏覽器攝像頭渲染時背景可見度
-    window.addEventListener('load', () => {
-      // 若需要可調整背景透明度
-      // document.getElementById('bg').style.opacity = '0.18';
-    });
-
-    // 相容：NodeList.forEach Polyfill（舊瀏覽器）
     if (window.NodeList && !NodeList.prototype.forEach) {
       NodeList.prototype.forEach = Array.prototype.forEach;
     }
