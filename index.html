@@ -218,7 +218,7 @@
       }
     });
 
-    // ---------- Fire Dragon model (bamboo + spiky incense) ----------
+    // ---------- Fire Dragon model: single upright bamboo + spiky incense ball ----------
     function buildFireDragon() {
       const dragon = document.getElementById('dragon');
       while (dragon.firstChild) dragon.removeChild(dragon.firstChild);
@@ -228,65 +228,62 @@
       const incense = '#d9c19f';
       const glow = '#ffcc80';
 
-      function pole(pos, len, rot=[0,0,0], radius=0.035, color=bamboo) {
-        const c = document.createElement('a-cylinder');
-        c.setAttribute('position', pos.join(' '));
-        c.setAttribute('radius', radius);
-        c.setAttribute('height', len);
-        c.setAttribute('rotation', rot.join(' '));
-        c.setAttribute('color', color);
-        c.setAttribute('roughness', 1);
-        dragon.appendChild(c);
+      // Upright bamboo pole
+      const pole = document.createElement('a-cylinder');
+      pole.setAttribute('position', '0 0.4 0');
+      pole.setAttribute('radius', 0.04);
+      pole.setAttribute('height', 0.8);
+      pole.setAttribute('color', bamboo);
+      pole.setAttribute('roughness', 1);
+      dragon.appendChild(pole);
+
+      // Small handle base
+      const base = document.createElement('a-cylinder');
+      base.setAttribute('position', '0 0 0');
+      base.setAttribute('radius', 0.06);
+      base.setAttribute('height', 0.12);
+      base.setAttribute('color', darkBamboo);
+      base.setAttribute('roughness', 1);
+      dragon.appendChild(base);
+
+      // Spiky incense ball at top
+      const ballGroup = document.createElement('a-entity');
+      ballGroup.setAttribute('position', '0 0.85 0');
+
+      const core = document.createElement('a-sphere');
+      core.setAttribute('radius', 0.09);
+      core.setAttribute('color', darkBamboo);
+      core.setAttribute('opacity', 0.95);
+      ballGroup.appendChild(core);
+
+      const spikes = 48;
+      const radius = 0.2;
+      for (let i=0; i<spikes; i++){
+        const phi = Math.acos(1 - 2*(i+0.5)/spikes);
+        const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+        const dir = new THREE.Vector3(
+          Math.cos(theta) * Math.sin(phi),
+          Math.cos(phi),
+          Math.sin(theta) * Math.sin(phi)
+        );
+        const len = radius * (0.9 + Math.random()*0.4);
+        const mid = dir.clone().multiplyScalar(len*0.5);
+        const spike = document.createElement('a-cylinder');
+        spike.setAttribute('radius', 0.007);
+        spike.setAttribute('height', len);
+        spike.setAttribute('color', incense);
+        spike.object3D.position.set(mid.x, mid.y, mid.z);
+        spike.object3D.lookAt(dir.clone().multiplyScalar(len));
+        ballGroup.appendChild(spike);
+
+        const tip = document.createElement('a-sphere');
+        tip.setAttribute('radius', 0.012);
+        tip.setAttribute('color', glow);
+        tip.setAttribute('emissive', glow);
+        tip.object3D.position.set(dir.x * len, dir.y * len, dir.z * len);
+        ballGroup.appendChild(tip);
       }
-
-      function addSpikyBall(pos, radius=0.16, spikes=45) {
-        const group = document.createElement('a-entity');
-        group.setAttribute('position', pos.join(' '));
-
-        const core = document.createElement('a-sphere');
-        core.setAttribute('radius', radius * 0.45);
-        core.setAttribute('color', darkBamboo);
-        core.setAttribute('opacity', 0.95);
-        group.appendChild(core);
-
-        for (let i=0; i<spikes; i++){
-          const phi = Math.acos(1 - 2*(i+0.5)/spikes);
-          const theta = Math.PI * (1 + Math.sqrt(5)) * i;
-          const dir = new THREE.Vector3(
-            Math.cos(theta) * Math.sin(phi),
-            Math.cos(phi),
-            Math.sin(theta) * Math.sin(phi)
-          );
-          const len = radius * (0.9 + Math.random()*0.5);
-          const mid = dir.clone().multiplyScalar(len*0.5);
-          const spike = document.createElement('a-cylinder');
-          spike.setAttribute('radius', 0.008);
-          spike.setAttribute('height', len);
-          spike.setAttribute('color', incense);
-          spike.object3D.position.set(mid.x, mid.y, mid.z);
-          spike.object3D.lookAt(dir.clone().multiplyScalar(len));
-          group.appendChild(spike);
-
-          const tip = document.createElement('a-sphere');
-          tip.setAttribute('radius', 0.014);
-          tip.setAttribute('color', glow);
-          tip.setAttribute('emissive', glow);
-          tip.object3D.position.set(dir.x * len, dir.y * len, dir.z * len);
-          group.appendChild(tip);
-        }
-        dragon.appendChild(group);
-      }
-
-      pole([0,0,0], 1.8, [0,0,90], 0.04, bamboo);
-      pole([0.6, 0.05, 0], 0.6, [0,0,60], 0.02, darkBamboo);
-      pole([1.2,-0.04, 0], 0.55, [0,0,120],0.02, darkBamboo);
-      pole([0.3,-0.02, 0], 0.5, [0,0,110],0.02, darkBamboo);
-
-      addSpikyBall([1.8, 0, 0], 0.22, 60);
-      addSpikyBall([1.0, 0.08, 0], 0.18, 52);
-      addSpikyBall([0.35,-0.05, 0], 0.16, 45);
-
-      pole([-0.05, -0.06, 0], 0.25, [0,0,90], 0.015, darkBamboo);
+      dragon.appendChild(ballGroup);
     }
     // ---------------------------------------------------------------
 
@@ -347,18 +344,15 @@
       const ctx = c.getContext('2d');
       ctx.clearRect(0,0,size,size);
 
-      // background rounded
       const pad = 12;
       roundedRect(ctx, pad, pad, size-2*pad, size-2*pad, 28);
       ctx.fillStyle = bgColor;
       ctx.fill();
 
-      // text
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.font = 'bold 170px "Noto Sans TC","Microsoft JhengHei","PingFang TC","Heiti TC",sans-serif';
-      // Auto shrink if long (though here single glyph)
       let fsize = 170;
       while (true) {
         const metrics = ctx.measureText(word);
