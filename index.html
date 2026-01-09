@@ -13,7 +13,6 @@
     :root {
       --glass: rgba(0,0,0,0.52);
       --glass-strong: rgba(0,0,0,0.68);
-      --accent: #ffb300;
       --good: #e53935;
       --bad: #455a64;
       --text: #f5f5f5;
@@ -170,7 +169,7 @@
     </div>
 
     <div class="card bottom-note">
-      說明：在 60 秒內移動「hiro」marker 讓竹龍去撞紅色好字得分，撞灰色壞字會扣分。建議在光線充足的地方使用 HTTPS（GitHub Pages 預設支援）。
+      說明：在 60 秒內移動「hiro」marker 讓火龍去撞紅色好字得分，撞灰色壞字會扣分。建議在光線充足的地方使用 HTTPS（GitHub Pages 預設支援）。
     </div>
   </div>
 
@@ -185,26 +184,9 @@
     
     <a-assets></a-assets>
 
-    <!-- Marker with Bamboo Dragon -->
+    <!-- Marker anchor -->
     <a-marker preset="hiro" id="marker">
-      <a-entity id="dragon" position="0 0 0" scale="1 1 1">
-        <!-- body segments -->
-        <a-cylinder position="0 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#2e7d32"></a-cylinder>
-        <a-cylinder position="0.22 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#43a047"></a-cylinder>
-        <a-cylinder position="0.44 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#2e7d32"></a-cylinder>
-        <a-cylinder position="0.66 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#43a047"></a-cylinder>
-        <a-cylinder position="0.88 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#2e7d32"></a-cylinder>
-        <a-cylinder position="1.10 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#43a047"></a-cylinder>
-        <a-cylinder position="1.32 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#2e7d32"></a-cylinder>
-        <!-- head -->
-        <a-sphere position="1.5 0 0" radius="0.11" color="#c62828"></a-sphere>
-        <a-torus position="1.46 0 0" radius="0.11" radius-tubular="0.015" color="#ffeb3b" rotation="0 0 0"></a-torus>
-        <a-cone position="1.55 0.08 0.05" radius-bottom="0.025" radius-top="0.005" height="0.08" rotation="0 0 20" color="#ffeb3b"></a-cone>
-        <a-cone position="1.55 0.08 -0.05" radius-bottom="0.025" radius-top="0.005" height="0.08" rotation="0 0 -20" color="#ffeb3b"></a-cone>
-        <a-sphere position="1.56 0.02 0.04" radius="0.015" color="#000"></a-sphere>
-        <a-sphere position="1.56 0.02 -0.04" radius="0.015" color="#000"></a-sphere>
-        <a-cylinder position="1.45 -0.08 0" radius="0.012" height="0.12" rotation="20 0 90" color="#ffb300"></a-cylinder>
-      </a-entity>
+      <a-entity id="dragon" position="0 0 0" scale="1 1 1"></a-entity>
     </a-marker>
 
     <a-entity camera></a-entity>
@@ -235,6 +217,89 @@
         this.baseY = this.el.object3D.position.y || 0;
       }
     });
+
+    // ---------- Fire Dragon model (bamboo + spiky incense) ----------
+    function buildFireDragon() {
+      const dragon = document.getElementById('dragon');
+      // clear old
+      while (dragon.firstChild) dragon.removeChild(dragon.firstChild);
+
+      // materials/colors
+      const bamboo = '#8d6e63';
+      const darkBamboo = '#6d4c41';
+      const incense = '#d9c19f';
+      const glow = '#ffcc80';
+
+      // helper: bamboo pole
+      function pole(pos, len, rot=[0,0,0], radius=0.035, color=bamboo) {
+        const c = document.createElement('a-cylinder');
+        c.setAttribute('position', pos.join(' '));
+        c.setAttribute('radius', radius);
+        c.setAttribute('height', len);
+        c.setAttribute('rotation', rot.join(' '));
+        c.setAttribute('color', color);
+        c.setAttribute('roughness', 1);
+        dragon.appendChild(c);
+      }
+
+      // helper: spiky ball (incense head)
+      function addSpikyBall(pos, radius=0.16, spikes=45) {
+        const group = document.createElement('a-entity');
+        group.setAttribute('position', pos.join(' '));
+
+        // core
+        const core = document.createElement('a-sphere');
+        core.setAttribute('radius', radius * 0.45);
+        core.setAttribute('color', darkBamboo);
+        core.setAttribute('opacity', 0.95);
+        group.appendChild(core);
+
+        for (let i=0; i<spikes; i++){
+          const phi = Math.acos(1 - 2*(i+0.5)/spikes); // quasi-even
+          const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+          const dir = new THREE.Vector3(
+            Math.cos(theta) * Math.sin(phi),
+            Math.cos(phi),
+            Math.sin(theta) * Math.sin(phi)
+          );
+          const len = radius * (0.9 + Math.random()*0.5);
+          const mid = dir.clone().multiplyScalar(len*0.5);
+          const spike = document.createElement('a-cylinder');
+          spike.setAttribute('radius', 0.008);
+          spike.setAttribute('height', len);
+          spike.setAttribute('color', incense);
+          spike.object3D.position.set(mid.x, mid.y, mid.z);
+          spike.object3D.lookAt(dir.clone().multiplyScalar(len));
+          group.appendChild(spike);
+
+          // tip glow
+          const tip = document.createElement('a-sphere');
+          tip.setAttribute('radius', 0.014);
+          tip.setAttribute('color', glow);
+          tip.setAttribute('emissive', glow);
+          tip.object3D.position.set(dir.x * len, dir.y * len, dir.z * len);
+          group.appendChild(tip);
+        }
+        dragon.appendChild(group);
+      }
+
+      // body: a main bamboo spine
+      pole([0,0,0], 1.8, [0,0,90], 0.04, bamboo);
+
+      // a few support sticks
+      pole([0.6, 0.05, 0], 0.6, [0,0,60], 0.02, darkBamboo);
+      pole([1.2,-0.04, 0], 0.55, [0,0,120],0.02, darkBamboo);
+      pole([0.3,-0.02, 0], 0.5, [0,0,110],0.02, darkBamboo);
+
+      // incense heads (spiky balls)
+      addSpikyBall([1.8, 0, 0], 0.22, 60);   // head
+      addSpikyBall([1.0, 0.08, 0], 0.18, 52); // mid cluster
+      addSpikyBall([0.35,-0.05, 0], 0.16, 45); // tail cluster
+
+      // small tail whisk
+      pole([-0.05, -0.06, 0], 0.25, [0,0,90], 0.015, darkBamboo);
+    }
+    // ---------------------------------------------------------------
 
     const goodWords = ['福','春','財','安','旺','吉','祥','賀','龍','年'];
     const badWords  = ['⚽','🍔','🎧','🧊','🧼','🍺','💡','📎','🧽','🧯'];
@@ -317,6 +382,7 @@
     // Collision detection each tick
     scene.addEventListener('loaded', () => {
       scene.setAttribute('game-manager','');
+      buildFireDragon();
     });
 
     AFRAME.registerComponent('game-manager', {
