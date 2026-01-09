@@ -1,438 +1,432 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>大坑舞火龍 AR 遊戲（Hiro Marker）</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+  <title>大坑舞火龍 AR 遊戲</title>
 
-  <!-- Three.js UMD 全域版 -->
-  <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
-  <!-- MindAR Image + Three UMD 全域版 -->
-  <script src="https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+  <!-- A-Frame & AR.js (marker-based) -->
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
   <style>
+    :root {
+      --glass: rgba(0,0,0,0.52);
+      --glass-strong: rgba(0,0,0,0.68);
+      --accent: #ffb300;
+      --good: #e53935;
+      --bad: #455a64;
+      --text: #f5f5f5;
+    }
+    * { box-sizing: border-box; }
     html, body {
-      margin: 0;
-      padding: 0;
-      background: #000;
-      height: 100%;
+      margin: 0; padding: 0; width: 100%; height: 100%;
       overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "PingFang HK", "Heiti TC", Arial, sans-serif;
-      color: #fff;
+      background: #000 url('image_1.png') center/cover fixed no-repeat;
+      color: var(--text);
+      font-family: "Segoe UI", "Noto Sans TC", system-ui, -apple-system, sans-serif;
+    }
+    body.bg-off { background: #000; }
+    a-scene {
+      position: fixed !important;
+      top: 0; left: 0; width: 100vw; height: 100vh;
     }
     .hud {
       position: fixed;
-      top: 0; left: 0; right: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 12px;
+      inset: 0;
       pointer-events: none;
-      gap: 10px;
-      background: linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0));
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      gap: 8px;
     }
-    .hud .pill {
-      pointer-events: auto;
-      background: rgba(0,0,0,0.55);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 999px;
-      padding: 8px 12px;
-      font-weight: 700;
-      display: inline-flex;
+    .row {
+      display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       align-items: center;
-      backdrop-filter: blur(6px);
-    }
-    .btn {
       pointer-events: auto;
-      background: #e53935;
-      border: none;
+    }
+    .card {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--glass);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.35;
+    }
+    .card strong { color: #fff; font-size: 15px; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .tag.good { background: var(--good); color: #fff; }
+    .tag.bad { background: var(--bad); color: #fff; }
+    .btn {
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: var(--glass-strong);
       color: #fff;
       font-weight: 700;
-      border-radius: 999px;
-      padding: 8px 14px;
       cursor: pointer;
-      transition: transform .05s ease, opacity .2s ease;
+      transition: transform 0.12s ease, background 0.15s ease;
     }
-    .btn:hover { opacity: 0.9; }
-    .btn:active { transform: scale(0.98); }
-    .center-overlay {
-      position: fixed;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.55);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 16px;
-      padding: 16px 18px;
-      text-align: center;
-      backdrop-filter: blur(6px);
+    .btn:hover { background: rgba(255,255,255,0.12); }
+    .btn:active { transform: scale(0.97); }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #f44336; margin-right: 6px; display: inline-block;
+      box-shadow: 0 0 0 0 rgba(244,67,54,0.6);
+      animation: pulse 1.4s infinite;
     }
-    .small { font-size: 12px; opacity: 0.85; }
-    #ar-container {
-      position: fixed;
-      inset: 0;
-      background: #000 url("./image_1.png") center/cover no-repeat;
+    .status-dot.on { background: #4caf50; box-shadow: 0 0 0 8px rgba(76,175,80,0); }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(76,175,80,0.35); }
+      70% { box-shadow: 0 0 0 12px rgba(76,175,80,0); }
+      100% { box-shadow: 0 0 0 0 rgba(76,175,80,0); }
     }
-    canvas { display: block; }
-    .bottom-bar {
-      position: fixed;
-      left: 0; right: 0; bottom: 0;
-      padding: 8px 12px;
-      display: flex; justify-content: space-between; gap: 12px; align-items: center;
-      background: linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0));
-      pointer-events: none;
+    .bottom-note {
+      margin-top: auto;
+      font-size: 13px;
+      opacity: 0.9;
+      pointer-events: auto;
     }
-    .legend { display: flex; gap: 8px; flex-wrap: wrap; pointer-events: auto; }
-    .chip {
+    .flex-gap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .pill {
+      padding: 6px 10px;
       background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.2);
       border-radius: 999px;
-      padding: 4px 8px;
-      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
     }
-    .good { border-color: #66bb6a; color: #a5d6a7; }
-    .bad { border-color: #ef5350; color: #ef9a9a; }
-    .mobile-hint {
-      position: fixed; top: 60px; right: 10px;
-      background: rgba(0,0,0,0.55);
-      border: 1px solid rgba(255,255,255,0.2);
+    .toast {
+      position: fixed;
+      left: 50%; top: 16px;
+      transform: translateX(-50%);
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.78);
       border-radius: 12px;
-      padding: 8px 10px;
-      font-size: 12px;
-      max-width: 50vw;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #fff;
+      font-weight: 700;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
     }
-    @media (min-width: 768px) { .mobile-hint { display: none; } }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    @media (max-width: 700px) {
+      .card { width: 100%; }
+      .row { width: 100%; }
+    }
   </style>
 </head>
-<body>
-  <div id="ar-container"></div>
-
+<body class="bg-on">
   <div class="hud">
-    <div class="pill" id="statusPill">狀態：<span id="statusText">初始化中…</span></div>
-    <div class="pill">時間：<span id="timerText">60</span>s</div>
-    <div class="pill">分數：<span id="scoreText">0</span></div>
-    <button id="startBtn" class="btn">開始遊戲</button>
-  </div>
-
-  <div class="bottom-bar">
-    <div class="legend">
-      <div class="chip good">撞「福/春/財/安/旺/吉/祥/賀/龍/年」+1</div>
-      <div class="chip bad">撞「⚽/🍔/🎧/🧊/🧼/🍺/💡/📎/🧽/🧯」-1</div>
+    <div class="row">
+      <div class="card">
+        <div class="flex-gap" style="margin-bottom:4px;">
+          <span class="status-dot" id="markerDot"></span>
+          <strong>Marker 狀態：</strong><span id="markerState">未偵測</span>
+        </div>
+        <div class="flex-gap">
+          <div class="pill">分數：<strong id="scoreText">0</strong></div>
+          <div class="pill">倒數：<strong id="timeText">60s</strong></div>
+          <div class="pill">狀態：<strong id="gameState">待開始</strong></div>
+        </div>
+      </div>
+      <div class="row" style="gap:6px;">
+        <button class="btn" id="startBtn">開始 / 暫停</button>
+        <button class="btn" id="resetBtn">重置</button>
+        <button class="btn" id="videoBtn">影像開關</button>
+        <button class="btn" id="bgBtn">背景開關</button>
+      </div>
     </div>
-    <div class="chip small">請用 Hiro Marker；把竹龍對準飄浮字牌碰撞</div>
+
+    <div class="card">
+      <div class="flex-gap" style="margin-bottom:6px;">
+        <strong>碰撞規則：</strong>
+        <span class="tag good">+1</span> 撞「福春財安旺吉祥賀龍年」
+        <span class="tag bad">-1</span> 撞「⚽ 🍔 🎧 🧊 🧼 🍺 💡 📎 🧽 🧯」
+      </div>
+      <div class="flex-gap">
+        <div>好字：福、春、財、安、旺、吉、祥、賀、龍、年</div>
+        <div>壞字：⚽、🍔、🎧、🧊、🧼、🍺、💡、📎、🧽、🧯</div>
+      </div>
+    </div>
+
+    <div class="card bottom-note">
+      說明：在 60 秒內移動「hiro」marker 讓竹龍去撞紅色好字得分，撞灰色壞字會扣分。建議在光線充足的地方使用 HTTPS（GitHub Pages 預設支援）。
+    </div>
   </div>
 
-  <div class="center-overlay" id="overlay" style="display:none;">
-    <div id="overlayText">遊戲結束！</div>
-    <div class="small" style="margin-top:6px;">按「開始遊戲」再玩一次</div>
-  </div>
+  <div class="toast" id="toast"></div>
 
-  <div class="mobile-hint">提示：如看不到相機畫面，請到瀏覽器允許鏡頭。</div>
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true; alpha: true; antialias: true"
+    arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+    id="scene">
+    
+    <a-assets></a-assets>
+
+    <!-- Marker with Bamboo Dragon -->
+    <a-marker preset="hiro" id="marker">
+      <a-entity id="dragon" position="0 0 0" scale="1 1 1">
+        <!-- body segments -->
+        <a-cylinder position="0 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#2e7d32"></a-cylinder>
+        <a-cylinder position="0.22 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#43a047"></a-cylinder>
+        <a-cylinder position="0.44 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#2e7d32"></a-cylinder>
+        <a-cylinder position="0.66 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#43a047"></a-cylinder>
+        <a-cylinder position="0.88 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#2e7d32"></a-cylinder>
+        <a-cylinder position="1.10 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#43a047"></a-cylinder>
+        <a-cylinder position="1.32 0 0" radius="0.08" height="0.28" rotation="0 0 90" color="#2e7d32"></a-cylinder>
+        <!-- head -->
+        <a-sphere position="1.5 0 0" radius="0.11" color="#c62828"></a-sphere>
+        <a-torus position="1.46 0 0" radius="0.11" radius-tubular="0.015" color="#ffeb3b" rotation="0 0 0"></a-torus>
+        <a-cone position="1.55 0.08 0.05" radius-bottom="0.025" radius-top="0.005" height="0.08" rotation="0 0 20" color="#ffeb3b"></a-cone>
+        <a-cone position="1.55 0.08 -0.05" radius-bottom="0.025" radius-top="0.005" height="0.08" rotation="0 0 -20" color="#ffeb3b"></a-cone>
+        <a-sphere position="1.56 0.02 0.04" radius="0.015" color="#000"></a-sphere>
+        <a-sphere position="1.56 0.02 -0.04" radius="0.015" color="#000"></a-sphere>
+        <a-cylinder position="1.45 -0.08 0" radius="0.012" height="0.12" rotation="20 0 90" color="#ffb300"></a-cylinder>
+      </a-entity>
+    </a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
 
   <script>
-    // 取用 MindAR UMD 全域
-    const MindARThree = window.MINDAR.IMAGE.MindARThree;
+    // Face-camera billboard component
+    AFRAME.registerComponent('face-camera', {
+      tick: function () {
+        const cam = this.el.sceneEl && this.el.sceneEl.camera;
+        if (!cam) return;
+        this.el.object3D.quaternion.copy(cam.quaternion);
+      }
+    });
 
-    // 遊戲設定
-    const RELATED = ["福","春","財","安","旺","吉","祥","賀","龍","年"];
-    const UNRELATED = ["⚽","🍔","🎧","🧊","🧼","🍺","💡","📎","🧽","🧯"];
-    const GAME_DURATION = 60;
-    const MAX_ITEMS = 10;
-    const SPAWN_AREA = { x: [-0.6, 0.6], y: [0.0, 0.8], z: [-0.6, 0.6] };
-    const ITEM_SPEED = 0.25;
-    const ITEM_RADIUS = 0.08;
+    // Floating animation helper
+    AFRAME.registerComponent('floaty', {
+      schema: { amp: {default: 0.05}, speed: {default: 1} },
+      init: function () { this.t0 = Math.random() * Math.PI * 2; },
+      tick: function (t) {
+        const y = Math.sin((t / 1000) * this.data.speed + this.t0) * this.data.amp;
+        this.el.object3D.position.y = this.baseY + y;
+      },
+      update: function () {
+        this.baseY = this.el.object3D.position.y;
+      }
+    });
 
-    const statusText = document.getElementById("statusText");
-    const timerText = document.getElementById("timerText");
-    const scoreText = document.getElementById("scoreText");
-    const startBtn = document.getElementById("startBtn");
-    const overlay = document.getElementById("overlay");
-    const overlayText = document.getElementById("overlayText");
-
-    let mindarThree, renderer, scene, camera, anchor;
-    let running = false;
-    let timeLeft = GAME_DURATION;
+    const goodWords = ['福','春','財','安','旺','吉','祥','賀','龍','年'];
+    const badWords  = ['⚽','🍔','🎧','🧊','🧼','🍺','💡','📎','🧽','🧯'];
     let score = 0;
-    let items = [];
-    let lastSpawnTime = 0;
-    let clock = new THREE.Clock();
-    let dragon = null;
-    let started = false;
+    let timeLeft = 60;
+    let running = false;
+    let spawnTimer = null;
+    let countdownTimer = null;
+    const targets = new Map(); // id -> {el, isGood}
 
-    function createBambooDragon() {
-      const root = new THREE.Group();
+    const scoreText = document.getElementById('scoreText');
+    const timeText = document.getElementById('timeText');
+    const gameStateText = document.getElementById('gameState');
+    const markerState = document.getElementById('markerState');
+    const markerDot = document.getElementById('markerDot');
+    const toast = document.getElementById('toast');
 
-      const body = new THREE.Group();
-      const segCount = 10;
-      const cylMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.8, metalness: 0.05 });
-      for (let i = 0; i < segCount; i++) {
-        const cylGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.16, 16);
-        const segment = new THREE.Mesh(cylGeo, cylMat);
-        segment.position.set(0, 0.02, i * 0.14);
-        segment.rotation.z = Math.sin(i * 0.5) * 0.15;
-        body.add(segment);
+    const scene = document.getElementById('scene');
+    const marker = document.getElementById('marker');
 
-        const ringGeo = new THREE.TorusGeometry(0.055, 0.01, 10, 20);
-        const ringMat = new THREE.MeshStandardMaterial({ color: 0x558b2f, roughness: 0.9 });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.x = Math.PI / 2;
-        ring.position.set(0, 0.02, i * 0.14 + 0.08);
-        body.add(ring);
-      }
-      root.add(body);
+    // Show toast
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 900);
+    }
 
-      const headGroup = new THREE.Group();
-      const snoutGeo = new THREE.ConeGeometry(0.08, 0.16, 16);
-      const snoutMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.7 });
-      const snout = new THREE.Mesh(snoutGeo, snoutMat);
-      snout.rotation.x = Math.PI / 2;
-      snout.position.set(0, 0.04, -0.12);
-      headGroup.add(snout);
+    // Random helper
+    function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+    function rand(min,max){ return Math.random()*(max-min)+min; }
 
-      const noseRingGeo = new THREE.TorusGeometry(0.03, 0.006, 10, 24);
-      const noseRingMat = new THREE.MeshStandardMaterial({ color: 0xffc107, metalness: 0.6, roughness: 0.3 });
-      const noseRing = new THREE.Mesh(noseRingGeo, noseRingMat);
-      noseRing.rotation.y = Math.PI / 2;
-      noseRing.position.set(0, 0.02, -0.16);
-      headGroup.add(noseRing);
+    // Spawn a target into the world (not parented to marker)
+    let targetId = 0;
+    function spawnTarget() {
+      if (!running) return;
+      const isGood = Math.random() < 0.7;
+      const word = isGood ? pick(goodWords) : pick(badWords);
 
-      const eyeGeo = new THREE.SphereGeometry(0.02, 16, 16);
-      const eyeWhite = new THREE.MeshStandardMaterial({ color: 0xffffff });
-      const eyeL = new THREE.Mesh(eyeGeo, eyeWhite);
-      const eyeR = new THREE.Mesh(eyeGeo, eyeWhite);
-      eyeL.position.set(-0.05, 0.08, -0.07);
-      eyeR.position.set( 0.05, 0.08, -0.07);
-      headGroup.add(eyeL, eyeR);
+      const el = document.createElement('a-entity');
+      const bgColor = isGood ? '#d32f2f' : '#455a64';
 
-      const pupilGeo = new THREE.SphereGeometry(0.008, 12, 12);
-      const pupilMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
-      const pupilL = new THREE.Mesh(pupilGeo, pupilMat);
-      const pupilR = new THREE.Mesh(pupilGeo, pupilMat);
-      pupilL.position.set(-0.05, 0.075, -0.055);
-      pupilR.position.set( 0.05, 0.075, -0.055);
-      headGroup.add(pupilL, pupilR);
+      el.setAttribute('geometry', 'primitive: plane; width: 0.5; height: 0.5');
+      el.setAttribute('material', `color: ${bgColor}; opacity: 0.9; side: double`);
+      el.setAttribute('face-camera', '');
+      el.setAttribute('floaty', `amp: 0.04; speed: ${rand(0.6,1.2)}`);
 
-      headGroup.position.set(0, 0.02, -0.15);
-      root.add(headGroup);
+      const text = document.createElement('a-entity');
+      text.setAttribute('text', `value: ${word}; align: center; color: #fff; width: 1.4; anchor: center; baseline: center`);
+      text.setAttribute('position', '0 0 0.01');
+      el.appendChild(text);
 
-      const fireGroup = new THREE.Group();
-      const flameMat = new THREE.MeshBasicMaterial({ color: 0xff6f00, transparent: true, opacity: 0.8 });
-      for (let i = 0; i < 6; i++) {
-        const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.12), flameMat);
-        plane.position.set((Math.random()-0.5)*0.05, 0.03 + Math.random()*0.05, -0.22 - Math.random()*0.03);
-        fireGroup.add(plane);
-      }
-      root.add(fireGroup);
+      // Position in front of camera
+      const x = rand(-1.4, 1.4);
+      const y = rand(0.4, 1.6);
+      const z = rand(-2.4, -0.9);
+      el.object3D.position.set(x, y, z);
 
-      root.userData.update = (t) => {
-        headGroup.position.y = 0.015 + Math.sin(t * 3.0) * 0.01;
-        headGroup.rotation.z = Math.sin(t * 2.5) * 0.1;
-        body.children.forEach((seg, idx) => {
-          if (seg.type === "Mesh") {
-            seg.rotation.z = Math.sin(t * 2.0 + idx * 0.4) * 0.15;
+      const id = ++targetId;
+      el.dataset.id = id;
+      el.dataset.isGood = isGood ? '1' : '0';
+
+      scene.appendChild(el);
+      targets.set(id, { el, isGood });
+
+      // Auto-remove after 6s to avoid clutter
+      setTimeout(() => {
+        if (targets.has(id)) {
+          scene.removeChild(el);
+          targets.delete(id);
+        }
+      }, 6000);
+    }
+
+    // Collision detection each tick
+    scene.addEventListener('loaded', () => {
+      scene.setAttribute('game-manager','');
+    });
+
+    AFRAME.registerComponent('game-manager', {
+      tick: function () {
+        if (!running) return;
+        if (!marker.object3D.visible) return;
+        const markerWorld = new THREE.Vector3();
+        marker.object3D.getWorldPosition(markerWorld);
+
+        targets.forEach((obj, id) => {
+          if (!obj.el.object3D) return;
+          const pos = new THREE.Vector3();
+          obj.el.object3D.getWorldPosition(pos);
+          const dist = markerWorld.distanceTo(pos);
+          if (dist < 0.35) {
+            // collision
+            const isGood = obj.isGood;
+            score += isGood ? 1 : -1;
+            scoreText.textContent = score;
+            showToast(isGood ? '+1 得分！' : '-1 扣分！');
+
+            // flash effect
+            obj.el.setAttribute('material', 'color', isGood ? '#ffeb3b' : '#000');
+            setTimeout(() => {
+              if (obj.el.parentNode) scene.removeChild(obj.el);
+            }, 80);
+
+            targets.delete(id);
           }
         });
-        fireGroup.children.forEach((f, i) => {
-          f.material.opacity = 0.6 + 0.4 * Math.sin(t * 8 + i);
-        });
-      };
+      }
+    });
 
-      root.userData.radius = 0.12;
-      return root;
+    // Marker events
+    marker.addEventListener('markerFound', () => {
+      markerState.textContent = '已偵測';
+      markerDot.classList.add('on');
+    });
+    marker.addEventListener('markerLost', () => {
+      markerState.textContent = '未偵測';
+      markerDot.classList.remove('on');
+    });
+
+    // Timer logic
+    function startGame() {
+      if (running) { pauseGame(); return; }
+      running = true;
+      gameStateText.textContent = '進行中';
+      // start countdown
+      countdownTimer = setInterval(() => {
+        timeLeft -= 1;
+        if (timeLeft < 0) timeLeft = 0;
+        timeText.textContent = timeLeft + 's';
+        if (timeLeft <= 0) {
+          endGame();
+        }
+      }, 1000);
+      // spawn loop
+      spawnTimer = setInterval(spawnTarget, 1400);
+      showToast('開始！60 秒計時中');
     }
 
-    function createTextBillboard(text, color, isRelated) {
-      const size = 256;
-      const canvas = document.createElement("canvas");
-      canvas.width = size; canvas.height = size;
-      const ctx = canvas.getContext("2d");
-
-      ctx.clearRect(0, 0, size, size);
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
-      roundedRect(ctx, 8, 8, size-16, size-16, 36);
-      ctx.fill();
-
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = isRelated ? "#66bb6a" : "#ef5350";
-      ctx.stroke();
-
-      ctx.fillStyle = isRelated ? "#c8e6c9" : "#ffcdd2";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const isEmoji = /\p{Extended_Pictographic}/u.test(text);
-      const fontSize = isEmoji ? 160 : 180;
-      ctx.font = `bold ${fontSize}px "Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji","Noto Sans CJK TC","PingFang HK","Microsoft JhengHei",sans-serif`;
-      ctx.fillText(text, size/2, size/2 + (isEmoji ? 6 : 0));
-
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.anisotropy = 4;
-      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
-      const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(0.24, 0.24, 0.24);
-      sprite.userData = { isRelated, text };
-      return sprite;
-    }
-
-    function roundedRect(ctx, x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.arcTo(x + w, y, x + w, y + h, r);
-      ctx.arcTo(x + w, y + h, x, y + h, r);
-      ctx.arcTo(x, y + h, x, y, r);
-      ctx.arcTo(x, y, x + w, y, r);
-      ctx.closePath();
-    }
-
-    function spawnItem() {
-      const isRelated = Math.random() < 0.5;
-      const char = isRelated
-        ? RELATED[Math.floor(Math.random() * RELATED.length)]
-        : UNRELATED[Math.floor(Math.random() * UNRELATED.length)];
-
-      const sprite = createTextBillboard(char, isRelated ? 0x66bb6a : 0xef5350, isRelated);
-
-      const x = THREE.MathUtils.lerp(SPAWN_AREA.x[0], SPAWN_AREA.x[1], Math.random());
-      const y = THREE.MathUtils.lerp(SPAWN_AREA.y[0], SPAWN_AREA.y[1], Math.random());
-      const z = THREE.MathUtils.lerp(SPAWN_AREA.z[0], SPAWN_AREA.z[1], Math.random());
-      sprite.position.set(x, y, z);
-
-      const dir = new THREE.Vector3(-x, -y, -z).normalize().multiplyScalar(ITEM_SPEED);
-      sprite.userData.velocity = dir;
-      sprite.userData.radius = ITEM_RADIUS;
-
-      anchor.group.add(sprite);
-      items.push(sprite);
-    }
-
-    function resetGameState() {
-      items.forEach(it => anchor.group.remove(it));
-      items = [];
-      score = 0;
-      timeLeft = GAME_DURATION;
-      scoreText.textContent = score;
-      timerText.textContent = timeLeft;
-      lastSpawnTime = 0;
-      clock.getDelta();
-      overlay.style.display = "none";
+    function pauseGame() {
+      running = false;
+      gameStateText.textContent = '已暫停';
+      clearInterval(countdownTimer);
+      clearInterval(spawnTimer);
     }
 
     function endGame() {
       running = false;
-      overlayText.textContent = `遊戲結束！分數：${score}`;
-      overlay.style.display = "block";
-      statusText.textContent = "完成";
+      clearInterval(countdownTimer);
+      clearInterval(spawnTimer);
+      gameStateText.textContent = '已結束';
+      showToast('時間到！總分：' + score);
     }
 
-    function updateGame(dt, elapsed) {
-      if (!running) return;
-
-      if (items.length < MAX_ITEMS && elapsed - lastSpawnTime > 0.8) {
-        spawnItem();
-        lastSpawnTime = elapsed;
-      }
-
-      items.forEach(it => {
-        const v = it.userData.velocity;
-        it.position.addScaledVector(v, dt);
-        it.position.y += Math.sin(elapsed * 2 + it.position.x * 3) * 0.001;
-        it.lookAt(camera.position);
+    function resetGame() {
+      running = false;
+      clearInterval(countdownTimer);
+      clearInterval(spawnTimer);
+      timeLeft = 60;
+      score = 0;
+      scoreText.textContent = score;
+      timeText.textContent = timeLeft + 's';
+      gameStateText.textContent = '待開始';
+      // remove all targets
+      targets.forEach(obj => {
+        if (obj.el.parentNode) scene.removeChild(obj.el);
       });
-
-      if (dragon && dragon.userData.update) {
-        dragon.userData.update(elapsed);
-      }
-
-      if (dragon) {
-        const dPos = new THREE.Vector3();
-        dragon.getWorldPosition(dPos);
-        const toRemove = [];
-        items.forEach(it => {
-          const iPos = new THREE.Vector3();
-          it.getWorldPosition(iPos);
-          const dist = dPos.distanceTo(iPos);
-          const r = (dragon.userData.radius || 0.12) + (it.userData.radius || ITEM_RADIUS);
-          if (dist <= r) {
-            score += it.userData.isRelated ? 1 : -1;
-            scoreText.textContent = score;
-            it.scale.multiplyScalar(1.4);
-            it.material.opacity = 0.0;
-            anchor.group.remove(it);
-            toRemove.push(it);
-          }
-        });
-        items = items.filter(it => !toRemove.includes(it));
-      }
-
-      timeLeft -= dt;
-      if (timeLeft < 0) timeLeft = 0;
-      timerText.textContent = Math.ceil(timeLeft);
-      if (timeLeft <= 0) {
-        endGame();
-      }
+      targets.clear();
+      showToast('已重置');
     }
 
-    async function initAR() {
-      // 重要：MindAR-Image 使用 .mind 目標檔，而不是 AR.js 的 .patt
-      // 先用官方示例目標檔（你可換成自己的 ./hiro.mind）
-      const HIRO_TARGET = "https://raw.githubusercontent.com/hiukim/mind-ar-js/master/examples/image-tracking/assets/card.mind";
-      mindarThree = new MindARThree({
-        container: document.querySelector("#ar-container"),
-        imageTargetSrc: HIRO_TARGET,
-        uiScanning: false,
-        uiLoading: "正在載入相機…",
-        filterMinCF: 0.0005,
-        filterBeta: 0.01,
-        warmupTolerance: 5,
-      });
-      const res = mindarThree;
-      renderer = res.renderer;
-      scene = res.scene;
-      camera = res.camera;
+    // UI buttons
+    document.getElementById('startBtn').onclick = startGame;
+    document.getElementById('resetBtn').onclick = resetGame;
 
-      const hemi = new THREE.HemisphereLight(0xffffff, 0x223344, 0.6);
-      scene.add(hemi);
-      const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-      dir.position.set(0.5, 1, 0.5);
-      scene.add(dir);
+    // Camera video toggle
+    let videoOn = true;
+    document.getElementById('videoBtn').onclick = () => {
+      const vid = document.querySelector('video');
+      if (!vid) { showToast('等待相機啟動…'); return; }
+      videoOn = !videoOn;
+      vid.style.display = videoOn ? 'block' : 'none';
+      if (videoOn) { vid.play?.().catch(()=>{}); }
+      else { vid.pause?.(); }
+      showToast(videoOn ? '相機影像：開' : '相機影像：關');
+    };
 
-      anchor = mindarThree.addAnchor(0);
+    // Background toggle
+    let bgOn = true;
+    document.getElementById('bgBtn').onclick = () => {
+      bgOn = !bgOn;
+      document.body.classList.toggle('bg-off', !bgOn);
+      showToast(bgOn ? '背景圖：開' : '背景圖：關');
+    };
 
-      dragon = createBambooDragon();
-      dragon.position.set(0, 0, 0);
-      anchor.group.add(dragon);
-
-      anchor.onTargetFound = () => { statusText.textContent = "已偵測到標記"; };
-      anchor.onTargetLost  = () => { statusText.textContent = "尋找標記中…"; };
-
-      await mindarThree.start();
-      renderer.setAnimationLoop(loop);
-      statusText.textContent = "準備就緒";
-      started = true;
-    }
-
-    function loop() {
-      const dt = Math.min(0.05, clock.getDelta());
-      const elapsed = clock.elapsedTime;
-      updateGame(dt, elapsed);
-      renderer.render(scene, camera);
-    }
-
-    document.getElementById("startBtn").addEventListener("click", () => {
-      if (!started) return;
-      resetGameState();
-      running = true;
-      statusText.textContent = "遊戲進行中";
+    // Auto-spawn a few after load
+    window.addEventListener('load', () => {
+      // pre-spawn a couple (not running) just for scene? We'll keep empty until start.
     });
-
-    (async () => {
-      try {
-        await initAR();
-      } catch (e) {
-        console.error(e);
-        statusText.textContent = "初始化失敗，請檢查相機權限";
-      }
-    })();
   </script>
 </body>
 </html>
