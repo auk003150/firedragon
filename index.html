@@ -4,56 +4,94 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>大坑舞火龍 AR 小遊戲（Hiro 標記版）</title>
+  <title>大坑舞火龍 AR 小遊戲（Marker 版）</title>
   <style>
     html, body {
-      margin: 0; padding: 0; height: 100%; background: #000; color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "PingFang HK", "Heiti TC", Arial, sans-serif;
-      overflow: hidden; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      margin: 0; padding: 0;
+      height: 100%; background: #000; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "Noto Sans CJK", "PingFang HK", "Heiti TC", Arial, sans-serif;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
       touch-action: manipulation;
     }
     .wrap { position: relative; width: 100%; height: 100%; background: #000; }
-    video#cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: none; background: #000; }
+    video#cam {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      transform: none; background: #000;
+    }
     img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 1; mix-blend-mode: lighten; }
     canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
 
-    .ui { position: absolute; left: 0; right: 0; top: 0; display: grid; gap: 6px; padding: 10px 12px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0)); user-select: none; z-index: 20; }
-    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: nowrap; }
-    .hudbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .btn { background: #e11d48; border: none; color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(225,29,72,0.35); -webkit-tap-highlight-color: rgba(0,0,0,0); }
+    .ui {
+      position: absolute; left: 0; right: 0; top: 0;
+      display: grid; gap: 6px; padding: 10px 12px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0));
+      user-select: none; z-index: 20;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      flex-wrap: nowrap;
+    }
+    .hudbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+
+    .btn { background: #e11d48; border: none; color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(225,29,72,0.35); }
     .btn.secondary { background:#334155; box-shadow: 0 4px 12px rgba(15,23,42,0.35); }
     .btn.ghost { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; box-shadow: none; }
     .btn:disabled { opacity: 0.6; }
     .btn:active { transform: translateY(1px); }
+
     .hud { display: flex; gap: 10px; align-items: center; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,0.6); flex-wrap: wrap; }
     .chip { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 6px 10px; font-size: 14px; }
-    .hint { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; padding: 0 16px; color: #ffd166; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.7); z-index: 5; }
+
+    .hint {
+      position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+      text-align: center; padding: 0 16px; color: #ffd166; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.7); z-index: 5;
+    }
     .ok { color: #22c55e; }
     .bad { color: #f97316; }
 
     .menuBtn { padding: 8px 12px; font-weight: 700; border-radius: 10px; }
 
-    .panel-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.4); z-index: 30; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
-    .panel { position: absolute; top: 0; right: 0; height: 100%; background: rgba(17,24,39,0.9); backdrop-filter: blur(10px); border-left: 1px solid rgba(255,255,255,0.12); width: min(420px, 92vw); transform: translateX(100%); transition: transform .25s ease; z-index: 31; color: #fff; overflow: auto; -webkit-overflow-scrolling: touch; }
+    .panel-backdrop {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.4); z-index: 30;
+      opacity: 0; pointer-events: none; transition: opacity .2s ease;
+    }
+    .panel {
+      position: absolute; top: 0; right: 0; height: 100%;
+      background: rgba(17,24,39,0.9); backdrop-filter: blur(10px);
+      border-left: 1px solid rgba(255,255,255,0.12);
+      width: min(420px, 92vw);
+      transform: translateX(100%);
+      transition: transform .25s ease;
+      z-index: 31; color: #fff; overflow: auto;
+      -webkit-overflow-scrolling: touch;
+    }
     .panel.open { transform: translateX(0); }
     .panel-backdrop.open { opacity: 1; pointer-events: auto; }
-    .panel header { position: sticky; top: 0; background: rgba(17,24,39,0.95); padding: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); }
+
+    .panel header {
+      position: sticky; top: 0; background: rgba(17,24,39,0.95);
+      padding: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
     .panel h2 { margin: 0; font-size: 16px; }
     .panel .section { padding: 12px; display: grid; gap: 12px; }
     .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .row .label { font-size: 14px; color: #e5e7eb; }
     .row .controls { display: flex; align-items: center; gap: 8px; }
-    .mini { padding: 8px 10px; font-weight: 600; font-size: 12px; border-radius: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; -webkit-tap-highlight-color: rgba(0,0,0,0); }
+    .mini { padding: 8px 10px; font-weight: 600; font-size: 12px; border-radius: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; }
     .danger { background: #7f1d1d; border-color: rgba(255,255,255,0.25); }
 
-    input[type="range"] { width: 160px; }
+    .sliderRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+    .val { font-variant-numeric: tabular-nums; color: #fcd34d; min-width: 40px; text-align: right; }
+
+    /* 這些紅色追蹤相關控制已隱藏（保留結構以免破壞面板布局） */
+    .hide { display: none !important; }
+
     .bar { display: none; }
   </style>
-
-  <!-- js-aruco 與 jsfeat（角點偵測依賴） -->
-  <script src="https://unpkg.com/jsfeat/js/jsfeat-min.js"></script>
-  <script src="https://unpkg.com/js-aruco/build/aruco.min.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -75,7 +113,6 @@
       </div>
     </div>
 
-    <!-- 面板：刪除 HSV 相關滑桿，改為標記來源設定 -->
     <div id="panelBackdrop" class="panel-backdrop"></div>
     <aside id="panel" class="panel" aria-hidden="true">
       <header>
@@ -87,15 +124,18 @@
           <div class="label">鏡頭</div>
           <div class="controls">
             <button id="toggleFacing" class="mini">切換鏡頭</button>
-            <button id="toggleMirror" class="mini">鏡像：關</button>
-            <button id="fullscreenBtn" class="mini">全屏</button>
           </div>
         </div>
         <div class="row">
-          <div class="label">標記圖</div>
+          <div class="label">鏡像</div>
           <div class="controls">
-            <button id="loadHiro" class="mini">載入 Hiro</button>
-            <input id="markerFile" type="file" accept="image/*" class="mini" />
+            <button id="toggleMirror" class="mini">鏡像：關</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="label">螢幕</div>
+          <div class="controls">
+            <button id="fullscreenBtn" class="mini">全屏</button>
           </div>
         </div>
         <div class="row">
@@ -105,10 +145,86 @@
           </div>
         </div>
       </div>
+
+      <!-- 以 Marker 為主，隱藏舊色域控制 -->
+      <div class="section hide" style="border-top:1px solid rgba(255,255,255,0.1)">
+        <div class="sliderRow">
+          <div class="label">Hmin</div>
+          <div class="controls">
+            <input id="hMin" type="range" min="0" max="360" value="330">
+            <span id="hMinVal" class="val">330</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">Hmax</div>
+          <div class="controls">
+            <input id="hMax" type="range" min="0" max="360" value="20">
+            <span id="hMaxVal" class="val">20</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">Smin</div>
+          <div class="controls">
+            <input id="sMin" type="range" min="0" max="100" value="50">
+            <span id="sMinVal" class="val">50</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">Vmin</div>
+          <div class="controls">
+            <input id="vMin" type="range" min="0" max="100" value="40">
+            <span id="vMinVal" class="val">40</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">靈敏度</div>
+          <div class="controls">
+            <input id="sens" type="range" min="0" max="300" value="80">
+            <span id="sensVal" class="val">80</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" style="border-top:1px solid rgba(255,255,255,0.1)">
+        <div class="sliderRow">
+          <div class="label">目標密度</div>
+          <div class="controls">
+            <input id="density" type="range" min="1" max="10" value="4">
+            <span id="densityVal" class="val">4</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">速度</div>
+          <div class="controls">
+            <input id="speed" type="range" min="1" max="10" value="5">
+            <span id="speedVal" class="val">5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" style="border-top:1px solid rgba(255,255,255,0.1)">
+        <div class="row">
+          <div class="label">Marker</div>
+          <div class="controls">
+            <select id="markerSelect" class="mini">
+              <option value="hiro">HIRO</option>
+              <option value="kanji">KANJI</option>
+            </select>
+            <button id="recenterBtn" class="mini">重置對準</button>
+          </div>
+        </div>
+        <p style="margin:0; font-size:12px; color:#cbd5e1">
+          請把 HIRO / KANJI Marker 放入鏡頭。偵測成功後，火龍頭會跟隨 Marker 位置。
+        </p>
+      </div>
     </aside>
 
-    <div id="hint" class="hint" role="status" aria-live="polite">按「開始」允許相機。將 Hiro 標記置於鏡頭中。</div>
+    <div id="hint" class="hint">按「開始」允許相機權限。將 HIRO Marker 放到鏡頭中。</div>
   </div>
+
+  <!-- js-aruco（單文件簡易版）: 你可改為使用你自己的已託管版本 -->
+  <!-- 若無外網，將 js-aruco 內嵌到專案中再引用 -->
+  <script src="https://cdn.jsdelivr.net/gh/jcmellado/js-aruco/build/aruco-min.js"></script>
 
   <script>
     // ========= DOM =========
@@ -118,6 +234,8 @@
     const ctx = canvas.getContext('2d', { alpha: true });
 
     const startBtn = document.getElementById('startBtn');
+
+    // 面板 DOM
     const menuBtn = document.getElementById('menuBtn');
     const panel = document.getElementById('panel');
     const panelBackdrop = document.getElementById('panelBackdrop');
@@ -128,13 +246,20 @@
     const toggleMirrorBtn = document.getElementById('toggleMirror');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
 
-    const loadHiroBtn = document.getElementById('loadHiro');
-    const markerFile = document.getElementById('markerFile');
-
     const scoreEl = document.getElementById('score');
     const comboEl = document.getElementById('combo');
     const timeEl = document.getElementById('time');
     const hintEl = document.getElementById('hint');
+
+    // Marker 控制
+    const markerSelect = document.getElementById('markerSelect');
+    const recenterBtn = document.getElementById('recenterBtn');
+
+    // 仍保留密度/速度
+    const densEl = document.getElementById('density');
+    const speedEl = document.getElementById('speed');
+    const densityVal = document.getElementById('densityVal');
+    const speedVal = document.getElementById('speedVal');
 
     // ========= 狀態 =========
     let running = false;
@@ -144,26 +269,27 @@
     let score = 0, combo = 0, timeLeft = 60;
     let timerId = null;
 
-    let centroid = { x: 0, y: 0 };
-    let direction = { x: 1, y: 0 }; // 由標記角點推估
-    const smoothing = 0.28;
-
-    let useEnvironment = true;
+    // Marker 追蹤狀態
     let mirrored = false;
+    let useEnvironment = true;
+    let currentStream = null;
 
-    // 標記參考影像（可切換/上傳）
-    const markerImage = new Image();
-    markerImage.crossOrigin = 'anonymous';
-    markerImage.src = 'https://raw.githubusercontent.com/AR-js-org/AR.js/master/three.js/data/images/HIRO.jpg'; // 預設 Hiro
-    let markerReady = false;
-    markerImage.onload = () => { markerReady = true; };
+    // Marker 選擇：用常見的 ARToolKit ID
+    // HIRO: 0, KANJI: 3（視庫而定；js-aruco 預設使用 0..1023 字典 ID）
+    let targetMarkerId = 0; // 默認 HIRO
+    const namedMarkers = { hiro: 0, kanji: 3 };
 
-    // js-aruco 元件
-    const detector = new AR.Detector();
-
-    // 內部工作畫布（灰階/邊緣）
+    // 影像尺寸與處理
     const workCanvas = document.createElement('canvas');
     const wctx = workCanvas.getContext('2d', { willReadFrequently: true });
+
+    // Aruco 檢測器
+    const detector = new AR.Detector();
+
+    // 火龍頭位置（由 Marker 決定）
+    let headPos = { x: 0, y: 0 };
+    let headSmooth = { x: 0, y: 0 };
+    const smoothing = 0.28;
 
     // ========= 單張貼圖（無旋轉）=========
     const dragonImg = new Image();
@@ -180,11 +306,13 @@
       fineOffsetY: -0.1
     };
 
+    // 文字目標
     const goodList = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
     const badList  = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
     const items = [];
     const MAX_ITEMS = 14;
 
+    // 粒子
     const particles = [];
     const MAX_PARTICLES = 1200;
 
@@ -194,14 +322,13 @@
       const doResize = () => {
         dpr = Math.min(window.devicePixelRatio || 1, 2);
         const rect = canvas.getBoundingClientRect();
-        W = Math.max(2, Math.round(rect.width));
-        H = Math.max(2, Math.round(rect.height));
+        W = rect.width; H = rect.height;
         canvas.width = Math.round(W * dpr);
         canvas.height = Math.round(H * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       };
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(doResize, 80);
+      resizeTimer = setTimeout(doResize, 50);
     }
     window.addEventListener('resize', resize, { passive: true });
     window.addEventListener('orientationchange', () => setTimeout(resize, 150), { passive: true });
@@ -222,7 +349,6 @@
     }
 
     // ========= 相機 =========
-    let currentStream = null;
     async function stopStream() {
       if (currentStream) {
         currentStream.getTracks().forEach(t => t.stop());
@@ -230,28 +356,24 @@
       }
     }
     async function initCamera() {
-      const facing = useEnvironment ? { ideal: 'environment' } : { ideal: 'user' };
       const kinds = [
-        { width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16/9 } },
-        { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16/9 } },
+        { width: { ideal: 1280 }, height: { ideal: 720 } },
         { width: { ideal: 960 }, height: { ideal: 540 } },
         { width: { ideal: 640 }, height: { ideal: 480 } }
       ];
-      await stopStream();
+      const facing = useEnvironment ? { ideal: 'environment' } : { ideal: 'user' };
       let lastErr = null;
+      await stopStream();
       for (const res of kinds) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
-            audio: false, video: { ...res, facingMode: facing }
+            audio: false,
+            video: { ...res, facingMode: facing }
           });
           currentStream = stream;
           video.srcObject = stream;
-          video.setAttribute('playsinline', 'true');
-          video.muted = true;
+          video.playsInline = true;
           await video.play().catch(()=>{});
-          if (!video.videoWidth) {
-            await new Promise(r => video.onloadedmetadata = r);
-          }
           applyMirror();
           return true;
         } catch (err) { lastErr = err; }
@@ -261,73 +383,54 @@
       hintEl.className = 'hint bad';
       return false;
     }
-
     function applyMirror() {
       video.style.transform = mirrored ? 'scaleX(-1)' : 'none';
       toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`;
     }
 
-    // ========= 標記偵測 =========
-    // 將 video 畫面繪到工作畫布，餵給 js-aruco
-    function detectMarkerCentroid() {
+    // ========= Marker 追蹤 =========
+    // 解析 video 畫面，傳給 Aruco 偵測
+    function detectMarkerAndGetCenter() {
       const vw = video.videoWidth|0, vh = video.videoHeight|0;
-      if (!vw || !vh) return null;
+      if (vw === 0 || vh === 0) return null;
 
-      // 降採樣提升效能
-      const scale = 0.66;
-      const w = Math.max(160, Math.round(vw * scale));
-      const h = Math.max(120, Math.round(vh * scale));
+      // 以較低解析度處理提速
+      const scale = 0.6;
+      const w = Math.max(80, Math.round(vw * scale));
+      const h = Math.max(80, Math.round(vh * scale));
       workCanvas.width = w; workCanvas.height = h;
 
-      // 將鏡像也套用到偵測平面，使座標對齊
-      if (mirrored) {
-        wctx.save();
-        wctx.scale(-1, 1);
-        wctx.drawImage(video, -w, 0, w, h);
-        wctx.restore();
-      } else {
-        wctx.drawImage(video, 0, 0, w, h);
-      }
+      try { wctx.drawImage(video, 0, 0, w, h); } catch { return null; }
 
-      const img = wctx.getImageData(0, 0, w, h);
+      const imageData = wctx.getImageData(0, 0, w, h);
       let markers;
       try {
-        markers = detector.detect(img);
+        markers = detector.detect(imageData);
       } catch {
         return null;
       }
       if (!markers || markers.length === 0) return null;
 
-      // 選擇最大面積的標記
-      let best = markers[0], bestArea = 0;
+      // 找到匹配 targetMarkerId 的 marker（或退而求其次選信心最高的一個）
+      let best = null;
       for (const m of markers) {
-        const a = quadArea(m.corners);
-        if (a > bestArea) { bestArea = a; best = m; }
+        if (m.id === targetMarkerId) { best = m; break; }
       }
+      if (!best) best = markers[0];
 
-      // 中心點與朝向
+      // 取四點中心
       const c = best.corners;
-      // c 是 4 個點：將它們映射回原畫布座標
-      const cx = (c[0].x + c[1].x + c[2].x + c[3].x) * 0.25 / w * W;
-      const cy = (c[0].y + c[1].y + c[2].y + c[3].y) * 0.25 / h * H;
+      // 鏡像時把 x 反轉（在工作畫布座標系）
+      let cx = (c[0].x + c[1].x + c[2].x + c[3].x) * 0.25;
+      let cy = (c[0].y + c[1].y + c[2].y + c[3].y) * 0.25;
 
-      // 以邊 c[0]->c[1] 作為朝向近似（右向），取單位向量
-      const dx = (c[1].x - c[0].x);
-      const dy = (c[1].y - c[0].y);
-      const len = Math.hypot(dx, dy) || 1;
-      const dirx = dx / len, diry = dy / len;
+      if (mirrored) cx = w - cx;
 
-      return { x: cx, y: cy, dirx, diry, id: best.id };
-    }
+      // 映射回主畫布
+      const px = cx / w * W;
+      const py = cy / h * H;
 
-    function quadArea(pts) {
-      // 多邊形面積（Shoelace）
-      let s = 0;
-      for (let i=0; i<4; i++){
-        const a = pts[i], b = pts[(i+1)&3];
-        s += (a.x*b.y - b.x*a.y);
-      }
-      return Math.abs(s) * 0.5;
+      return { x: px, y: py };
     }
 
     // ========= 目標物件 =========
@@ -338,14 +441,14 @@
       const margin = 28 + size;
       const x = margin + Math.random()*(W - margin*2);
       const y = 80 + Math.random()*(H - 160);
-      const speed = 5;
+      const speed = parseInt(speedEl.value, 10);
       const vx = (Math.random()-0.5)*speed;
       const vy = (Math.random()-0.5)*speed;
       const ttl = 12 + Math.random()*10;
       items.push({ x,y,vx,vy,text,size,isGood,ttl });
     }
     function ensureItems() {
-      const target = 12;
+      const target = parseInt(densEl.value, 10) * 3;
       while (items.length < Math.min(MAX_ITEMS, target)) spawnItem();
     }
     function updateItems(dt) {
@@ -414,7 +517,7 @@
       ctx.restore();
     }
 
-    // ========= 貼圖繪製 =========
+    // ========= 火龍繪製 =========
     function drawDragon(ctx, head) {
       if (!dragonImgReady) return;
 
@@ -487,24 +590,24 @@
 
       ctx.clearRect(0, 0, W, H);
 
-      const m = detectMarkerCentroid();
+      // Marker 追蹤
+      const m = detectMarkerAndGetCenter();
       if (m) {
-        centroid.x = centroid.x + (m.x - centroid.x) * smoothing || m.x;
-        centroid.y = centroid.y + (m.y - centroid.y) * smoothing || m.y;
-        direction.x = m.dirx; direction.y = m.diry;
-        hintEl.textContent = `已偵測到標記${typeof m.id==='number' ? ' #' + m.id : ''}，盡情舞動！`;
+        headPos = m;
+        headSmooth.x = headSmooth.x + (headPos.x - headSmooth.x) * smoothing || headPos.x;
+        headSmooth.y = headSmooth.y + (headPos.y - headSmooth.y) * smoothing || headPos.y;
+
+        hintEl.textContent = '已偵測到 Marker！舞動火龍！';
         hintEl.className = 'hint ok';
       } else {
-        hintEl.textContent = '未偵測到標記，請將 Hiro 圖放入鏡頭並確保光線充足。';
+        hintEl.textContent = '未偵測到 Marker，請將 HIRO / KANJI 圖卡放入鏡頭並確保光線。';
         hintEl.className = 'hint bad';
       }
 
       updateItems(dt);
       drawItems(ctx);
 
-      let head = { x: centroid.x || W/2, y: centroid.y || H/2 };
-      // 若使用前鏡頭鏡像，座標已在 detect 裡處理，不需再翻轉
-
+      const head = { x: headSmooth.x || W/2, y: headSmooth.y || H/2 };
       drawDragon(ctx, head);
 
       updateParticles(dt);
@@ -519,10 +622,6 @@
     // ========= 控制 =========
     function startGameLoop() {
       if (running) return;
-      if (!dragonImgReady) {
-        const wait = () => { if (!dragonImgReady) return requestAnimationFrame(wait); startGameLoop(); };
-        return wait();
-      }
       running = true; gameOver = false;
       lastTime = performance.now();
       ensureItems();
@@ -561,8 +660,8 @@
     resetBtn.addEventListener('click', async () => {
       score = 0; combo = 0; scoreEl.textContent = score; comboEl.textContent = combo;
       items.length = 0; ensureItems();
-      centroid = { x: W/2, y: H/2 };
-      direction = { x: 1, y: 0 };
+      headPos = { x: W/2, y: H/2 };
+      headSmooth = { x: headPos.x, y: headPos.y };
       hintEl.textContent = '重置完成，按「開始」重新啟動相機。';
       hintEl.className = 'hint';
       running = false; gameOver = false;
@@ -572,13 +671,9 @@
       await stopStream();
     });
 
-    let facingBusy = false;
     toggleFacingBtn.addEventListener('click', async () => {
-      if (facingBusy) return;
-      facingBusy = true;
       useEnvironment = !useEnvironment;
       await initCamera();
-      facingBusy = false;
     });
     toggleMirrorBtn.addEventListener('click', () => {
       mirrored = !mirrored;
@@ -607,23 +702,29 @@
     menuBtn.addEventListener('click', openPanel);
     closePanelBtn.addEventListener('click', closePanel);
     panelBackdrop.addEventListener('click', closePanel);
-    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closePanel(); });
 
-    // 載入預設 Hiro 圖
-    loadHiroBtn.addEventListener('click', () => {
-      markerImage.src = 'https://raw.githubusercontent.com/AR-js-org/AR.js/master/three.js/data/images/HIRO.jpg';
+    // 值同步
+    function bindVal(input, labelEl) {
+      const sync = () => labelEl.textContent = input.value;
+      input.addEventListener('input', sync);
+      sync();
+    }
+    bindVal(densEl, densityVal);
+    bindVal(speedEl, speedVal);
+
+    // Marker 選擇
+    markerSelect.addEventListener('change', () => {
+      const val = markerSelect.value;
+      targetMarkerId = namedMarkers[val] ?? 0;
     });
-    // 允許自訂標記圖（高對比黑白最佳）
-    markerFile.addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      const url = URL.createObjectURL(file);
-      markerImage.src = url;
+    recenterBtn.addEventListener('click', () => {
+      headPos = { x: W/2, y: H/2 };
+      headSmooth = { x: headPos.x, y: headPos.y };
     });
 
     // 初始
-    centroid = { x: W/2, y: H/2 };
-    direction = { x: 1, y: 0 };
+    headPos = { x: W/2, y: H/2 };
+    headSmooth = { x: headPos.x, y: headPos.y };
   </script>
 </body>
 </html>
