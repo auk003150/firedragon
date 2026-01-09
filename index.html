@@ -221,16 +221,13 @@
     // ---------- Fire Dragon model (bamboo + spiky incense) ----------
     function buildFireDragon() {
       const dragon = document.getElementById('dragon');
-      // clear old
       while (dragon.firstChild) dragon.removeChild(dragon.firstChild);
 
-      // materials/colors
       const bamboo = '#8d6e63';
       const darkBamboo = '#6d4c41';
       const incense = '#d9c19f';
       const glow = '#ffcc80';
 
-      // helper: bamboo pole
       function pole(pos, len, rot=[0,0,0], radius=0.035, color=bamboo) {
         const c = document.createElement('a-cylinder');
         c.setAttribute('position', pos.join(' '));
@@ -242,12 +239,10 @@
         dragon.appendChild(c);
       }
 
-      // helper: spiky ball (incense head)
       function addSpikyBall(pos, radius=0.16, spikes=45) {
         const group = document.createElement('a-entity');
         group.setAttribute('position', pos.join(' '));
 
-        // core
         const core = document.createElement('a-sphere');
         core.setAttribute('radius', radius * 0.45);
         core.setAttribute('color', darkBamboo);
@@ -255,7 +250,7 @@
         group.appendChild(core);
 
         for (let i=0; i<spikes; i++){
-          const phi = Math.acos(1 - 2*(i+0.5)/spikes); // quasi-even
+          const phi = Math.acos(1 - 2*(i+0.5)/spikes);
           const theta = Math.PI * (1 + Math.sqrt(5)) * i;
           const dir = new THREE.Vector3(
             Math.cos(theta) * Math.sin(phi),
@@ -272,7 +267,6 @@
           spike.object3D.lookAt(dir.clone().multiplyScalar(len));
           group.appendChild(spike);
 
-          // tip glow
           const tip = document.createElement('a-sphere');
           tip.setAttribute('radius', 0.014);
           tip.setAttribute('color', glow);
@@ -283,20 +277,15 @@
         dragon.appendChild(group);
       }
 
-      // body: a main bamboo spine
       pole([0,0,0], 1.8, [0,0,90], 0.04, bamboo);
-
-      // a few support sticks
       pole([0.6, 0.05, 0], 0.6, [0,0,60], 0.02, darkBamboo);
       pole([1.2,-0.04, 0], 0.55, [0,0,120],0.02, darkBamboo);
       pole([0.3,-0.02, 0], 0.5, [0,0,110],0.02, darkBamboo);
 
-      // incense heads (spiky balls)
-      addSpikyBall([1.8, 0, 0], 0.22, 60);   // head
-      addSpikyBall([1.0, 0.08, 0], 0.18, 52); // mid cluster
-      addSpikyBall([0.35,-0.05, 0], 0.16, 45); // tail cluster
+      addSpikyBall([1.8, 0, 0], 0.22, 60);
+      addSpikyBall([1.0, 0.08, 0], 0.18, 52);
+      addSpikyBall([0.35,-0.05, 0], 0.16, 45);
 
-      // small tail whisk
       pole([-0.05, -0.06, 0], 0.25, [0,0,90], 0.015, darkBamboo);
     }
     // ---------------------------------------------------------------
@@ -334,6 +323,57 @@
       setTimeout(() => toast.classList.remove('show'), 900);
     }
 
+    // Texture cache for labels
+    const texCache = {};
+    function roundedRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x+r, y);
+      ctx.lineTo(x+w-r, y);
+      ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+      ctx.lineTo(x+w, y+h-r);
+      ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+      ctx.lineTo(x+r, y+h);
+      ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+      ctx.lineTo(x, y+r);
+      ctx.quadraticCurveTo(x, y, x+r, y);
+      ctx.closePath();
+    }
+    function makeLabelTexture(word, bgColor) {
+      const key = word + '|' + bgColor;
+      if (texCache[key]) return texCache[key];
+      const size = 256;
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0,0,size,size);
+
+      // background rounded
+      const pad = 12;
+      roundedRect(ctx, pad, pad, size-2*pad, size-2*pad, 28);
+      ctx.fillStyle = bgColor;
+      ctx.fill();
+
+      // text
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 170px "Noto Sans TC","Microsoft JhengHei","PingFang TC","Heiti TC",sans-serif';
+      // Auto shrink if long (though here single glyph)
+      let fsize = 170;
+      while (true) {
+        const metrics = ctx.measureText(word);
+        const w = metrics.width;
+        if (w < size - 60 || fsize < 80) break;
+        fsize -= 10;
+        ctx.font = `bold ${fsize}px "Noto Sans TC","Microsoft JhengHei","PingFang TC","Heiti TC",sans-serif`;
+      }
+      ctx.fillText(word, size/2, size/2 + 8);
+
+      const url = c.toDataURL('image/png');
+      texCache[key] = url;
+      return url;
+    }
+
     function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
     function rand(min,max){ return Math.random()*(max-min)+min; }
 
@@ -343,21 +383,15 @@
       if (!running) return;
       const isGood = Math.random() < 0.7;
       const word = isGood ? pick(goodWords) : pick(badWords);
+      const bgColor = isGood ? '#d32f2f' : '#455a64';
+      const tex = makeLabelTexture(word, bgColor);
 
       const el = document.createElement('a-entity');
-      const bgColor = isGood ? '#d32f2f' : '#455a64';
-
       el.setAttribute('geometry', 'primitive: plane; width: 0.5; height: 0.5');
-      el.setAttribute('material', `color: ${bgColor}; opacity: 0.9; side: double`);
+      el.setAttribute('material', `src: ${tex}; transparent: true; side: double; alphaTest: 0.01;`);
       el.setAttribute('face-camera', '');
       el.setAttribute('floaty', `amp: 0.04; speed: ${rand(0.6,1.2)}`);
 
-      const text = document.createElement('a-entity');
-      text.setAttribute('text', `value: ${word}; align: center; color: #fff; width: 1.4; anchor: center; baseline: center`);
-      text.setAttribute('position', '0 0 0.01');
-      el.appendChild(text);
-
-      // Position in front of camera
       const x = rand(-1.4, 1.4);
       const y = rand(0.4, 1.6);
       const z = rand(-2.4, -0.9);
@@ -370,7 +404,6 @@
       scene.appendChild(el);
       targets.set(id, { el, isGood });
 
-      // Auto-remove after 6s to avoid clutter
       setTimeout(() => {
         if (targets.has(id)) {
           scene.removeChild(el);
