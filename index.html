@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>AR.js 載入測試</title>
+  <title>本機 AR.js / THREEx 載入測試</title>
   <style>
     body { margin:0; font-family: system-ui, -apple-system, "Noto Sans", Arial, sans-serif; background:#0b1220; color:#e5e7eb; }
     main { max-width: 720px; margin: 0 auto; padding: 16px; }
@@ -13,111 +13,66 @@
     .ok { color:#22c55e; font-weight:700; }
     .fail { color:#f97316; font-weight:700; }
     .mono { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace; font-size: 13px; }
-    button { padding:10px 14px; border:none; border-radius:10px; background:#2563eb; color:#fff; font-weight:700; }
+    button { padding:10px 14px; border:none; border-radius:10px; background:#2563eb; color:#fff; font-weight:700; cursor:pointer; }
   </style>
 </head>
 <body>
   <main>
-    <h1>AR.js / THREEx 載入測試</h1>
+    <h1>本機 AR.js / THREEx 載入測試</h1>
     <div class="card">
       <div class="status">three.js：<span id="threeStatus">等待...</span></div>
       <div class="status">THREEx (ar-threex.js)：<span id="threexStatus">等待...</span></div>
     </div>
     <div class="card">
-      <div>當前來源：<span id="srcNow" class="mono">-</span></div>
-      <div>錯誤訊息：<div id="errLog" class="mono" style="white-space:pre-wrap;"></div></div>
+      <div>錯誤訊息：</div>
+      <div id="errLog" class="mono" style="white-space:pre-wrap;"></div>
     </div>
-    <button id="retryBtn">重新嘗試全部來源</button>
+    <button id="runBtn">開始測試</button>
   </main>
+
+  <!-- 改為本機檔案，不走 CDN -->
+  <script src="./vendor/three.min.js"></script>
+  <script src="./vendor/ar-threex.js"></script>
 
   <script>
     const threeStatus = document.getElementById('threeStatus');
     const threexStatus = document.getElementById('threexStatus');
-    const srcNow = document.getElementById('srcNow');
     const errLog = document.getElementById('errLog');
-    const retryBtn = document.getElementById('retryBtn');
+    const runBtn = document.getElementById('runBtn');
 
-    const threeSources = [
-      "https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/3.4.5/three.js/build/three.min.js",
-      "https://unpkg.com/@ar-js-org/ar.js@3.4.5/three.js/build/three.min.js",
-      "https://raw.githack.com/AR-js-org/AR.js/3.4.5/three.js/build/three.min.js"
-    ];
-    const threexSources = [
-      "https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/3.4.5/three.js/build/ar-threex.js",
-      "https://unpkg.com/@ar-js-org/ar.js@3.4.5/three.js/build/ar-threex.js",
-      "https://raw.githack.com/AR-js-org/AR.js/3.4.5/three.js/build/ar-threex.js"
-    ];
+    function logErr(msg) { errLog.textContent += msg + "\\n"; }
 
-    function logErr(msg) {
-      errLog.textContent += msg + "\n";
-    }
-
-    function loadScript(src) {
-      return new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = src;
-        s.async = true;
-        s.onload = () => resolve(src);
-        s.onerror = () => reject(new Error('load error: ' + src));
-        document.head.appendChild(s);
-      });
-    }
-
-    async function trySources(list, label) {
-      let lastErr = null;
-      for (const src of list) {
-        srcNow.textContent = `${label}: ${src}`;
-        try {
-          await loadScript(src);
-          return src;
-        } catch (e) {
-          lastErr = e;
-          logErr(e.message);
-        }
-      }
-      throw lastErr || new Error('all sources failed: ' + label);
-    }
-
-    async function run() {
-      threeStatus.textContent = '載入中...';
-      threexStatus.textContent = '載入中...';
+    function testLoad() {
+      errLog.textContent = '';
+      threeStatus.textContent = '檢查中...';
+      threexStatus.textContent = '檢查中...';
       threeStatus.className = '';
       threexStatus.className = '';
-      errLog.textContent = '';
 
-      try {
-        const threeSrc = await trySources(threeSources, 'three.js');
-        threeStatus.textContent = '成功 (' + threeSrc + ')';
-        threeStatus.className = 'ok';
-      } catch (e) {
-        threeStatus.textContent = '失敗';
+      if (typeof THREE === 'undefined') {
+        threeStatus.textContent = '失敗（THREE 未定義）';
         threeStatus.className = 'fail';
-        logErr('three.js fail: ' + e.message);
+        logErr('three.min.js 未正確載入，請確認路徑 ./vendor/three.min.js 及伺服器可讀。');
         return;
+      } else {
+        threeStatus.textContent = '成功（本機）';
+        threeStatus.className = 'ok';
       }
 
-      try {
-        const threexSrc = await trySources(threexSources, 'ar-threex.js');
-        // 檢查全域是否有 THREEx
-        if (typeof THREEx === 'undefined') {
-          throw new Error('THREEx 未定義（載入後檢查失敗）');
-        }
-        threexStatus.textContent = '成功 (' + threexSrc + ')';
-        threexStatus.className = 'ok';
-      } catch (e) {
-        threexStatus.textContent = '失敗';
+      if (typeof THREEx === 'undefined') {
+        threexStatus.textContent = '失敗（THREEx 未定義）';
         threexStatus.className = 'fail';
-        logErr('ar-threex.js fail: ' + e.message);
+        logErr('ar-threex.js 未正確載入，請確認路徑 ./vendor/ar-threex.js 及伺服器可讀。');
+        return;
+      } else {
+        threexStatus.textContent = '成功（本機）';
+        threexStatus.className = 'ok';
       }
     }
 
-    retryBtn.addEventListener('click', () => {
-      // 清掉已載入的 script，避免快取影響
-      document.querySelectorAll('script[data-temp="yes"]').forEach(n => n.remove());
-      run();
-    });
-
-    run();
+    runBtn.addEventListener('click', testLoad);
+    // 進頁面自動跑一次
+    testLoad();
   </script>
 </body>
 </html>
