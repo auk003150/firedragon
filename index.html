@@ -165,7 +165,7 @@
       </div>
     </aside>
 
-    <div id="hint" class="hint">按「開始」允許相機權限。請將 Hiro 在鏡頭前移動。</div>
+    <div id="hint" class="hint">按「開始」允許相機權限。請將 Hiro marker 在鏡頭前移動。如果鏡頭未開，請檢查權限或瀏覽器。</div>
   </div>
 
   <script>
@@ -443,7 +443,7 @@
         detected = true;
       }
       if (!detected) {
-        hintEl.textContent = '未偵測到 Hiro marker，請將 Hiro marker 放在鏡頭前並調整光線。';
+        hintEl.textContent = '未偵測到 Hiro marker，請將 Hiro marker 放在鏡頭前並調整光線。如果鏡頭未開，請檢查權限。';
         hintEl.className = 'hint bad';
       }
 
@@ -487,12 +487,18 @@
     async function startAll() {
       if (!supported()) return;
       startBtn.disabled = true;
+      hintEl.textContent = '正在啟動相機...';
+      hintEl.className = 'hint';
       try {
+        // 等待 A-Frame 載入
+        await new Promise(resolve => scene.addEventListener('loaded', resolve, { once: true }));
         scene.setAttribute('arjs', `sourceType: webcam; facingMode: ${useEnvironment ? 'environment' : 'user'}; detectionMode: mono; debugUIEnabled: false;`);
+        hintEl.textContent = '相機已啟動，請將 Hiro marker 放在鏡頭前。';
+        hintEl.className = 'hint ok';
         startGameLoop();
       } catch (err) {
-        console.error(err);
-        hintEl.textContent = '相機無法啟動，請確認權限與 HTTPS。';
+        console.error('相機啟動錯誤:', err);
+        hintEl.textContent = '相機無法啟動：' + (err.message || '未知錯誤') + '。請確認權限、HTTPS，並重試。';
         hintEl.className = 'hint bad';
         startBtn.disabled = false;
       }
