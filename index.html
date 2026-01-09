@@ -10,37 +10,49 @@
       margin: 0; padding: 0;
       height: 100%; background: #000; color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "Noto Sans CJK", "PingFang HK", "Heiti TC", Arial, sans-serif;
-      overflow: hidden;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       touch-action: manipulation;
     }
-    .wrap { position: relative; width: 100%; height: 100%; background: #000; }
+    /* 鎖捲用（面板開啟時套到 body） */
+    .no-scroll { overflow: hidden; }
+
+    .wrap { position: relative; width: 100%; height: 100vh; background: #000; overflow: hidden; }
+
+    /* 視訊層：允許指標事件，避免在某些瀏覽器阻擋手勢啟動相機 */
     video#cam {
       position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-      transform: none; background: #000;
+      transform: none; background: #000; z-index: 1;
+      pointer-events: none; /* 改為不攔截點擊，UI 才能操作 */
     }
-    img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 1; mix-blend-mode: lighten; }
-    canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
+    /* 背景裝飾層：不可互動 */
+    img#bg {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; pointer-events: none; opacity: 1; mix-blend-mode: lighten; z-index: 2;
+    }
+    /* 遊戲畫布：不可互動 */
+    canvas#game {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      touch-action: none; pointer-events: none; z-index: 3;
+    }
 
+    /* UI 在最上層，確保可點擊 */
     .ui {
       position: absolute; left: 0; right: 0; top: 0;
       display: grid; gap: 6px; padding: 10px 12px;
       background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0));
-      user-select: none; z-index: 20;
+      user-select: none; z-index: 10; /* 高於畫布 */
+      pointer-events: auto; /* 確保可以點擊 */
     }
     .topbar {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      flex-wrap: nowrap;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: nowrap;
     }
-    .hudbar {
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    }
+    .hudbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-    .btn { background: #e11d48; border: none; color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(225,29,72,0.35); }
+    .btn { background: #e11d48; border: none; color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(225,29,72,0.35); cursor: pointer; }
     .btn.secondary { background:#334155; box-shadow: 0 4px 12px rgba(15,23,42,0.35); }
     .btn.ghost { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; box-shadow: none; }
-    .btn:disabled { opacity: 0.6; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
     .btn:active { transform: translateY(1px); }
 
     .hud { display: flex; gap: 10px; align-items: center; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,0.6); flex-wrap: wrap; }
@@ -48,17 +60,21 @@
 
     .hint {
       position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
-      text-align: center; padding: 0 16px; color: #ffd166; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.7); z-index: 5;
+      text-align: center; padding: 0 16px; color: #ffd166; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.7); z-index: 4;
+      pointer-events: none; /* 不擋住 UI 點擊 */
     }
     .ok { color: #22c55e; }
     .bad { color: #f97316; }
 
     .menuBtn { padding: 8px 12px; font-weight: 700; border-radius: 10px; }
 
+    /* 面板與遮罩放最上層，以便攔截點擊（開啟時） */
     .panel-backdrop {
-      position: absolute; inset: 0; background: rgba(0,0,0,0.4); z-index: 30;
+      position: absolute; inset: 0; background: rgba(0,0,0,0.4); z-index: 98;
       opacity: 0; pointer-events: none; transition: opacity .2s ease;
     }
+    .panel-backdrop.open { opacity: 1; pointer-events: auto; }
+
     .panel {
       position: absolute; top: 0; right: 0; height: 100%;
       background: rgba(17,24,39,0.9); backdrop-filter: blur(10px);
@@ -66,11 +82,9 @@
       width: min(420px, 92vw);
       transform: translateX(100%);
       transition: transform .25s ease;
-      z-index: 31; color: #fff; overflow: auto;
-      -webkit-overflow-scrolling: touch;
+      z-index: 99; color: #fff; overflow: auto; -webkit-overflow-scrolling: touch;
     }
     .panel.open { transform: translateX(0); }
-    .panel-backdrop.open { opacity: 1; pointer-events: auto; }
 
     .panel header {
       position: sticky; top: 0; background: rgba(17,24,39,0.95);
@@ -81,15 +95,13 @@
     .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .row .label { font-size: 14px; color: #e5e7eb; }
     .row .controls { display: flex; align-items: center; gap: 8px; }
-    .mini { padding: 8px 10px; font-weight: 600; font-size: 12px; border-radius: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; }
+    .mini { padding: 8px 10px; font-weight: 600; font-size: 12px; border-radius: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; cursor: pointer; }
     .danger { background: #7f1d1d; border-color: rgba(255,255,255,0.25); }
 
     .sliderRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
     .val { font-variant-numeric: tabular-nums; color: #fcd34d; min-width: 40px; text-align: right; }
 
-    /* 這些紅色追蹤相關控制已隱藏（保留結構以免破壞面板布局） */
     .hide { display: none !important; }
-
     .bar { display: none; }
   </style>
 </head>
@@ -99,13 +111,13 @@
     <img id="bg" alt="背景" src="image_1.png" />
     <canvas id="game"></canvas>
 
-    <div class="ui">
+    <div class="ui" role="toolbar" aria-label="遊戲控制">
       <div class="topbar">
-        <button id="startBtn" class="btn">開始</button>
-        <button id="menuBtn" class="btn ghost menuBtn">≡ 選單</button>
+        <button id="startBtn" class="btn" type="button">開始</button>
+        <button id="menuBtn" class="btn ghost menuBtn" type="button" aria-haspopup="true" aria-controls="panel">≡ 選單</button>
       </div>
       <div class="hudbar">
-        <div class="hud">
+        <div class="hud" aria-live="polite">
           <div class="chip">分數：<span id="score">0</span></div>
           <div class="chip">Combo：<span id="combo">0</span></div>
           <div class="chip">時間：<span id="time">60</span>s</div>
@@ -113,74 +125,35 @@
       </div>
     </div>
 
-    <div id="panelBackdrop" class="panel-backdrop"></div>
-    <aside id="panel" class="panel" aria-hidden="true">
+    <div id="panelBackdrop" class="panel-backdrop" aria-hidden="true"></div>
+    <aside id="panel" class="panel" aria-hidden="true" aria-label="設定面板">
       <header>
         <h2>設定</h2>
-        <button id="closePanel" class="btn ghost" aria-label="關閉">✕</button>
+        <button id="closePanel" class="btn ghost" type="button" aria-label="關閉">✕</button>
       </header>
       <div class="section">
         <div class="row">
           <div class="label">鏡頭</div>
           <div class="controls">
-            <button id="toggleFacing" class="mini">切換鏡頭</button>
+            <button id="toggleFacing" class="mini" type="button">切換鏡頭</button>
           </div>
         </div>
         <div class="row">
           <div class="label">鏡像</div>
           <div class="controls">
-            <button id="toggleMirror" class="mini">鏡像：關</button>
+            <button id="toggleMirror" class="mini" type="button">鏡像：關</button>
           </div>
         </div>
         <div class="row">
           <div class="label">螢幕</div>
           <div class="controls">
-            <button id="fullscreenBtn" class="mini">全屏</button>
+            <button id="fullscreenBtn" class="mini" type="button">全屏</button>
           </div>
         </div>
         <div class="row">
           <div class="label">遊戲</div>
           <div class="controls">
-            <button id="resetBtn" class="mini danger">重置</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 以 Marker 為主，隱藏舊色域控制 -->
-      <div class="section hide" style="border-top:1px solid rgba(255,255,255,0.1)">
-        <div class="sliderRow">
-          <div class="label">Hmin</div>
-          <div class="controls">
-            <input id="hMin" type="range" min="0" max="360" value="330">
-            <span id="hMinVal" class="val">330</span>
-          </div>
-        </div>
-        <div class="sliderRow">
-          <div class="label">Hmax</div>
-          <div class="controls">
-            <input id="hMax" type="range" min="0" max="360" value="20">
-            <span id="hMaxVal" class="val">20</span>
-          </div>
-        </div>
-        <div class="sliderRow">
-          <div class="label">Smin</div>
-          <div class="controls">
-            <input id="sMin" type="range" min="0" max="100" value="50">
-            <span id="sMinVal" class="val">50</span>
-          </div>
-        </div>
-        <div class="sliderRow">
-          <div class="label">Vmin</div>
-          <div class="controls">
-            <input id="vMin" type="range" min="0" max="100" value="40">
-            <span id="vMinVal" class="val">40</span>
-          </div>
-        </div>
-        <div class="sliderRow">
-          <div class="label">靈敏度</div>
-          <div class="controls">
-            <input id="sens" type="range" min="0" max="300" value="80">
-            <span id="sensVal" class="val">80</span>
+            <button id="resetBtn" class="mini danger" type="button">重置</button>
           </div>
         </div>
       </div>
@@ -189,14 +162,14 @@
         <div class="sliderRow">
           <div class="label">目標密度</div>
           <div class="controls">
-            <input id="density" type="range" min="1" max="10" value="4">
+            <input id="density" type="range" min="1" max="10" value="4" />
             <span id="densityVal" class="val">4</span>
           </div>
         </div>
         <div class="sliderRow">
           <div class="label">速度</div>
           <div class="controls">
-            <input id="speed" type="range" min="1" max="10" value="5">
+            <input id="speed" type="range" min="1" max="10" value="5" />
             <span id="speedVal" class="val">5</span>
           </div>
         </div>
@@ -206,11 +179,11 @@
         <div class="row">
           <div class="label">Marker</div>
           <div class="controls">
-            <select id="markerSelect" class="mini">
+            <select id="markerSelect" class="mini" aria-label="選擇 Marker">
               <option value="hiro">HIRO</option>
               <option value="kanji">KANJI</option>
             </select>
-            <button id="recenterBtn" class="mini">重置對準</button>
+            <button id="recenterBtn" class="mini" type="button">重置對準</button>
           </div>
         </div>
         <p style="margin:0; font-size:12px; color:#cbd5e1">
@@ -222,8 +195,6 @@
     <div id="hint" class="hint">按「開始」允許相機權限。將 HIRO Marker 放到鏡頭中。</div>
   </div>
 
-  <!-- js-aruco（單文件簡易版）: 你可改為使用你自己的已託管版本 -->
-  <!-- 若無外網，將 js-aruco 內嵌到專案中再引用 -->
   <script src="https://cdn.jsdelivr.net/gh/jcmellado/js-aruco/build/aruco-min.js"></script>
 
   <script>
@@ -234,8 +205,6 @@
     const ctx = canvas.getContext('2d', { alpha: true });
 
     const startBtn = document.getElementById('startBtn');
-
-    // 面板 DOM
     const menuBtn = document.getElementById('menuBtn');
     const panel = document.getElementById('panel');
     const panelBackdrop = document.getElementById('panelBackdrop');
@@ -251,11 +220,9 @@
     const timeEl = document.getElementById('time');
     const hintEl = document.getElementById('hint');
 
-    // Marker 控制
     const markerSelect = document.getElementById('markerSelect');
     const recenterBtn = document.getElementById('recenterBtn');
 
-    // 仍保留密度/速度
     const densEl = document.getElementById('density');
     const speedEl = document.getElementById('speed');
     const densityVal = document.getElementById('densityVal');
@@ -269,50 +236,34 @@
     let score = 0, combo = 0, timeLeft = 60;
     let timerId = null;
 
-    // Marker 追蹤狀態
     let mirrored = false;
     let useEnvironment = true;
     let currentStream = null;
 
-    // Marker 選擇：用常見的 ARToolKit ID
-    // HIRO: 0, KANJI: 3（視庫而定；js-aruco 預設使用 0..1023 字典 ID）
-    let targetMarkerId = 0; // 默認 HIRO
+    let targetMarkerId = 0; // hiro
     const namedMarkers = { hiro: 0, kanji: 3 };
 
-    // 影像尺寸與處理
     const workCanvas = document.createElement('canvas');
     const wctx = workCanvas.getContext('2d', { willReadFrequently: true });
-
-    // Aruco 檢測器
     const detector = new AR.Detector();
 
-    // 火龍頭位置（由 Marker 決定）
     let headPos = { x: 0, y: 0 };
     let headSmooth = { x: 0, y: 0 };
     const smoothing = 0.28;
 
-    // ========= 單張貼圖（無旋轉）=========
+    // 資產
     const dragonImg = new Image();
     dragonImg.src = 'image_2.png';
     let dragonImgReady = false;
     dragonImg.onload = () => { dragonImgReady = true; };
 
-    const sprite = {
-      drawWidth: 90,
-      drawHeight: 90,
-      headAnchorX: 0.6,
-      headAnchorY: 0.6,
-      fineOffsetX: 0,
-      fineOffsetY: -0.1
-    };
+    const sprite = { drawWidth: 90, drawHeight: 90, headAnchorX: 0.6, headAnchorY: 0.6, fineOffsetX: 0, fineOffsetY: -0.1 };
 
-    // 文字目標
     const goodList = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
     const badList  = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
     const items = [];
     const MAX_ITEMS = 14;
 
-    // 粒子
     const particles = [];
     const MAX_PARTICLES = 1200;
 
@@ -366,10 +317,7 @@
       await stopStream();
       for (const res of kinds) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: { ...res, facingMode: facing }
-          });
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...res, facingMode: facing } });
           currentStream = stream;
           video.srcObject = stream;
           video.playsInline = true;
@@ -389,12 +337,10 @@
     }
 
     // ========= Marker 追蹤 =========
-    // 解析 video 畫面，傳給 Aruco 偵測
     function detectMarkerAndGetCenter() {
       const vw = video.videoWidth|0, vh = video.videoHeight|0;
       if (vw === 0 || vh === 0) return null;
 
-      // 以較低解析度處理提速
       const scale = 0.6;
       const w = Math.max(80, Math.round(vw * scale));
       const h = Math.max(80, Math.round(vh * scale));
@@ -404,39 +350,28 @@
 
       const imageData = wctx.getImageData(0, 0, w, h);
       let markers;
-      try {
-        markers = detector.detect(imageData);
-      } catch {
-        return null;
-      }
+      try { markers = detector.detect(imageData); } catch { return null; }
       if (!markers || markers.length === 0) return null;
 
-      // 找到匹配 targetMarkerId 的 marker（或退而求其次選信心最高的一個）
       let best = null;
-      for (const m of markers) {
-        if (m.id === targetMarkerId) { best = m; break; }
-      }
+      for (const m of markers) { if (m.id === targetMarkerId) { best = m; break; } }
       if (!best) best = markers[0];
 
-      // 取四點中心
       const c = best.corners;
-      // 鏡像時把 x 反轉（在工作畫布座標系）
       let cx = (c[0].x + c[1].x + c[2].x + c[3].x) * 0.25;
       let cy = (c[0].y + c[1].y + c[2].y + c[3].y) * 0.25;
-
       if (mirrored) cx = w - cx;
 
-      // 映射回主畫布
       const px = cx / w * W;
       const py = cy / h * H;
-
       return { x: px, y: py };
     }
 
-    // ========= 目標物件 =========
+    // ========= 遊戲元素 =========
     function spawnItem() {
       const isGood = Math.random() < 0.6;
-      const text = isGood ? goodList[Math.floor(Math.random()*goodList.length)] : badList[Math.floor(Math.random()*badList.length)];
+      const list = isGood ? goodList : badList;
+      const text = list[Math.floor(Math.random()*list.length)];
       const size = 28 + Math.random()*18;
       const margin = 28 + size;
       const x = margin + Math.random()*(W - margin*2);
@@ -474,7 +409,6 @@
       }
     }
 
-    // ========= 粒子效果 =========
     function spawnIncenseParticles(pos, dir, count=6) {
       for (let i=0; i<count; i++){
         if (particles.length >= MAX_PARTICLES) break;
@@ -496,10 +430,7 @@
     function updateParticles(dt) {
       for (let i=particles.length-1; i>=0; i--){
         const p = particles[i];
-        p.age += dt;
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.vy += 20 * dt;
+        p.age += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 20 * dt;
         if (p.age >= p.life) particles.splice(i,1);
       }
     }
@@ -517,27 +448,19 @@
       ctx.restore();
     }
 
-    // ========= 火龍繪製 =========
     function drawDragon(ctx, head) {
       if (!dragonImgReady) return;
-
-      const imgW = sprite.drawWidth;
-      const imgH = sprite.drawHeight;
-
+      const imgW = sprite.drawWidth, imgH = sprite.drawHeight;
       ctx.save();
       ctx.translate(head.x, head.y);
-
       const headOffsetX = -imgW * sprite.headAnchorX + (sprite.fineOffsetX || 0);
       const headOffsetY = -imgH * sprite.headAnchorY + (sprite.fineOffsetY ? sprite.fineOffsetY * imgH : 0);
       ctx.translate(headOffsetX, headOffsetY);
-
       ctx.drawImage(dragonImg, 0, -imgH * 0.5, imgW, imgH);
-
       spawnIncenseParticles({ x: 0, y: 0 }, { x: 1, y: 0 }, 8);
       ctx.restore();
     }
 
-    // ========= 碰撞與得分 =========
     function circleHit(ax, ay, bx, by, r) {
       const dx = ax - bx, dy = ay - by;
       return (dx*dx + dy*dy) <= r*r;
@@ -590,13 +513,11 @@
 
       ctx.clearRect(0, 0, W, H);
 
-      // Marker 追蹤
       const m = detectMarkerAndGetCenter();
       if (m) {
         headPos = m;
         headSmooth.x = headSmooth.x + (headPos.x - headSmooth.x) * smoothing || headPos.x;
         headSmooth.y = headSmooth.y + (headPos.y - headSmooth.y) * smoothing || headPos.y;
-
         hintEl.textContent = '已偵測到 Marker！舞動火龍！';
         hintEl.className = 'hint ok';
       } else {
@@ -655,8 +576,8 @@
       }
     }
 
-    startBtn.addEventListener('click', startAll);
-
+    // 事件繫結（確保不被覆蓋層攔截）
+    startBtn.addEventListener('click', startAll, { passive: true });
     resetBtn.addEventListener('click', async () => {
       score = 0; combo = 0; scoreEl.textContent = score; comboEl.textContent = combo;
       items.length = 0; ensureItems();
@@ -669,7 +590,7 @@
       timeLeft = 60; timeEl.textContent = timeLeft;
       startBtn.disabled = false;
       await stopStream();
-    });
+    }, { passive: true });
 
     toggleFacingBtn.addEventListener('click', async () => {
       useEnvironment = !useEnvironment;
@@ -688,20 +609,27 @@
       }
     });
 
-    // 面板開關
+    // 面板開關 + 鎖捲
     function openPanel() {
       panel.classList.add('open');
       panelBackdrop.classList.add('open');
       panel.setAttribute('aria-hidden', 'false');
+      panelBackdrop.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
     }
     function closePanel() {
       panel.classList.remove('open');
       panelBackdrop.classList.remove('open');
       panel.setAttribute('aria-hidden', 'true');
+      panelBackdrop.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('no-scroll');
     }
     menuBtn.addEventListener('click', openPanel);
     closePanelBtn.addEventListener('click', closePanel);
     panelBackdrop.addEventListener('click', closePanel);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closePanel();
+    });
 
     // 值同步
     function bindVal(input, labelEl) {
