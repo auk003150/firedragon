@@ -107,10 +107,51 @@
     input[type="range"] { width: 180px; }
     .sliderRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
     .val { font-variant-numeric: tabular-nums; color: #fcd34d; min-width: 40px; text-align: right; }
+
+    /* Camera permission overlay */
+    .camera-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,0.75), rgba(0,0,0,0.55));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 30;
+    }
+    .camera-card {
+      width: min(520px, 100%);
+      background: rgba(17,24,39,0.92);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+      backdrop-filter: blur(10px);
+      display: grid;
+      gap: 12px;
+      text-align: center;
+    }
+    .camera-title { font-size: 18px; font-weight: 800; }
+    .camera-desc { font-size: 14px; color: #e5e7eb; line-height: 1.5; }
+    .camera-msg { font-size: 13px; color: #fbbf24; min-height: 18px; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <!-- Camera permission overlay -->
+    <div id="cameraOverlay" class="camera-overlay">
+      <div class="camera-card">
+        <div class="camera-title">需要相機權限</div>
+        <div class="camera-desc">
+          請允許相機以啟動 AR 偵測（建議使用後鏡頭）。<br>
+          若先前拒絕，請到瀏覽器設定開啟相機權限並重新整理。
+        </div>
+        <button id="cameraBtn" class="btn">允許相機</button>
+        <div id="cameraMsg" class="camera-msg"></div>
+      </div>
+    </div>
+
     <!-- AR.js + A-Frame scene -->
     <a-scene
       id="scene"
@@ -147,7 +188,7 @@
       </div>
     </div>
 
-    <div id="hint" class="hint">按「開始」並將 Hiro Marker 放入鏡頭畫面。</div>
+    <div id="hint" class="hint">按「允許相機」授權後，再按「開始」，並將 Hiro Marker 放入鏡頭畫面。</div>
 
     <!-- Panel -->
     <div id="panelBackdrop" class="panel-backdrop"></div>
@@ -212,6 +253,11 @@
     const densityVal = document.getElementById('densityVal');
     const speedVal = document.getElementById('speedVal');
 
+    // Camera permission UI
+    const cameraOverlay = document.getElementById('cameraOverlay');
+    const cameraBtn = document.getElementById('cameraBtn');
+    const cameraMsg = document.getElementById('cameraMsg');
+
     // Marker status DOM
     const markerStatusEl = document.getElementById('markerStatus');
     const markerStatusText = markerStatusEl.querySelector('.status-text');
@@ -221,6 +267,7 @@
     const markerEl = document.getElementById('hiroMarker');
     let markerVisible = false;
     let cameraReady = false;
+    let cameraGranted = false;
 
     // THREE reference
     const THREE = (window.AFRAME && window.AFRAME.THREE) ? window.AFRAME.THREE : window.THREE;
@@ -518,8 +565,6 @@
       startGameLoop();
     }
 
-    startBtn.addEventListener('click', startAll);
-
     resetBtn.addEventListener('click', () => {
       score = 0; combo = 0; scoreEl.textContent = score; comboEl.textContent = combo;
       items.length = 0; ensureItems();
@@ -565,8 +610,70 @@
     bindVal(densEl, densityVal);
     bindVal(speedEl, speedVal);
 
+    // ======== 相機權限處理 ========
+    async function requestCameraAccess() {
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        cameraMsg.textContent = '需在 HTTPS (或 localhost) 下才能啟用相機。';
+        return false;
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        cameraMsg.textContent = '瀏覽器不支援相機存取。';
+        return false;
+      }
+      cameraBtn.disabled = true;
+      cameraMsg.textContent = '正在請求相機權限…';
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        cameraGranted = true;
+        // 立即停止臨時串流，AR.js 會自行開啟
+        stream.getTracks().forEach(t => t.stop());
+        cameraOverlay.classList.add('hidden');
+        hintEl.textContent = '已取得相機權限，將 Hiro Marker 放入畫面。';
+        hintEl.className = 'hint';
+        return true;
+      } catch (err) {
+        console.error(err);
+        cameraMsg.textContent = '相機被拒絕，請在瀏覽器設定中允許相機後重試。';
+        cameraBtn.disabled = false;
+        return false;
+      }
+    }
+
+    async function checkCameraPermission() {
+      if (!navigator.permissions || !navigator.permissions.query) {
+        return;
+      }
+      try {
+        const status = await navigator.permissions.query({ name: 'camera' });
+        const sync = () => {
+          if (status.state === 'granted') {
+            cameraGranted = true;
+            cameraOverlay.classList.add('hidden');
+            hintEl.textContent = '相機已授權，將 Hiro Marker 放入畫面。';
+            hintEl.className = 'hint';
+          }
+        };
+        sync();
+        status.onchange = sync;
+      } catch (e) { /* ignore */ }
+    }
+
+    cameraBtn.addEventListener('click', requestCameraAccess);
+
+    // 改寫開始按鈕：若未授權相機，先請求；成功後才開始遊戲
+    startBtn.addEventListener('click', async () => {
+      if (!cameraGranted) {
+        const ok = await requestCameraAccess();
+        if (!ok) return;
+      }
+      startAll();
+    });
+
     // 初始
     centroid = { x: W/2, y: H/2 };
+    checkCameraPermission();
   </script>
 </body>
 </html>
