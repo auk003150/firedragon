@@ -16,7 +16,7 @@
       touch-action: manipulation;
     }
     .wrap { position: relative; width: 100%; height: 100%; background: #000; overflow: hidden; }
-    /* AR.js 產生的 WebGL 畫布容器 */
+    /* AR.js WebGL 畫布容器 */
     #arLayer {
       position: absolute; inset: 0;
       width: 100%; height: 100%;
@@ -153,7 +153,6 @@
         </div>
       </div>
       <div class="section" style="border-top:1px solid rgba(255,255,255,0.1)">
-        <!-- 這些滑桿保留供日後調整，但對 Hiro 偵測不再需要 -->
         <div class="sliderRow">
           <div class="label">目標密度</div>
           <div class="controls">
@@ -174,9 +173,9 @@
     <div id="hint" class="hint">按「開始」允許相機權限，將 Hiro Marker 放到鏡頭前。</div>
   </div>
 
-  <!-- 必要庫：three.js + AR.js (marker) -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.122.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/three.js/build/ar-threex.js"></script>
+  <!-- three.js 與 AR.js：使用固定版本並保證 THREEx 可用 -->
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/3.4.5/three.js/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/3.4.5/three.js/build/ar-threex.js"></script>
 
   <script>
     // ========= DOM =========
@@ -200,7 +199,7 @@
     const timeEl = document.getElementById('time');
     const hintEl = document.getElementById('hint');
 
-    // 滑桿（僅保留目標密度與速度）
+    // 滑桿（目標密度與速度）
     const densEl = document.getElementById('density');
     const speedEl = document.getElementById('speed');
     const densityVal = document.getElementById('densityVal');
@@ -295,10 +294,15 @@
     let markerRoot = null;
 
     function initAR() {
-      // 若已存在，先清理
+      if (typeof THREEx === 'undefined') {
+        hintEl.textContent = 'AR 庫載入失敗，請檢查網絡或重試。';
+        hintEl.className = 'hint bad';
+        startBtn.disabled = false;
+        return;
+      }
+
       disposeAR();
 
-      // 建立 renderer 並插入 arLayer
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(W, H);
@@ -323,16 +327,16 @@
         facingMode: useEnvironment ? 'environment' : 'user'
       });
 
-      arToolkitSource.init(function onReady(){
+      arToolkitSource.init(() => {
         resizeAR();
       });
 
       arToolkitContext = new THREEx.ArToolkitContext({
-        cameraParametersUrl: 'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/three.js/data/camera_para.dat',
+        cameraParametersUrl: 'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/3.4.5/three.js/data/camera_para.dat',
         detectionMode: 'mono'
       });
 
-      arToolkitContext.init(function() {
+      arToolkitContext.init(() => {
         camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
       });
 
@@ -340,14 +344,14 @@
       scene.add(markerRoot);
       new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
         type: 'pattern',
-        patternUrl: 'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/three.js/data/patt.hiro'
+        patternUrl: 'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/3.4.5/three.js/data/patt.hiro'
       });
 
       arInitialized = true;
     }
 
     function resizeAR() {
-      if (!arToolkitSource) return;
+      if (!arToolkitSource || !renderer) return;
       arToolkitSource.onResizeElement();
       arToolkitSource.copyElementSizeTo(renderer.domElement);
     }
@@ -595,6 +599,10 @@
       startBtn.disabled = true;
       try {
         initAR();
+        if (!arInitialized) {
+          startBtn.disabled = false;
+          return;
+        }
         startGameLoop();
       } catch (err) {
         console.error(err);
@@ -606,7 +614,7 @@
 
     startBtn.addEventListener('click', startAll);
 
-    resetBtn.addEventListener('click', async () => {
+    resetBtn.addEventListener('click', () => {
       score = 0; combo = 0; scoreEl.textContent = score; comboEl.textContent = combo;
       items.length = 0; ensureItems();
       centroid = { x: W/2, y: H/2 };
@@ -618,7 +626,7 @@
       startBtn.disabled = false;
     });
 
-    toggleFacingBtn.addEventListener('click', async () => {
+    toggleFacingBtn.addEventListener('click', () => {
       useEnvironment = !useEnvironment;
       initAR(); // 重新啟動 AR 來源
     });
