@@ -2,332 +2,287 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>Hiro Marker AR Game</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Hiro Marker AR Demo + 碰撞與分數</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <!-- AR.js for A-Frame -->
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
-  
   <style>
     html, body { margin: 0; padding: 0; overflow: hidden; }
     body { font-family: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
-    
-    /* UI Overlay */
     .overlay {
       position: fixed;
       top: 0; left: 0; right: 0;
-      display: flex; justify-content: space-between; align-items: flex-start;
+      display: flex; justify-content: space-between; align-items: center;
       padding: 12px 16px;
       background: linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0));
       color: #fff; z-index: 10; pointer-events: none;
       font-size: 14px;
     }
-    
-    .score-board {
-      background: rgba(255, 193, 7, 0.9);
-      color: #000;
-      padding: 8px 16px;
-      border-radius: 12px;
-      font-weight: bold;
-      font-size: 18px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-      border: 2px solid #fff;
-    }
-
     .hint {
       position: fixed;
       bottom: 0; left: 0; right: 0;
       padding: 10px 14px;
-      background: linear-gradient(0deg, rgba(0,0,0,0.8), rgba(0,0,0,0));
+      background: linear-gradient(0deg, rgba(0,0,0,0.7), rgba(0,0,0,0));
       color: #fff; z-index: 10; text-align: center;
       font-size: 13px; pointer-events: none;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
     }
-    
     .badge {
       background: rgba(255,255,255,0.12);
       padding: 6px 10px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,0.2);
       pointer-events: auto;
-      margin-bottom: 5px;
-      display: inline-block;
     }
-    
     .link {
       color: #9ad6ff; text-decoration: underline; pointer-events: auto;
     }
-
-    /* 碰撞時的浮動分數動畫 */
-    .float-score {
-      position: absolute;
-      font-weight: bold;
-      font-size: 24px;
-      animation: fadeUp 1s forwards;
+    .score {
       pointer-events: none;
-      z-index: 20;
+      font-weight: 600;
     }
-    
-    @keyframes fadeUp {
-      0% { opacity: 1; transform: translateY(0) scale(1); }
-      100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
-    }
-
     @media (max-width: 640px) {
       .overlay { font-size: 13px; padding: 10px 12px; }
       .hint { font-size: 12px; padding: 8px 12px; }
     }
   </style>
-
-  <script>
-    // 遊戲數據
-    const GOOD_WORDS = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
-    const BAD_WORDS = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
-    
-    let score = 0;
-    let markerVisible = false;
-
-    // 註冊一個組件來處理遊戲邏輯
-    AFRAME.registerComponent('game-logic', {
-      init: function () {
-        this.marker = document.querySelector('#hiro-marker');
-        this.scene = document.querySelector('a-scene');
-        
-        // 監聽 Marker 狀態
-        this.marker.addEventListener('markerFound', () => {
-          markerVisible = true;
-          document.getElementById('status-text').innerText = "遊戲進行中！移動標記去撞擊文字";
-          document.getElementById('status-text').style.color = "#4caf50";
-        });
-        this.marker.addEventListener('markerLost', () => {
-          markerVisible = false;
-          document.getElementById('status-text').innerText = "尋找 Hiro 標記中...";
-          document.getElementById('status-text').style.color = "#ff9800";
-        });
-
-        // 定時生成物體 (每 1.2 秒)
-        setInterval(() => {
-          if (document.hidden) return; 
-          this.spawnItem();
-        }, 1200);
-      },
-
-      tick: function () {
-        if (!markerVisible) return;
-
-        const playerObj = document.querySelector('#player-box');
-        const playerPos = new THREE.Vector3();
-        playerObj.object3D.getWorldPosition(playerPos);
-
-        const items = document.querySelectorAll('.floating-item');
-        items.forEach(item => {
-          if (item.getAttribute('data-hit') === 'true') return; 
-
-          const itemPos = new THREE.Vector3();
-          item.object3D.getWorldPosition(itemPos);
-
-          const distance = playerPos.distanceTo(itemPos);
-
-          // 碰撞距離閾值
-          if (distance < 0.7) {
-            this.handleCollision(item);
-          }
-        });
-      },
-
-      spawnItem: function () {
-        const isGood = Math.random() > 0.4;
-        const textSet = isGood ? GOOD_WORDS : BAD_WORDS;
-        const text = textSet[Math.floor(Math.random() * textSet.length)];
-        const color = isGood ? '#FFD700' : '#FF5252';
-
-        const el = document.createElement('a-entity');
-        el.setAttribute('class', 'floating-item');
-        el.setAttribute('data-type', isGood ? 'good' : 'bad');
-        el.setAttribute('data-hit', 'false');
-
-        // --- 位置與移動邏輯修改 ---
-        
-        // 1. 設定初始位置
-        // X: 左右範圍 (-3 到 3)
-        // Y: 上下範圍 (-1 到 3)
-        // Z: 深度固定在 -2 到 -4 之間 (這樣大小看起來比較一致，且在手臂可及範圍內)
-        const startX = (Math.random() - 0.5) * 6;
-        const startY = (Math.random() - 0.5) * 4 + 1; 
-        const fixedZ = - (Math.random() * 2 + 2); // Z 軸固定，不參與動畫變化
-
-        el.setAttribute('position', `${startX} ${startY} ${fixedZ}`);
-
-        // 2. 設定漂浮目標位置 (上下左右隨機移動)
-        // 我們讓它在初始位置的基礎上，隨機偏移一點點
-        const moveX = (Math.random() - 0.5) * 3; // 左右漂移幅度
-        const moveY = (Math.random() - 0.5) * 3; // 上下漂移幅度
-
-        // 3. 設定動畫
-        // property: position
-        // to: 新的 X, Y, 但 Z 保持不變 (這樣視覺尺寸就不會變)
-        // dir: alternate (來回移動，像在漂浮)
-        // loop: true (循環)
-        // easing: easeInOutSine (平滑的正弦波移動)
-        el.setAttribute('animation', `
-          property: position; 
-          to: ${startX + moveX} ${startY + moveY} ${fixedZ}; 
-          dur: ${3000 + Math.random() * 2000}; 
-          easing: easeInOutSine; 
-          loop: true; 
-          dir: alternate
-        `);
-        
-        // 繪製文字
-        el.setAttribute('canvas-text', `text: ${text}; color: ${color}`);
-        
-        // 12秒後自動消失，避免場景物件過多
-        setTimeout(() => {
-          if (el.parentNode) el.parentNode.removeChild(el);
-        }, 12000);
-
-        // 始終面向相機
-        el.setAttribute('look-at', '[camera]');
-
-        this.scene.appendChild(el);
-      },
-
-      handleCollision: function (item) {
-        item.setAttribute('data-hit', 'true');
-        const type = item.getAttribute('data-type');
-        
-        let points = 0;
-        if (type === 'good') {
-          points = 15;
-          score += 15;
-          // 吃到時變大消失 (僅作為反饋動畫)
-          item.setAttribute('animation__hit', 'property: scale; to: 2 2 2; dur: 200; easing: easeOutQuad');
-          item.setAttribute('animation__fade', 'property: opacity; to: 0; dur: 200; easing: easeOutQuad');
-        } else {
-          points = -5;
-          score -= 5;
-          // 扣分時縮小消失
-          item.setAttribute('animation__hit', 'property: scale; to: 0.1 0.1 0.1; dur: 200; easing: easeInQuad');
-        }
-
-        document.getElementById('score-val').innerText = score;
-        this.showFloatingScore(points);
-
-        setTimeout(() => {
-          if (item.parentNode) item.parentNode.removeChild(item);
-        }, 200);
-      },
-
-      showFloatingScore: function(points) {
-        const div = document.createElement('div');
-        div.className = 'float-score';
-        div.innerText = points > 0 ? `+${points}` : points;
-        div.style.color = points > 0 ? '#4caf50' : '#f44336';
-        div.style.left = '50%';
-        div.style.top = '50%';
-        document.body.appendChild(div);
-        setTimeout(() => div.remove(), 1000);
-      }
-    });
-
-    // 文字貼圖組件
-    AFRAME.registerComponent('canvas-text', {
-      schema: {
-        text: {type: 'string', default: ''},
-        color: {type: 'string', default: '#FFF'},
-        width: {type: 'number', default: 256},
-        height: {type: 'number', default: 256}
-      },
-      init: function () {
-        this.canvas = document.createElement('canvas');
-        this.canvas.width = this.data.width;
-        this.canvas.height = this.data.height;
-        this.ctx = this.canvas.getContext('2d');
-        this.draw();
-        
-        const texture = new THREE.CanvasTexture(this.canvas);
-        const material = new THREE.MeshBasicMaterial({
-          map: texture,
-          transparent: true,
-          side: THREE.DoubleSide
-        });
-        const geometry = new THREE.PlaneGeometry(1, 1);
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.el.setObject3D('mesh', this.mesh);
-      },
-      draw: function() {
-        const ctx = this.ctx;
-        const w = this.canvas.width;
-        const h = this.canvas.height;
-        ctx.clearRect(0, 0, w, h);
-        
-        ctx.beginPath();
-        ctx.arc(w/2, h/2, w/2 - 10, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fill();
-        ctx.strokeStyle = this.data.color;
-        ctx.lineWidth = 10;
-        ctx.stroke();
-
-        ctx.font = 'bold 140px "Microsoft JhengHei", Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = this.data.color;
-        ctx.fillText(this.data.text, w/2, h/2 + 15);
-      }
-    });
-
-    // 面向相機組件
-    AFRAME.registerComponent('look-at', {
-      schema: { type: 'selector' },
-      tick: function () {
-        if (this.data) {
-          this.el.object3D.lookAt(this.data.object3D.position);
-        }
-      }
-    });
-  </script>
 </head>
 <body>
   <div class="overlay">
-    <div>
-      <div class="badge">Hiro Marker 遊戲</div>
-      <div id="status-text" style="font-size: 12px; color: #ff9800;">尋找 Hiro 標記中...</div>
-    </div>
-    <div class="score-board">
-      分數: <span id="score-val">0</span>
-    </div>
+    <div class="badge">Hiro Marker AR</div>
+    <div class="score" id="score">分數：0</div>
   </div>
-  
   <div class="hint">
-    移動 Hiro 標記去撞擊漂浮的字！<br/>
-    <span style="color:#FFD700">吉利字 +15分</span> | <span style="color:#FF5252">雜物 -5分</span><br/>
-    <a class="link" href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/aframe/examples/marker-training/examples/pattern-files/pattern-hiro.png" target="_blank">下載 Hiro 圖</a>
+    將 Hiro 標記置於鏡頭前方，3D 物件會出現在標記上。<br/>
+    沒有標記？可列印：<a class="link" href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/aframe/examples/marker-training/examples/pattern-files/pattern-hiro.png" target="_blank" rel="noopener">下載 Hiro 圖</a><br/>
+    提示：移動標記去碰觸螢幕中的字元來加減分！
   </div>
 
   <a-scene
-    game-logic
     vr-mode-ui="enabled: false"
     embedded
     renderer="logarithmicDepthBuffer: true; antialias: true;"
     arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; maxDetectionRate: 30;"
   >
-    <a-entity light="type: ambient; color: #ffffff; intensity: 0.7"></a-entity>
-    <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="-1 1 0"></a-entity>
+    <!-- 光源 -->
+    <a-entity light="type: ambient; color: #cccccc"></a-entity>
+    <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="1 1 0.5"></a-entity>
 
-    <!-- Hiro 標記 (玩家) -->
-    <a-marker id="hiro-marker" preset="hiro">
-      <a-box id="player-box" 
-             position="0 0.5 0" 
-             depth="0.8" height="0.8" width="0.8"
-             material="color: #4FC3F7; opacity: 0.5; transparent: true"
-             animation="property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear">
+    <!-- Hiro 標記（玩家） -->
+    <a-marker preset="hiro" id="marker">
+      <!-- 玩家碰撞體：旋轉立方體（同你原有的） -->
+      <a-box id="player"
+             position="0 0.5 0"
+             depth="1" height="1" width="1"
+             color="#4FC3F7"
+             animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
       </a-box>
-      <a-sphere position="0 0.5 0" radius="0.2" color="#fff"></a-sphere>
+      <!-- 一個小圓柱當底座 -->
+      <a-cylinder position="0 0 0" radius="0.35" height="0.1" color="#FFC107"></a-cylinder>
     </a-marker>
 
-    <a-entity camera></a-entity>
+    <!-- 相機 -->
+    <a-entity camera id="camera"></a-entity>
+
+    <!-- 字元容器（在世界中以相機座標 / 視域平面控制） -->
+    <a-entity id="targets-root"></a-entity>
+
+    <script>
+      // 參數設定
+      const FIRST_SET = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
+      const SECOND_SET = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
+
+      const COUNT_PER_SET = 10;       // 每組 10 個
+      const PLANE_Z = -2;             // 字元所在的相機前方固定深度（公尺）
+      const SPEED_MIN = 60;           // 每秒最小速度（螢幕像素）
+      const SPEED_MAX = 160;          // 每秒最大速度（螢幕像素）
+      const TEXT_WORLD_SCALE = 0.5;   // 字元在世界的縮放（固定大小）
+      const COLLIDE_RADIUS = 0.75;    // 碰撞半徑（公尺，依你方塊 1m 尺寸大致設定）
+      const SCORE_HIT_FIRST = 15;     // 第一組加分
+      const SCORE_HIT_SECOND = -5;    // 第二組扣分
+      const HIT_COOLDOWN_MS = 600;    // 同一目標連續碰撞冷卻
+
+      const scene = document.querySelector('a-scene');
+      const cameraEl = document.getElementById('camera');
+      const markerEl = document.getElementById('marker');
+      const playerEl = document.getElementById('player');
+      const targetsRoot = document.getElementById('targets-root');
+      const scoreEl = document.getElementById('score');
+
+      let score = 0;
+
+      // 工具：螢幕座標 <-> 世界座標（在相機前方固定深度）
+      function screenToWorldAtZ(x, y, zMeters) {
+        // 取得相機三要素
+        const cam = cameraEl.getObject3D('camera');
+        const obj = cameraEl.object3D;
+        if (!cam) return null;
+        // NDC 轉換
+        const ndcX = (x / window.innerWidth) * 2 - 1;
+        const ndcY = -(y / window.innerHeight) * 2 + 1;
+        const ndc = new THREE.Vector3(ndcX, ndcY, 0.5);
+
+        // 射線從相機出發，取得在距離 zMeters 的點
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(ndc, cam);
+
+        const origin = raycaster.ray.origin.clone();
+        const dir = raycaster.ray.direction.clone().normalize();
+
+        // 找到與相機前方距離為 |zMeters| 的位置（沿著視線方向）
+        const point = origin.add(dir.multiplyScalar(Math.abs(zMeters)));
+        return point;
+      }
+
+      function worldToScreen(worldVec3) {
+        const cam = cameraEl.getObject3D('camera');
+        if (!cam) return null;
+        const vector = worldVec3.clone();
+        vector.project(cam);
+        const sx = (vector.x + 1) / 2 * window.innerWidth;
+        const sy = (1 - vector.y) / 2 * window.innerHeight;
+        return { x: sx, y: sy };
+      }
+
+      // 建立一個目標字元
+      function createTarget(char, type) {
+        const el = document.createElement('a-entity');
+        // 使用 A-Frame 的 text component 渲染字/emoji
+        el.setAttribute('text', {
+          value: char,
+          align: 'center',
+          width: 2,            // 基底寬度：搭配 scale 得到穩定大小
+          color: type === 'first' ? '#00E676' : '#FF5252'
+        });
+        el.setAttribute('scale', `${TEXT_WORLD_SCALE} ${TEXT_WORLD_SCALE} ${TEXT_WORLD_SCALE}`);
+        el.setAttribute('position', `0 0 ${PLANE_Z}`); // 初值，稍後會馬上更新
+
+        // 自訂狀態
+        el.__state = {
+          type,
+          char,
+          // 初始隨機螢幕位置（保留邊界）
+          sx: Math.random() * (window.innerWidth - 60) + 30,
+          sy: Math.random() * (window.innerHeight - 60) + 30,
+          // 隨機方向與速度（以螢幕像素/秒）
+          vx: (Math.random() * 2 - 1) * (SPEED_MIN + Math.random() * (SPEED_MAX - SPEED_MIN)),
+          vy: (Math.random() * 2 - 1) * (SPEED_MIN + Math.random() * (SPEED_MAX - SPEED_MIN)),
+          lastHitAt: 0
+        };
+
+        targetsRoot.appendChild(el);
+        return el;
+      }
+
+      // 建立多個目標
+      const targets = [];
+      function spawnAllTargets() {
+        // 第一組
+        for (let i = 0; i < COUNT_PER_SET; i++) {
+          const c = FIRST_SET[i % FIRST_SET.length];
+          targets.push(createTarget(c, 'first'));
+        }
+        // 第二組
+        for (let i = 0; i < COUNT_PER_SET; i++) {
+          const c = SECOND_SET[i % SECOND_SET.length];
+          targets.push(createTarget(c, 'second'));
+        }
+      }
+
+      // 更新分數顯示
+      function setScore(val) {
+        score = val;
+        scoreEl.textContent = `分數：${score}`;
+      }
+
+      // 碰撞反饋動畫（簡單縮放閃爍）
+      function hitFeedback(el) {
+        el.setAttribute('animation__hit1', {
+          property: 'scale',
+          to: `${TEXT_WORLD_SCALE * 1.4} ${TEXT_WORLD_SCALE * 1.4} ${TEXT_WORLD_SCALE * 1.4}`,
+          dur: 120,
+          easing: 'easeOutQuad',
+          dir: 'alternate',
+          loop: 1
+        });
+      }
+
+      // 主更新迴圈
+      let lastTime = performance.now();
+
+      function tick() {
+        const now = performance.now();
+        const dt = (now - lastTime) / 1000; // seconds
+        lastTime = now;
+
+        // 更新每個目標在螢幕的 2D 位置（彈跳）
+        const margin = 24;
+        const minX = margin, maxX = window.innerWidth - margin;
+        const minY = margin, maxY = window.innerHeight - margin;
+
+        for (const el of targets) {
+          const st = el.__state;
+          if (!st) continue;
+          st.sx += st.vx * dt;
+          st.sy += st.vy * dt;
+
+          // 邊界反彈
+          if (st.sx < minX) { st.sx = minX; st.vx = Math.abs(st.vx); }
+          if (st.sx > maxX) { st.sx = maxX; st.vx = -Math.abs(st.vx); }
+          if (st.sy < minY) { st.sy = minY; st.vy = Math.abs(st.vy); }
+          if (st.sy > maxY) { st.sy = maxY; st.vy = -Math.abs(st.vy); }
+
+          // 轉換到世界座標（相機前方固定深度）
+          const worldPos = screenToWorldAtZ(st.sx, st.sy, Math.abs(PLANE_Z));
+          if (worldPos) {
+            el.object3D.position.copy(worldPos);
+          }
+        }
+
+        // 取得玩家（標記上的方塊）世界座標
+        const playerObj = playerEl.object3D;
+        const playerWorldPos = new THREE.Vector3();
+        playerObj.getWorldPosition(playerWorldPos);
+
+        // 與每個目標做距離碰撞
+        const nowMs = now;
+        for (const el of targets) {
+          const st = el.__state;
+          if (!st) continue;
+
+          const targetWorldPos = new THREE.Vector3();
+          el.object3D.getWorldPosition(targetWorldPos);
+
+          const dist = playerWorldPos.distanceTo(targetWorldPos);
+          if (dist <= COLLIDE_RADIUS) {
+            if (nowMs - st.lastHitAt > HIT_COOLDOWN_MS) {
+              st.lastHitAt = nowMs;
+              // 計分
+              setScore(score + (st.type === 'first' ? SCORE_HIT_FIRST : SCORE_HIT_SECOND));
+              hitFeedback(el);
+            }
+          }
+        }
+
+        requestAnimationFrame(tick);
+      }
+
+      // 初始化
+      function start() {
+        spawnAllTargets();
+        lastTime = performance.now();
+        requestAnimationFrame(tick);
+      }
+
+      if (scene.hasLoaded) start();
+      else scene.addEventListener('loaded', start);
+
+      // 視窗尺寸變更時不需重建，只調整反彈邏輯的邊界依賴 window.innerWidth/Height 即可
+      window.addEventListener('resize', () => {
+        // 無需特別處理；tick 中使用即時的 window.innerWidth/Height
+      });
+    </script>
   </a-scene>
 </body>
 </html>
