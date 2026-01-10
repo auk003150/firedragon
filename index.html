@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (大坑火龍．完整版)</title>
+    <title>WebAR 新春碰撞遊戲 (大坑火龍．雙音效版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     
@@ -47,13 +47,13 @@
             position: absolute; width: 140px; height: 140px;
             transform: translate(-50%, -50%); display: none;
             justify-content: center; align-items: center;
-            z-index: 20; /* 龍頭在最上層 */
+            z-index: 20; 
         }
 
         /* --- 龍身容器 --- */
         #dragon-body-container {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 15; /* 龍身在龍頭下面 */
+            pointer-events: none; z-index: 15; 
         }
 
         /* 
@@ -62,7 +62,6 @@
            ========================================
         */
         
-        /* 草紮紋理共用 */
         .straw-texture {
             background-color: #3e2723;
             background-image: repeating-linear-gradient(
@@ -92,20 +91,17 @@
         .dh-whisker { position: absolute; top: 50px; width: 60px; height: 40px; border-top: 4px solid #8d6e63; border-radius: 50%; z-index: 2; opacity: 0.8; }
         .whisker-left { right: 75px; transform: rotate(20deg); } .whisker-right { left: 75px; transform: rotate(-20deg); }
 
-        /* --- 龍身樣式 (Body Segment) --- */
+        /* --- 龍身樣式 --- */
         .dragon-body-segment {
             position: absolute;
             width: 60px; height: 60px;
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            display: none; /* 初始隱藏，由 JS 控制顯示 */
+            display: none; 
         }
-        
-        /* 每一節龍身的香火光點 */
         .dragon-body-segment::after {
             content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             border-radius: 50%;
-            /* 模擬插在身上的香 */
             box-shadow: 
                 0 -25px 2px #ff3d00, 
                 20px -15px 2px #ff9100, 
@@ -116,11 +112,10 @@
             animation: burn-twinkle 0.3s infinite alternate;
         }
 
-        /* --- 龍尾樣式 (Tail) --- */
+        /* --- 龍尾樣式 --- */
         .dragon-tail {
             position: absolute;
             width: 50px; height: 80px;
-            /* 尾巴形狀 */
             clip-path: polygon(50% 0%, 100% 30%, 80% 100%, 20% 100%, 0% 30%);
             transform: translate(-50%, -50%);
             display: none;
@@ -134,7 +129,6 @@
             animation: burn-twinkle 0.2s infinite alternate;
         }
 
-        /* 香火與煙霧動畫 */
         .incense-glow { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         .incense-particles { position: absolute; width: 2px; height: 2px; background: #ff3d00; border-radius: 50%; top: 50%; left: 50%; box-shadow: 0 -35px 1px #ff9100, 10px -32px 1px #ff3d00, -10px -32px 1px #ff3d00, 20px -28px 1px #ff9100, -20px -28px 1px #ff3d00, 35px 10px 1px #ff3d00, -35px 10px 1px #ff9100, 40px 0px 1px #ff3d00, -40px 0px 1px #ff3d00, 30px -10px 1px #ff9100, -30px -10px 1px #ff3d00, 0 30px 1px #ff3d00, 15px 25px 1px #ff9100, -15px 25px 1px #ff3d00; filter: drop-shadow(0 0 2px #ff3d00); animation: burn-twinkle 0.2s infinite alternate; }
         .smoke-effect { position: absolute; top: -30px; left: 50%; width: 10px; height: 10px; background: rgba(200,200,200,0.3); border-radius: 50%; box-shadow: 0 0 20px 10px rgba(200,200,200,0.3); transform: translateX(-50%); animation: smoke-rise 2s infinite linear; z-index: 1; }
@@ -161,8 +155,13 @@
     <audio id="bgm" loop>
         <source src="https://actions.google.com/sounds/v1/ambiences/carnival_atmosphere.ogg" type="audio/ogg">
     </audio>
+    <!-- 吉祥字音效 -->
     <audio id="sfx-collect">
         <source src="Collect.mp3" type="audio/mp3">
+    </audio>
+    <!-- 倒霉字音效 (新增) -->
+    <audio id="sfx-crunch">
+        <source src="Crunch.mp3" type="audio/mp3">
     </audio>
     <audio id="sfx-end">
         <source src="https://actions.google.com/sounds/v1/cartoon/clown_horn.ogg" type="audio/ogg">
@@ -174,7 +173,7 @@
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="timer-board">時間: <span id="timer">60</span></div>
         
-        <!-- 龍身容器 (由 JS 動態生成) -->
+        <!-- 龍身容器 -->
         <div id="dragon-body-container"></div>
 
         <!-- 龍頭游標 -->
@@ -222,16 +221,21 @@
         const sounds = {
             bgm: document.getElementById('bgm'),
             collect: document.getElementById('sfx-collect'),
+            crunch: document.getElementById('sfx-crunch'), // 新增
             end: document.getElementById('sfx-end')
         };
         let isMuted = false;
         sounds.bgm.volume = 0.3; 
         sounds.collect.volume = 0.8;
+        sounds.crunch.volume = 0.8; // 設定音量
 
         function playSound(name) {
             if (isMuted) return;
             const audio = sounds[name];
-            if (audio) { audio.currentTime = 0; audio.play().catch(e => console.log("Audio play failed:", e)); }
+            if (audio) { 
+                audio.currentTime = 0; 
+                audio.play().catch(e => console.log("Audio play failed:", e)); 
+            }
         }
 
         function toggleMute() {
@@ -254,10 +258,10 @@
         let playerScreenPos = { x: -100, y: -100, visible: false };
 
         // --- 龍身邏輯變數 ---
-        const bodySegmentCount = 8; // 龍身節數
+        const bodySegmentCount = 8;
         const bodySegments = [];
-        const bodyPositions = []; // 儲存歷史位置
-        const bodySpacing = 40; // 每一節的間距
+        const bodyPositions = [];
+        const bodySpacing = 40;
 
         // --- DOM 元素 ---
         const gameArea = document.getElementById('game-area');
@@ -276,12 +280,10 @@
             bodySegments.length = 0;
             bodyPositions.length = 0;
 
-            // 創建龍身
             for (let i = 0; i < bodySegmentCount; i++) {
                 const el = document.createElement('div');
                 el.classList.add('dragon-body-segment');
                 el.classList.add('straw-texture');
-                // 越後面的身體越小一點
                 const scale = 1 - (i * 0.05);
                 el.style.transform = `translate(-50%, -50%) scale(${scale})`;
                 dragonBodyContainer.appendChild(el);
@@ -289,7 +291,6 @@
                 bodyPositions.push({ x: -100, y: -100 });
             }
 
-            // 創建龍尾
             const tail = document.createElement('div');
             tail.classList.add('dragon-tail');
             tail.classList.add('straw-texture');
@@ -389,7 +390,6 @@
         }
 
         function updateDragonBody(headX, headY) {
-            // 龍頭是第一個點
             let targetX = headX;
             let targetY = headY;
 
@@ -397,36 +397,28 @@
                 const segment = bodySegments[i];
                 const currentPos = bodyPositions[i];
 
-                // 計算當前節點與目標點的距離
                 const dx = targetX - currentPos.x;
                 const dy = targetY - currentPos.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 const angle = Math.atan2(dy, dx);
 
-                // 如果距離大於間距，就移動身體
                 if (dist > bodySpacing) {
-                    // 簡單的跟隨算法：保持固定距離
                     const moveDist = dist - bodySpacing;
-                    currentPos.x += Math.cos(angle) * moveDist * 0.5; // 0.5 是平滑係數
+                    currentPos.x += Math.cos(angle) * moveDist * 0.5;
                     currentPos.y += Math.sin(angle) * moveDist * 0.5;
                 }
 
-                // 更新 DOM 位置
                 segment.style.display = 'block';
                 segment.style.left = currentPos.x + 'px';
                 segment.style.top = currentPos.y + 'px';
                 
-                // 旋轉身體以面向前方 (龍尾特別需要)
                 if (i === bodySegments.length - 1) {
-                    // 龍尾旋轉
                     segment.style.transform = `translate(-50%, -50%) rotate(${angle * 180 / Math.PI + 90}deg)`;
                 } else {
-                    // 龍身縮放
                     const scale = 1 - (i * 0.05);
                     segment.style.transform = `translate(-50%, -50%) scale(${scale})`;
                 }
 
-                // 下一個節點的目標是當前節點的位置
                 targetX = currentPos.x;
                 targetY = currentPos.y;
             }
@@ -451,13 +443,11 @@
                 aimCursor.style.left = screenX + 'px';
                 aimCursor.style.top = screenY + 'px';
 
-                // 更新龍身位置
                 updateDragonBody(screenX, screenY);
 
             } else {
                 playerScreenPos.visible = false;
                 aimCursor.style.display = 'none';
-                // 隱藏龍身
                 bodySegments.forEach(seg => seg.style.display = 'none');
             }
 
@@ -486,7 +476,15 @@
             const pts = parseInt(item.element.dataset.points);
             score += pts;
             scoreEl.innerText = score;
-            playSound('collect');
+            
+            // --- 這裡修改了音效邏輯 ---
+            if (pts > 0) {
+                playSound('collect'); // 吉祥字
+            } else {
+                playSound('crunch');  // 倒霉字
+            }
+            // ------------------------
+
             const popup = document.createElement('div');
             popup.classList.add('score-popup');
             popup.innerText = pts > 0 ? `+${pts}` : pts;
