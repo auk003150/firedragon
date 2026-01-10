@@ -87,7 +87,7 @@
 
     input[type="range"] { width: 160px; }
     .sliderRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
-    .val { font-variant-numeric: tabular-nums; color: #fcd34d; min-width: 46px; text-align: right; font-weight: 700; }
+    .val { font-variant-numeric: tabular-nums; color: #fcd34d; min-width: 52px; text-align: right; font-weight: 700; }
 
     /* 隱藏原底部 bar */
     .bar { display: none; }
@@ -200,72 +200,72 @@
         </div>
       </div>
 
-      <!-- 新增：Hiro 偵測靈敏度設定 -->
+      <!-- 嚴格 Hiro 驗證（網格取樣 + 方向判斷） -->
       <div class="section" style="border-top:1px solid rgba(255,255,255,0.1)">
         <div class="row" style="justify-content:flex-start; color:#cbd5e1; font-size:13px;">
-          偵測過於靈敏時，可提高面積/周長/方形嚴格度，或增大區塊大小/偏移。
+          如仍過敏，請提高面積 / 邊長 / 方正度或降低誤碼容忍；在多人場域建議拉高閾值。
         </div>
         <div class="sliderRow">
           <div class="label">最小面積 (‰)</div>
           <div class="controls">
-            <input id="areaPpm" type="range" min="1" max="15" value="3">
-            <span id="areaPpmVal" class="val">3‰</span>
+            <input id="areaPpm" type="range" min="1" max="20" value="6">
+            <span id="areaPpmVal" class="val">6‰</span>
           </div>
         </div>
         <div class="sliderRow">
           <div class="label">最小邊長 (px)</div>
           <div class="controls">
-            <input id="minSide" type="range" min="8" max="80" value="26">
-            <span id="minSideVal" class="val">26</span>
+            <input id="minSide" type="range" min="10" max="100" value="32">
+            <span id="minSideVal" class="val">32</span>
           </div>
         </div>
         <div class="sliderRow">
           <div class="label">邊長比例上限</div>
           <div class="controls">
-            <input id="ratioTol" type="range" min="110" max="140" step="1" value="118">
-            <span id="ratioTolVal" class="val">1.18×</span>
+            <input id="ratioTol" type="range" min="108" max="140" step="1" value="112">
+            <span id="ratioTolVal" class="val">1.12×</span>
           </div>
         </div>
         <div class="sliderRow">
           <div class="label">角度容差 (cos)</div>
           <div class="controls">
-            <input id="angleCos" type="range" min="5" max="35" step="1" value="22">
-            <span id="angleCosVal" class="val">0.22</span>
+            <input id="angleCos" type="range" min="8" max="35" step="1" value="18">
+            <span id="angleCosVal" class="val">0.18</span>
           </div>
         </div>
         <div class="sliderRow">
           <div class="label">最小周長 (px)</div>
           <div class="controls">
-            <input id="minPeri" type="range" min="40" max="200" value="80">
-            <span id="minPeriVal" class="val">80</span>
+            <input id="minPeri" type="range" min="60" max="220" value="110">
+            <span id="minPeriVal" class="val">110</span>
           </div>
         </div>
         <div class="sliderRow">
           <div class="label">區塊大小 S</div>
           <div class="controls">
-            <input id="thrBlock" type="range" min="9" max="39" step="2" value="19">
-            <span id="thrBlockVal" class="val">19</span>
+            <input id="thrBlock" type="range" min="9" max="39" step="2" value="17">
+            <span id="thrBlockVal" class="val">17</span>
           </div>
         </div>
         <div class="sliderRow">
           <div class="label">對比偏移 T</div>
           <div class="controls">
-            <input id="thrOffset" type="range" min="2" max="30" value="8">
-            <span id="thrOffsetVal" class="val">8</span>
+            <input id="thrOffset" type="range" min="2" max="30" value="12">
+            <span id="thrOffsetVal" class="val">12</span>
           </div>
         </div>
         <div class="sliderRow">
           <div class="label">連續找到幀</div>
           <div class="controls">
-            <input id="foundFrames" type="range" min="1" max="8" value="3">
+            <input id="foundFrames" type="range" min="1" max="10" value="3">
             <span id="foundFramesVal" class="val">3</span>
           </div>
         </div>
         <div class="sliderRow">
           <div class="label">連續遺失幀</div>
           <div class="controls">
-            <input id="lostFrames" type="range" min="2" max="15" value="8">
-            <span id="lostFramesVal" class="val">8</span>
+            <input id="lostFrames" type="range" min="2" max="20" value="6">
+            <span id="lostFramesVal" class="val">6</span>
           </div>
         </div>
       </div>
@@ -274,15 +274,8 @@
     <div id="hint" class="hint">按「開始」允許相機權限。請將 Hiro 標記展示在鏡頭前。</div>
   </div>
 
-  <!-- js-aruco（含可調閾值） -->
+  <!-- 嚴格版 js-aruco：加入 7x7 取樣驗證 + 旋轉匹配，降低誤檢 -->
   <script>
-    /*
-     * js-aruco (精簡版，附加：
-     * - 3x3 box blur
-     * - 可調 Adaptive Threshold (S, T)
-     * - 加強幾何過濾以減少誤檢
-     */
-    /*! js-aruco embedded */
     (function(global){
       var CV = {
         grayscale: function(imageSrc){
@@ -336,12 +329,11 @@
           var labels=new Int32Array(imageSrc.data.length), label=1, comps=[];
           var w=imageSrc.width, h=imageSrc.height, data=imageSrc.data;
           function bfs(seed){
-            var q=[seed], idx, minx=w, miny=h, maxx=0, maxy=0, pts=[];
+            var q=[seed], minx=w, miny=h, maxx=0, maxy=0;
             labels[seed]=label;
             while(q.length){
-              idx=q.pop();
+              var idx=q.pop();
               var x=idx%w, y=idx/w|0;
-              pts.push({x:x,y:y});
               if(x<minx)minx=x; if(x>maxx)maxx=x; if(y<miny)miny=y; if(y>maxy)maxy=y;
               var n=[idx-1,idx+1,idx-w,idx+w];
               for(var k=0;k<4;++k){
@@ -351,15 +343,19 @@
                 labels[ni]=label; q.push(ni);
               }
             }
-            comps.push({points:pts, minx,miny,maxx,maxy});
+            comps.push({minx,miny,maxx,maxy});
           }
           for(var i=0;i<data.length;++i){
             if(data[i]===0 && labels[i]===0){ bfs(i); label++; }
           }
           var contours=[];
           for(var c of comps){
-            var rect=[{x:c.minx,y:c.miny},{x:c.maxx,y:c.miny},{x:c.maxx,y:c.maxy},{x:c.minx,y:c.maxy}];
-            contours.push(rect);
+            contours.push([
+              {x:c.minx,y:c.miny},
+              {x:c.maxx,y:c.miny},
+              {x:c.maxx,y:c.maxy},
+              {x:c.minx,y:c.maxy}
+            ]);
           }
           return contours;
         },
@@ -371,37 +367,125 @@
             p+=Math.hypot(dx,dy);
           }
           return p;
-        },
-        approxPolyDP: function(curve, epsilon){
-          return curve;
         }
       };
 
+      // Hiro 5x5 內部圖樣（含邊框皆為 1）
+      var HIRO_PATTERN = [
+        1,1,1,1,1,
+        1,0,0,0,1,
+        1,0,1,0,1,
+        1,0,0,0,1,
+        1,1,1,1,1
+      ];
+
+      function orderCorners(c){
+        // 已為矩形，保證 TL,TR,BR,BL
+        return [
+          c[0], c[1], c[2], c[3]
+        ];
+      }
+
+      function bilerp(p0,p1,p2,p3,u,v){
+        // p0:TL, p1:TR, p2:BR, p3:BL
+        var x = (1-u)*(1-v)*p0.x + u*(1-v)*p1.x + u*v*p2.x + (1-u)*v*p3.x;
+        var y = (1-u)*(1-v)*p0.y + u*(1-v)*p1.y + u*v*p2.y + (1-u)*v*p3.y;
+        return {x,y};
+      }
+
+      function sampleGray(gray, x, y){
+        var w=gray.width,h=gray.height;
+        x=Math.max(0, Math.min(w-1.001, x));
+        y=Math.max(0, Math.min(h-1.001, y));
+        var x0=x|0, y0=y|0;
+        var x1=Math.min(w-1, x0+1), y1=Math.min(h-1, y0+1);
+        var fx=x-x0, fy=y-y0;
+        var d=gray.data;
+        var i00=d[y0*w+x0], i10=d[y0*w+x1], i01=d[y1*w+x0], i11=d[y1*w+x1];
+        return i00*(1-fx)*(1-fy) + i10*fx*(1-fy) + i01*(1-fx)*fy + i11*fx*fy;
+      }
+
+      function sampleGrid7x7(gray, corners){
+        var pts = orderCorners(corners);
+        var vals = [];
+        var grid = Array.from({length:7}, ()=>Array(7).fill(0));
+        var min=255, max=0;
+        for(var r=0;r<7;r++){
+          for(var c=0;c<7;c++){
+            var u=(c+0.5)/7, v=(r+0.5)/7;
+            var p=bilerp(pts[0],pts[1],pts[2],pts[3],u,v);
+            var g=sampleGray(gray,p.x,p.y);
+            vals.push(g);
+            if(g<min)min=g; if(g>max)max=g;
+          }
+        }
+        var thr = (min+max)*0.5;
+        var darkVals=[], brightVals=[];
+        var idx=0;
+        for(var r=0;r<7;r++){
+          for(var c=0;c<7;c++,idx++){
+            var v=vals[idx];
+            var bit = v < thr ? 1:0;
+            grid[r][c]=bit;
+            if(bit) darkVals.push(v); else brightVals.push(v);
+          }
+        }
+        var darkMean = darkVals.length ? darkVals.reduce((a,b)=>a+b,0)/darkVals.length : 255;
+        var brightMean = brightVals.length ? brightVals.reduce((a,b)=>a+b,0)/brightVals.length : 0;
+        return { grid7:grid, contrast: brightMean - darkMean };
+      }
+
+      function rotate5(grid, times){
+        var g=grid;
+        for(var t=0;t<times;t++){
+          var n=5, ng=Array.from({length:5},()=>Array(5).fill(0));
+          for(var r=0;r<n;r++){
+            for(var c=0;c<n;c++){
+              ng[c][n-1-r]=g[r][c];
+            }
+          }
+          g=ng;
+        }
+        return g;
+      }
+
+      function checkHiro(grid7){
+        // 外圈應全 1
+        for(var i=0;i<7;i++){
+          if(!grid7[0][i]||!grid7[6][i]) return {ok:false};
+          if(!grid7[i][0]||!grid7[i][6]) return {ok:false};
+        }
+        // 取 5x5
+        var inner = Array.from({length:5},()=>Array(5).fill(0));
+        for(var r=0;r<5;r++) for(var c=0;c<5;c++) inner[r][c]=grid7[r+1][c+1];
+
+        // 嘗試四個方向
+        var bestErr=25, bestRot=0;
+        for(var rot=0; rot<4; rot++){
+          var g = rotate5(inner, rot);
+          var err=0;
+          for(var i=0;i<25;i++){
+            var r=i/5|0, c=i%5;
+            if (g[r][c] !== HIRO_PATTERN[i]) err++;
+          }
+          if(err<bestErr){ bestErr=err; bestRot=rot; }
+        }
+        return {ok: bestErr<=2, rot: bestRot, err: bestErr};
+      }
+
       var AR = {};
-      AR.Marker = function(id,corners){ this.id=id; this.corners=corners; };
-      AR.Dictionary = {
-        markers:{
-          0: [
-            1,1,1,1,1,
-            1,0,0,0,1,
-            1,0,1,0,1,
-            1,0,0,0,1,
-            1,1,1,1,1
-          ]
-        },
-        match: function(code){ return 0; }
-      };
+      AR.Marker = function(id,corners,rot,contrast){ this.id=id; this.corners=corners; this.rot=rot; this.contrast=contrast; };
 
       AR.Detector = function(){};
       AR.Detector.prototype.detect = function(imageData, cfg){
         cfg = cfg || {};
-        var S = cfg.blockSize || 19;
-        var T = cfg.offset   || 8;
+        var S = cfg.blockSize || 17;
+        var T = cfg.offset   || 12;
         var minArea    = cfg.minArea || 0;
         var minSide    = cfg.minSide || 0;
-        var ratioTol   = cfg.ratioTol || 1.25;
-        var angleCosTol= cfg.angleCos || 0.3;
-        var minPeri    = cfg.minPeri || 60;
+        var ratioTol   = cfg.ratioTol || 1.12;
+        var angleCosTol= cfg.angleCos || 0.25;
+        var minPeri    = cfg.minPeri || 100;
 
         var gray = CV.grayscale(imageData);
         var smooth = CV.boxBlur3(gray);
@@ -436,15 +520,16 @@
           if (maxCos > angleCosTol) continue;
 
           // 面積
-          var area = 0;
-          for (let i=0;i<4;i++){
-            var a=c[i], b=c[(i+1)%4];
-            area += a.x*b.y - b.x*a.y;
-          }
-          area = Math.abs(area)*0.5;
+          var area = (maxL * minL);
           if (area < minArea) continue;
 
-          markers.push(new AR.Marker(0, c));
+          // 7x7 取樣 + 方向驗證
+          var samp = sampleGrid7x7(smooth, c);
+          if (samp.contrast < 25) continue; // 光差不足
+          var chk = checkHiro(samp.grid7);
+          if (!chk.ok) continue;
+
+          markers.push(new AR.Marker(0, orderCorners(c), chk.rot, samp.contrast));
         }
         return markers;
       };
@@ -495,7 +580,7 @@
     const densityVal = document.getElementById('densityVal');
     const speedVal = document.getElementById('speedVal');
 
-    // 新增：偵測閾值滑桿
+    // 偵測閾值滑桿
     const areaPpmEl = document.getElementById('areaPpm');
     const minSideEl = document.getElementById('minSide');
     const ratioTolEl = document.getElementById('ratioTol');
@@ -524,14 +609,13 @@
     let timerId = null;
 
     let centroid = { x: 0, y: 0 };
-    let direction = { x: 1, y: 0 };
     const smoothing = 0.22; // 更平滑
 
     let useEnvironment = true;
     let mirrored = false;
 
     // 偵測節流
-    const detectInterval = 55; // ms
+    const detectInterval = 60; // ms
     let lastDetectTime = 0;
     let lastMarkerResult = null;
     let consecutiveFound = 0;
@@ -539,17 +623,17 @@
     let detected = false;
     let lastHintState = 'idle';
 
-    // 偵測配置（可調）
+    // 偵測配置（可調，嚴格缺省）
     const detectCfg = {
-      areaPpm: 3,       // ‰ of scaled frame
-      minSide: 26,      // px
-      ratioTol: 1.18,   // max longest/shortest side
-      angleCos: 0.22,   // |cos(theta)| tolerance to 90°
-      minPeri: 80,      // px
-      blockSize: 19,    // adaptive threshold S (odd)
-      offset: 8,        // adaptive threshold T
+      areaPpm: 6,       // ‰ of scaled frame
+      minSide: 32,      // px
+      ratioTol: 1.12,   // max longest/shortest side
+      angleCos: 0.18,   // |cos(theta)| tolerance to 90°
+      minPeri: 110,     // px
+      blockSize: 17,    // adaptive threshold S (odd)
+      offset: 12,       // adaptive threshold T
       foundFrames: 3,   // frames to confirm found
-      lostFrames: 8     // frames to confirm lost
+      lostFrames: 6     // frames to confirm lost
     };
 
     // ========= 單張貼圖（無旋轉）=========
@@ -651,7 +735,7 @@
       toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`;
     }
 
-    // ========= Hiro 標記偵測 =========
+    // ========= Hiro 標記偵測（嚴格網格驗證）=========
     const workCanvas = document.createElement('canvas');
     const wctx = workCanvas.getContext('2d', { willReadFrequently: true });
     const detector = new AR.Detector();
@@ -661,7 +745,7 @@
       let area = 0;
       for (let i=0;i<cs.length;i++){
         const c0 = cs[i], c1 = cs[(i+1)%cs.length];
-        area += c0.x * c1.y - c1.x * c0.y;
+        area += c0.x*c1.y - c1.x*c0.y;
       }
       return Math.abs(area) * 0.5;
     }
@@ -686,7 +770,7 @@
 
       const imageData = wctx.getImageData(0, 0, w, h);
 
-      // 計算當前最小面積（依螢幕比例）
+      // 計算當前最小面積（依縮放後大小）
       const minAreaAbs = w * h * (detectCfg.areaPpm / 1000);
 
       const markers = detector.detect(imageData, {
@@ -701,13 +785,14 @@
 
       if (!markers || markers.length === 0) return lastMarkerResult = null;
 
-      // 選最大面積
-      let best = null, bestArea = 0;
+      // 選最大面積且對比高者
+      let best = null, bestScore = 0;
       for (let i=0;i<markers.length;i++){
         const a = markerArea(markers[i]);
-        if (a > bestArea) { bestArea = a; best = markers[i]; }
+        const score = a * (1 + markers[i].contrast * 0.01);
+        if (score > bestScore) { bestScore = score; best = markers[i]; }
       }
-      if (!best || bestArea < minAreaAbs) return lastMarkerResult = null;
+      if (!best) return lastMarkerResult = null;
 
       const corners = best.corners;
       let cx = 0, cy = 0;
@@ -718,7 +803,7 @@
       const canvasY = (cy / h) * H;
       const finalX = mirrored ? (W - canvasX) : canvasX;
 
-      return lastMarkerResult = { x: finalX, y: canvasY, area: bestArea };
+      return lastMarkerResult = { x: finalX, y: canvasY, area: bestScore };
     }
 
     // ========= 目標物件 =========
@@ -871,15 +956,14 @@
     }
 
     // ========= 主循環 =========
-    let lastTime = performance.now();
     function updateHint(state) {
       if (state === lastHintState) return;
       lastHintState = state;
       if (state === 'found') {
-        hintEl.textContent = '已偵測到 Hiro 標記，請保持標記平整、置中且光線均勻。';
+        hintEl.textContent = '已偵測到 Hiro 標記，請保持平整、置中且光線均勻。';
         hintEl.className = 'hint ok';
       } else if (state === 'search') {
-        hintEl.textContent = '未偵測到 Hiro 標記，請將標記置中、距離 20–60cm，並確保光線充足。';
+        hintEl.textContent = '未偵測到 Hiro 標記，請置中 20–60cm，並確保光線充足。';
         hintEl.className = 'hint bad';
       } else {
         hintEl.textContent = '按「開始」允許相機權限。請將 Hiro 標記展示在鏡頭前。';
@@ -887,6 +971,7 @@
       }
     }
 
+    let lastTime = performance.now();
     function tick(now) {
       const dt = Math.min(0.033, (now - lastTime) / 1000);
       lastTime = now;
@@ -977,7 +1062,6 @@
       score = 0; combo = 0; scoreEl.textContent = score; comboEl.textContent = combo;
       items.length = 0; ensureItems();
       centroid = { x: W/2, y: H/2 };
-      direction = { x: 1, y: 0 };
       updateHint('idle');
       running = false; gameOver = false;
       clearInterval(timerId);
@@ -1055,7 +1139,6 @@
 
     // 初始
     centroid = { x: W/2, y: H/2 };
-    direction = { x: 1, y: 0 };
   </script>
 </body>
 </html>
