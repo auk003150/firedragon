@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>AR 抓寶遊戲 - 平面移動版</title>
+  <title>AR 抓寶遊戲 - 精緻版</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
@@ -19,26 +19,22 @@
       init: function() {
         this.isHit = false;
         
-        // --- 設定固定深度 (Z軸) ---
-        // 負數代表在相機前方，-2 代表距離 2 公尺
-        // 這樣物體大小就會保持一致
+        // 固定深度 (Z軸)
         const fixedZ = -2.5; 
 
-        // --- 隨機決定移動方向 (上下左右) ---
-        // 0: 左到右, 1: 右到左, 2: 上到下, 3: 下到上
+        // 隨機決定移動方向 (0:左到右, 1:右到左, 2:上到下, 3:下到上)
         const direction = Math.floor(Math.random() * 4);
         
-        // 設定邊界 (根據 -2.5 的深度，大約的可視範圍)
         const limitX = 2.5;
         const limitY = 1.8;
 
         let startX, startY, speedX, speedY;
-        const baseSpeed = 0.015 + Math.random() * 0.02; // 隨機速度
+        const baseSpeed = 0.015 + Math.random() * 0.02; 
 
         switch(direction) {
             case 0: // 左 -> 右
                 startX = -limitX; 
-                startY = (Math.random() - 0.5) * 2; // Y 隨機
+                startY = (Math.random() - 0.5) * 2; 
                 speedX = baseSpeed; speedY = 0;
                 break;
             case 1: // 右 -> 左
@@ -47,7 +43,7 @@
                 speedX = -baseSpeed; speedY = 0;
                 break;
             case 2: // 上 -> 下
-                startX = (Math.random() - 0.5) * 3; // X 隨機
+                startX = (Math.random() - 0.5) * 3; 
                 startY = limitY;
                 speedX = 0; speedY = -baseSpeed;
                 break;
@@ -59,11 +55,8 @@
         }
         
         this.el.setAttribute('position', `${startX} ${startY} ${fixedZ}`);
-        
-        // 儲存速度向量
         this.velocity = { x: speedX, y: speedY };
         
-        // 暫存變數
         this.playerPos = new THREE.Vector3();
         this.myPos = new THREE.Vector3();
       },
@@ -71,7 +64,6 @@
       tick: function() {
         if (this.isHit) return;
 
-        // 懶加載
         if (!this.playerCollider) {
             this.playerCollider = document.querySelector('#player-collider');
             this.playerMarker = document.querySelector('#player-marker');
@@ -79,7 +71,7 @@
             return; 
         }
 
-        // --- 1. 移動邏輯 (更新 X, Y) ---
+        // 1. 移動
         const pos = this.el.getAttribute('position');
         pos.x += this.velocity.x;
         pos.y += this.velocity.y;
@@ -90,31 +82,27 @@
             this.el.object3D.lookAt(this.camera.object3D.position);
         }
 
-        // --- 2. 邊界檢查 (超出範圍移除) ---
+        // 2. 邊界檢查
         if (Math.abs(pos.x) > 3.5 || Math.abs(pos.y) > 2.5) {
           if (this.el.parentNode) this.el.parentNode.removeChild(this.el);
           return;
         }
 
-        // --- 3. 碰撞偵測 (忽略 Z 軸深度) ---
+        // 3. 碰撞偵測
         if (this.playerMarker.object3D.visible) {
-            
             this.playerCollider.object3D.updateMatrixWorld();
             this.el.object3D.updateMatrixWorld();
 
             this.playerCollider.object3D.getWorldPosition(this.playerPos);
             this.el.object3D.getWorldPosition(this.myPos);
 
-            // 關鍵修改：將 Z 軸差異歸零，只計算 X 與 Y 的距離 (2D 距離)
-            // 這樣就算 Marker 很近，物體很遠，只要視覺上重疊就算碰到
             const dx = this.playerPos.x - this.myPos.x;
             const dy = this.playerPos.y - this.myPos.y;
-            
-            // 計算平面距離
             const distance2D = Math.sqrt(dx * dx + dy * dy);
 
-            // 判定範圍設為 0.35 (因為忽略了深度，範圍可以稍微縮小一點以求精確)
-            if (distance2D < 0.35) {
+            // --- 修改點：縮小判定範圍 ---
+            // 因為字卡變小了，判定距離改為 0.2 (原本是 0.35)
+            if (distance2D < 0.2) {
                 this.handleCollision();
             }
         }
@@ -201,7 +189,7 @@
     
     <div class="footer">
       <span class="marker-hint">Hiro Marker</span> 是你的網子<br>
-      像擦窗戶一樣移動它來接住字卡！
+      用雷射光束瞄準字卡！
     </div>
   </div>
 
@@ -215,10 +203,11 @@
     <!-- 玩家 (Hiro Marker) -->
     <a-marker preset="hiro" id="player-marker">
       <a-entity id="player-collider">
-        <!-- 視覺提示：加上一條長長的雷射光束，暗示這是「指向」操作 -->
-        <a-cylinder position="0 0 0" radius="0.02" height="10" color="#f1c40f" opacity="0.4" rotation="-90 0 0"></a-cylinder>
-        <a-ring radius-inner="0.25" radius-outer="0.3" color="#f1c40f" rotation="-90 0 0" material="side: double"></a-ring>
-        <a-sphere radius="0.05" color="red" position="0 0 0"></a-sphere>
+        <!-- 雷射光束 -->
+        <a-cylinder position="0 0 0" radius="0.01" height="10" color="#f1c40f" opacity="0.6" rotation="-90 0 0"></a-cylinder>
+        <!-- 準心圈圈 -->
+        <a-ring radius-inner="0.15" radius-outer="0.18" color="#f1c40f" rotation="-90 0 0" material="side: double"></a-ring>
+        <a-sphere radius="0.03" color="red" position="0 0 0"></a-sphere>
       </a-entity>
     </a-marker>
 
@@ -285,9 +274,10 @@
                 transparent: true, opacity: 1, shader: 'flat', side: 'double'
             });
 
-            // 調整大小：因為現在距離固定，可以稍微設大一點讓它看清楚
-            el.setAttribute('width', '0.6');
-            el.setAttribute('height', '0.6');
+            // --- 修改點：縮小尺寸 ---
+            // 從 0.6 改為 0.35
+            el.setAttribute('width', '0.35');
+            el.setAttribute('height', '0.35');
             
             el.setAttribute('floating-item', {
                 type: isGood ? 'good' : 'bad',
@@ -296,7 +286,7 @@
 
             cameraRig.appendChild(el);
 
-        }, 1000); // 生成速度加快一點
+        }, 1000);
     });
   </script>
 </body>
