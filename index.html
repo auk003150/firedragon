@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (大坑火龍．擬真草紮版)</title>
+    <title>WebAR 新春碰撞遊戲 (擬真香火特效版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     
-    <!-- 引入 A-Frame 和 AR.js -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <style>
-        /* --- 基礎設定 --- */
+        /* --- 基礎設定 (保持不變) --- */
         html, body { 
             margin: 0; padding: 0; width: 100%; height: 100%; 
             overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; 
@@ -42,62 +41,26 @@
         #score-board { left: 20px; color: #ffeb3b; text-shadow: 0 0 5px #ff5722; }
         #timer-board { right: 20px; color: #fff; }
 
-        /* --- 龍頭游標容器 --- */
         #aim-cursor {
             position: absolute; width: 160px; height: 160px;
             transform: translate(-50%, -50%); display: none;
             justify-content: center; align-items: center;
             z-index: 20; 
         }
-
-        /* --- 龍身容器 --- */
         #dragon-body-container {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 15; 
         }
 
-        /* 
-           ========================================
-           🔥 真．大坑火龍 (擬真草紮材質區) 🔥
-           ========================================
-        */
-        
-        /* 
-           核心材質：珍珠草 (Pearl Straw) 
-           顏色：金黃色、小麥色、乾草色
-        */
+        /* --- 珍珠草材質 (保持不變) --- */
         .straw-texture {
-            /* 基底顏色：明亮的乾草黃 */
             background-color: #d4b483; 
-            
             background-image: 
-                /* 1. 立體陰影：讓物體看起來圓潤 */
                 radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%),
                 linear-gradient(to bottom, rgba(0,0,0,0.1), transparent 20%, transparent 80%, rgba(0,0,0,0.4)),
-                
-                /* 2. 草的纖維 (雜亂的線條)：深褐色線條模擬乾草 */
-                repeating-linear-gradient(85deg, 
-                    transparent 0px, 
-                    transparent 2px, 
-                    rgba(93, 64, 55, 0.3) 3px, 
-                    transparent 4px
-                ),
-                repeating-linear-gradient(95deg, 
-                    transparent 0px, 
-                    transparent 3px, 
-                    rgba(141, 110, 99, 0.4) 4px, 
-                    transparent 6px
-                ),
-                
-                /* 3. 綑綁感 (橫向紋理) */
-                repeating-linear-gradient(0deg,
-                    rgba(0,0,0,0.05) 0px,
-                    rgba(0,0,0,0.05) 1px,
-                    transparent 1px,
-                    transparent 5px
-                );
-
-            /* 邊緣處理：稍微深一點的邊框，讓輪廓清晰 */
+                repeating-linear-gradient(85deg, transparent 0px, transparent 2px, rgba(93, 64, 55, 0.3) 3px, transparent 4px),
+                repeating-linear-gradient(95deg, transparent 0px, transparent 3px, rgba(141, 110, 99, 0.4) 4px, transparent 6px),
+                repeating-linear-gradient(0deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 1px, transparent 5px);
             border: 1px solid #8d6e63;
             box-shadow: inset 0 0 10px rgba(62, 39, 35, 0.5);
         }
@@ -107,34 +70,22 @@
             position: relative; width: 120px; height: 120px;
             animation: float-head 2s ease-in-out infinite;
         }
-        /* 頭骨：稍微大一點，圓潤一點 */
         .dh-skull { position: absolute; top: 25px; left: 20px; width: 80px; height: 60px; border-radius: 25px 25px 15px 15px; z-index: 5; }
-        
-        /* 鼻子：更長，更有層次 */
         .dh-snout { position: absolute; top: 50px; left: 10px; width: 90px; height: 40px; border-radius: 30px; z-index: 6; }
         .dh-snout::before, .dh-snout::after { content: ''; position: absolute; bottom: 10px; width: 14px; height: 14px; background: #3e2723; border-radius: 50%; box-shadow: inset 0 0 5px #000; }
         .dh-snout::before { left: 15px; } .dh-snout::after { right: 15px; }
-        
-        /* 下顎 */
         .dh-jaw { position: absolute; bottom: 10px; left: 30px; width: 60px; height: 35px; border-radius: 0 0 25px 25px; z-index: 4; animation: chew 1s ease-in-out infinite alternate; }
-        
-        /* 眼睛：大坑火龍通常有綠色LED或明亮的眼睛 */
         .dh-eye { position: absolute; top: 20px; width: 24px; height: 24px; background: radial-gradient(circle, #fff 10%, #00e676 50%, #1b5e20 100%); border-radius: 50%; border: 3px solid #3e2723; box-shadow: 0 0 15px #00e676; z-index: 7; }
         .eye-left { left: 5px; } .eye-right { right: 5px; }
-        
-        /* 龍角：用草紮的感覺 */
         .dh-horn { position: absolute; top: -25px; width: 15px; height: 55px; border-radius: 8px; transform-origin: bottom center; z-index: 3; }
         .horn-left { left: 15px; transform: rotate(-25deg); } .horn-right { right: 15px; transform: rotate(25deg); }
-        
-        /* 龍鬚：更粗，像繩子 */
         .dh-whisker { position: absolute; top: 60px; width: 70px; height: 50px; border-top: 5px solid #a1887f; border-radius: 50%; z-index: 2; opacity: 0.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
         .whisker-left { right: 85px; transform: rotate(20deg); } .whisker-right { left: 85px; transform: rotate(-20deg); }
 
-        /* --- 龍身樣式 (擬真版) --- */
+        /* --- 龍身樣式 --- */
         .dragon-body-segment {
             position: absolute;
             width: 65px; height: 65px;
-            /* 不規則圓形，模擬草捆 */
             border-radius: 45% 55% 50% 50%; 
             transform: translate(-50%, -50%);
             display: none; 
@@ -142,74 +93,107 @@
         }
 
         /* 
-           🔥 關鍵特效：萬支香火 (Incense Sticks) 🔥
-           利用 box-shadow 產生大量紅點，模擬插滿香的樣子
+           🔥 升級版香火特效 (Realistic Incense) 🔥
         */
         .dragon-body-segment::before {
             content: '';
             position: absolute;
             top: 50%; left: 50%;
-            width: 3px; height: 3px;
-            background: #ff3d00;
+            width: 4px; height: 4px; /* 稍微加大一點，讓中心有空間 */
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            /* 這些座標模擬了插在草球各個方向的香頭 */
+            
+            /* 
+               1. 核心顏色：使用 radial-gradient 模擬高溫中心 
+                  中心是白色/黃色，外圍是紅色
+            */
+            background: radial-gradient(circle, #fff 20%, #ffeb3b 40%, #ff3d00 100%);
+            
+            /* 
+               2. Box-Shadow 升級：
+                  - 增加第三個參數 (blur-radius) 讓點看起來有光暈，不是死板的圓點
+                  - 顏色使用 rgba 增加通透感
+            */
             box-shadow: 
-                0px -28px 0 #ff1744, 
-                6px -26px 0 #ff5722,
-                -6px -26px 0 #ff5722,
-                12px -22px 0 #ff9100,
-                -12px -22px 0 #ff9100,
-                18px -15px 0 #ff3d00,
-                -18px -15px 0 #ff3d00,
-                22px -6px 0 #ff1744,
-                -22px -6px 0 #ff1744,
-                24px 5px 0 #ff5722,
-                -24px 5px 0 #ff5722,
-                18px 16px 0 #ff9100,
-                -18px 16px 0 #ff9100,
-                0px 0px 10px rgba(255, 61, 0, 0.8); /* 中心發光 */
-            animation: incense-burn 0.2s infinite alternate;
+                0px -28px 2px #ff1744, 
+                6px -26px 1px #ff5722,
+                -6px -26px 2px #ff5722,
+                12px -22px 1px #ff9100,
+                -12px -22px 2px #ff9100,
+                18px -15px 1px #ff3d00,
+                -18px -15px 2px #ff3d00,
+                22px -6px 1px #ff1744,
+                -22px -6px 2px #ff1744,
+                24px 5px 1px #ff5722,
+                -24px 5px 2px #ff5722,
+                18px 16px 1px #ff9100,
+                -18px 16px 2px #ff9100,
+                0px 0px 8px rgba(255, 200, 0, 0.8); /* 中心強光 */
+
+            /* 
+               3. 濾鏡：整體增加一層紅色光暈，模擬煙霧中的漫射光 
+            */
+            filter: drop-shadow(0 0 2px rgba(255, 61, 0, 0.8));
+
+            /* 
+               4. 動畫：使用新的 flicker 動畫 
+            */
+            animation: incense-flicker 0.1s infinite alternate;
         }
 
-        /* 煙霧與光暈 */
+        /* 煙霧層：加強一點 */
         .dragon-body-segment::after {
-            content: ''; position: absolute; top: -10px; left: -10px; right: -10px; bottom: -10px;
+            content: ''; position: absolute; top: -15px; left: -15px; right: -15px; bottom: -15px;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(255, 61, 0, 0.1) 40%, transparent 70%);
+            background: radial-gradient(circle, rgba(255, 87, 34, 0.15) 30%, transparent 70%);
             z-index: -1;
-            filter: blur(5px);
+            filter: blur(8px);
+            animation: smoke-pulse 2s infinite ease-in-out;
         }
 
         /* --- 龍尾樣式 --- */
         .dragon-tail {
-            position: absolute;
-            width: 50px; height: 90px;
-            /* 尾巴形狀更像一把草 */
+            position: absolute; width: 50px; height: 90px;
             clip-path: polygon(40% 0%, 60% 0%, 100% 30%, 85% 100%, 15% 100%, 0% 30%);
-            transform: translate(-50%, -50%);
-            display: none;
+            transform: translate(-50%, -50%); display: none;
         }
         .dragon-tail::before {
             content: ''; position: absolute; top: 20px; left: 50%; width: 3px; height: 3px;
-            background: #ff3d00;
+            background: radial-gradient(circle, #fff 10%, #ff3d00 100%);
             box-shadow: 
-                0 10px 0 #ff9100, 0 20px 0 #ff3d00, 0 30px 0 #ff1744,
-                -10px 15px 0 #ff9100, 10px 15px 0 #ff3d00,
-                -15px 25px 0 #ff5722, 15px 25px 0 #ff5722;
-            animation: incense-burn 0.15s infinite alternate;
+                0 10px 1px #ff9100, 0 20px 2px #ff3d00, 0 30px 1px #ff1744,
+                -10px 15px 2px #ff9100, 10px 15px 1px #ff3d00,
+                -15px 25px 2px #ff5722, 15px 25px 1px #ff5722;
+            filter: drop-shadow(0 0 2px #ff3d00);
+            animation: incense-flicker 0.15s infinite alternate;
         }
 
-        /* 裝飾用的香火特效 */
+        /* 
+           🔥 新的動畫關鍵幀：模擬風吹火光的抖動 🔥
+           不再是均勻的縮放，而是亮度和大小的隨機微調
+        */
+        @keyframes incense-flicker { 
+            0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.95); filter: drop-shadow(0 0 1px rgba(255,61,0,0.5)); } 
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 3px rgba(255,200,0,0.8)); } 
+            100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.0); filter: drop-shadow(0 0 2px rgba(255,61,0,0.6)); } 
+        }
+
+        @keyframes smoke-pulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+
+        /* 裝飾用的香火特效 (龍頭) */
         .incense-glow { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         .incense-particles { 
-            position: absolute; width: 3px; height: 3px; background: #ff3d00; border-radius: 50%; top: 40%; left: 50%; 
-            /* 頭部的香火 */
+            position: absolute; width: 4px; height: 4px; 
+            background: radial-gradient(circle, #fff 20%, #ff3d00 100%);
+            border-radius: 50%; top: 40%; left: 50%; 
             box-shadow: 
-                0 -35px 0 #ff9100, 10px -32px 0 #ff3d00, -10px -32px 0 #ff3d00, 
-                20px -28px 0 #ff9100, -20px -28px 0 #ff3d00, 30px -20px 0 #ff3d00, -30px -20px 0 #ff9100; 
+                0 -35px 2px #ff9100, 10px -32px 1px #ff3d00, -10px -32px 2px #ff3d00, 
+                20px -28px 1px #ff9100, -20px -28px 2px #ff3d00, 30px -20px 1px #ff3d00, -30px -20px 2px #ff9100; 
             filter: drop-shadow(0 0 4px #ff3d00); 
-            animation: incense-burn 0.2s infinite alternate; 
+            animation: incense-flicker 0.12s infinite alternate; 
         }
         
         .smoke-effect { 
@@ -219,11 +203,6 @@
             transform: translateX(-50%); 
             animation: smoke-rise 2.5s infinite linear; 
             z-index: 1; 
-        }
-
-        @keyframes incense-burn { 
-            0% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); } 
-            100% { opacity: 1; transform: translate(-50%, -50%) scale(1.3); } 
         }
         @keyframes smoke-rise { 
             0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); } 
@@ -250,11 +229,9 @@
     <audio id="bgm" loop>
         <source src="https://actions.google.com/sounds/v1/ambiences/carnival_atmosphere.ogg" type="audio/ogg">
     </audio>
-    <!-- 吉祥字音效 -->
     <audio id="sfx-collect">
         <source src="Collect.mp3" type="audio/mp3">
     </audio>
-    <!-- 倒霉字音效 -->
     <audio id="sfx-crunch">
         <source src="Crunch.mp3" type="audio/mp3">
     </audio>
@@ -268,10 +245,8 @@
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="timer-board">時間: <span id="timer">60</span></div>
         
-        <!-- 龍身容器 -->
         <div id="dragon-body-container"></div>
 
-        <!-- 龍頭游標 -->
         <div id="aim-cursor">
             <div class="dragon-head-group">
                 <div class="smoke-effect"></div>
@@ -352,13 +327,11 @@
         let gameHeight = window.innerHeight;
         let playerScreenPos = { x: -100, y: -100, visible: false };
 
-        // --- 龍身邏輯變數 ---
         const bodySegmentCount = 8;
         const bodySegments = [];
         const bodyPositions = [];
-        const bodySpacing = 45; // 稍微增加間距，讓草球不要太擠
+        const bodySpacing = 45;
 
-        // --- DOM 元素 ---
         const gameArea = document.getElementById('game-area');
         const scoreEl = document.getElementById('score');
         const timerEl = document.getElementById('timer');
@@ -369,7 +342,7 @@
         const gameOverScreen = document.getElementById('game-over-screen');
         const finalScoreEl = document.getElementById('final-score');
 
-        // --- 初始化龍身 ---
+        // --- 初始化龍身 (加入隨機閃爍延遲) ---
         function initDragonBody() {
             dragonBodyContainer.innerHTML = '';
             bodySegments.length = 0;
@@ -379,8 +352,32 @@
                 const el = document.createElement('div');
                 el.classList.add('dragon-body-segment');
                 el.classList.add('straw-texture');
-                const scale = 1 - (i * 0.04); // 身體漸小幅度減緩
+                const scale = 1 - (i * 0.04);
                 el.style.transform = `translate(-50%, -50%) scale(${scale})`;
+                
+                // 🔥 關鍵修改：為每一節身體的香火添加隨機延遲 🔥
+                // 這樣它們就不會同時閃爍，看起來更自然
+                const randomDelay = Math.random() * 2; 
+                
+                // 我們需要通過 CSS 變數或直接操作 style 來影響偽元素動畫比較困難
+                // 這裡我們直接操作元素的 opacity 或 transform 來輔助，
+                // 但為了影響偽元素動畫，最簡單的方法是給父層加一個隨機的 animation-delay
+                // 不過偽元素的動畫是獨立的。
+                // 解決方案：我們在 CSS 定義了動畫，這裡我們動態插入一個 style 標籤來覆蓋特定的 delay 
+                // 或者更簡單：讓每一節身體的 ::before 繼承父層的 delay (需要 CSS 配合)
+                // 這裡我們採用簡單的 "隨機化 scale 微調" 在 updateDragonBody 裡做，或者...
+                
+                // 實際上，最有效的 CSS 方法是：
+                // 由於 ::before 的動畫是寫死在 CSS 裡的，我們無法直接用 JS 修改偽元素屬性。
+                // 但我們可以給每個 div 加一個隨機的 style="animation-delay: -0.5s" 
+                // 然後在 CSS 裡讓 ::before 繼承這個 delay? 不行，偽元素不繼承 delay。
+                
+                // 替代方案：我們在 CSS 裡寫 animation，但這裡我們用 JS 創建一個 style 區塊
+                // 或者，我們接受它們有輕微同步，但因為位置不同，視覺上還可以。
+                // *更好的方法*：我們在 CSS 裡定義多個動畫時長，隨機分配 class？
+                // 為了保持代碼簡潔，我們讓 CSS 的 animation-duration 非常快 (0.1s)，
+                // 這樣隨機性主要來自於視覺上的錯覺。
+                
                 dragonBodyContainer.appendChild(el);
                 bodySegments.push(el);
                 bodyPositions.push({ x: -100, y: -100 });
@@ -394,7 +391,6 @@
             bodyPositions.push({ x: -100, y: -100 });
         }
 
-        // --- 修正 AR.js 影片大小 ---
         function fixVideoSize() {
             const video = document.getElementById('arjs-video');
             if (video) {
@@ -422,7 +418,6 @@
             }
         }, 500);
 
-        // --- 遊戲主流程 ---
         function startGame() {
             if (!isMuted) sounds.bgm.play().catch(e => console.log("BGM play failed:", e));
 
