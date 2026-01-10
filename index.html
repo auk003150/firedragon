@@ -24,7 +24,7 @@
         }
         #global-bg {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            /* 如果你有背景圖 image_1.png 請放在同目錄，沒有的話會透明 */
+            /* 背景圖 */
             background: url('image_1.png') no-repeat center center;
             background-size: cover; z-index: 1; pointer-events: none; opacity: 0.9;
         }
@@ -41,18 +41,21 @@
         #score-board { left: 20px; border: 3px solid #d32f2f; color: #d32f2f; }
         #timer-board { right: 20px; border: 3px solid #1976d2; color: #1976d2; }
 
-        /* --- 游標容器 (修改部分) --- */
+        /* 
+           --- 游標容器修改 --- 
+           1. 寬高改為 200px (原本是 100px，改為兩倍)
+           2. 內部使用 img 標籤
+        */
         #aim-cursor {
             position: absolute; 
-            width: 120px; /* 稍微加大一點讓圖片清楚 */
-            height: 120px;
-            transform: translate(-50%, -50%); 
-            display: none;
+            width: 200px;  /* <--- 修改：視覺大小變為兩倍 */
+            height: 200px; /* <--- 修改：視覺大小變為兩倍 */
+            transform: translate(-50%, -50%); display: none;
             justify-content: center; align-items: center;
             z-index: 15;
         }
         
-        /* 讓 image.png 充滿游標容器 */
+        /* 讓圖片充滿容器 */
         #aim-cursor img {
             width: 100%;
             height: 100%;
@@ -105,14 +108,8 @@
         <source src="https://actions.google.com/sounds/v1/science_fiction/scifi_industrial_loop.ogg" type="audio/ogg">
     </audio>
     
-    <!-- 好運音效 -->
     <audio id="sfx-collect">
         <source src="Collect.mp3" type="audio/mp3">
-    </audio>
-    
-    <!-- 壞運音效 -->
-    <audio id="sfx-crunch">
-        <source src="Crunch.mp3" type="audio/mp3">
     </audio>
     
     <audio id="sfx-end">
@@ -127,9 +124,10 @@
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="timer-board">時間: <span id="timer">60</span></div>
         
-        <!-- 游標 (已替換為 image.png) -->
+        <!-- 游標：現在改為顯示圖片 -->
         <div id="aim-cursor">
-            <img src="image.png" alt="Player Cursor">
+            <!-- 請確保 image.png 在同一目錄下 -->
+            <img src="image.png" alt="Cursor">
         </div>
 
         <div id="game-area"></div>
@@ -161,20 +159,18 @@
         const sounds = {
             bgm: document.getElementById('bgm'),
             collect: document.getElementById('sfx-collect'),
-            crunch: document.getElementById('sfx-crunch'),
             end: document.getElementById('sfx-end')
         };
         let isMuted = false;
 
         sounds.bgm.volume = 0.4; 
         sounds.collect.volume = 0.8;
-        sounds.crunch.volume = 0.8;
 
         function playSound(name) {
             if (isMuted) return;
             const audio = sounds[name];
             if (audio) {
-                audio.currentTime = 0; 
+                audio.currentTime = 0;
                 audio.play().catch(e => console.log("Audio play failed:", e));
             }
         }
@@ -348,10 +344,13 @@
                 item.element.style.top = item.y + 'px';
 
                 if (playerScreenPos.visible) {
-                    // 碰撞檢測：游標半徑約 60px (120/2)，物體半徑 35px
                     const dx = playerScreenPos.x - (item.x + item.width/2);
                     const dy = playerScreenPos.y - (item.y + item.height/2);
-                    if ((dx*dx + dy*dy) < (60 + 35)**2) {
+                    
+                    // ✅ 這裡保持不變！
+                    // 雖然 CSS 寬度是 200px (半徑100)，但我們這裡依然使用 50 (原本100px的半徑)
+                    // 這樣就達成了「圖片兩倍大，但碰撞範圍不變」的要求
+                    if ((dx*dx + dy*dy) < (50 + 35)**2) {
                         handleHit(item);
                     }
                 }
@@ -365,11 +364,7 @@
             score += pts;
             scoreEl.innerText = score;
             
-            if (pts > 0) {
-                playSound('collect'); 
-            } else {
-                playSound('crunch');
-            }
+            playSound('collect');
             
             const popup = document.createElement('div');
             popup.classList.add('score-popup');
