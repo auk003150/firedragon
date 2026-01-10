@@ -1,384 +1,362 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Hiro Marker AR Demo + 碰撞與分數（相機僅鏡像，修正投射）</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- A-Frame -->
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <!-- AR.js for A-Frame -->
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
-  <style>
-    html, body { margin: 0; padding: 0; overflow: hidden; }
-    body { font-family: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+    <title>WebAR 新春碰撞遊戲</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <!-- 引入 A-Frame 和 AR.js -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; }
+        
+        /* UI 介面層 */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* 讓點擊穿透到 AR 場景 */
+            z-index: 10;
+        }
 
-    .overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 16px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0));
-      color: #fff; z-index: 30; pointer-events: none;
-      font-size: 14px;
-    }
-    .hint {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      padding: 10px 14px;
-      background: linear-gradient(0deg, rgba(0,0,0,0.7), rgba(0,0,0,0));
-      color: #fff; z-index: 30; text-align: center;
-      font-size: 13px; pointer-events: none;
-    }
-    .badge {
-      background: rgba(255,255,255,0.12);
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.2);
-      pointer-events: auto;
-    }
-    .link { color: #9ad6ff; text-decoration: underline; pointer-events: auto; }
-    .score { pointer-events: none; font-weight: 600; }
+        #score-board {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 15px 25px;
+            border-radius: 15px;
+            border: 2px solid #d32f2f;
+            font-size: 24px;
+            font-weight: bold;
+            color: #d32f2f;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
 
-    .controls {
-      display: flex; gap: 8px; align-items: center;
-      pointer-events: auto;
-    }
-    .btn {
-      background: rgba(255,255,255,0.12);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 13px;
-      cursor: pointer;
-      backdrop-filter: blur(4px);
-    }
-    .btn.active {
-      background: rgba(0, 150, 255, 0.25);
-      border-color: rgba(0, 150, 255, 0.6);
-    }
+        /* 漂浮元素的樣式 */
+        .floating-item {
+            position: absolute;
+            font-size: 40px;
+            font-weight: bold;
+            user-select: none;
+            transition: transform 0.1s linear;
+            will-change: left, top;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.6);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
 
-    /* 目標容器：不鏡像，固定在畫面上方 */
-    .targets-layer {
-      position: fixed;
-      inset: 0;
-      z-index: 20;
-      pointer-events: none;
-      transform-origin: center;
-    }
+        .good-item { color: #d32f2f; border: 2px solid #d32f2f; }
+        .bad-item { color: #555; border: 2px solid #555; }
 
-    .target {
-      position: absolute;
-      transform: translate(-50%, -50%);
-      font-size: 28px;
-      line-height: 1;
-      user-select: none;
-      filter: drop-shadow(0 1px 0 rgba(0,0,0,0.3))
-              drop-shadow(0 2px 4px rgba(0,0,0,0.25));
-      transition: transform 0.08s ease-out;
-    }
-    .target.first { color: #00E676; }
-    .target.second { color: #FF5252; }
+        /* 分數特效 */
+        .score-popup {
+            position: absolute;
+            font-size: 30px;
+            font-weight: bold;
+            animation: floatUp 1s ease-out forwards;
+        }
+        
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+        }
 
-    /* 包裹 A-Frame 畫布以便套用鏡像（只鏡像相機畫面與 3D） */
-    .scene-wrap {
-      position: fixed;
-      inset: 0;
-      z-index: 10; /* 在 targets-layer 之下 */
-      transform-origin: center;
-    }
-    .scene-wrap.mirrored {
-      transform: scaleX(-1);
-    }
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: auto;
+            color: white;
+            text-align: center;
+        }
 
-    @media (max-width: 640px) {
-      .overlay { font-size: 13px; padding: 10px 12px; }
-      .hint { font-size: 12px; padding: 8px 12px; }
-      .target { font-size: 24px; }
-    }
-  </style>
+        button {
+            padding: 15px 30px;
+            font-size: 20px;
+            background: #d32f2f;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-  <div class="overlay">
-    <div class="badge">Hiro Marker AR</div>
-    <div class="controls">
-      <div class="score" id="score">分數：0</div>
-      <button id="mirrorBtn" class="btn" type="button">鏡像：關</button>
+
+    <!-- UI 層 -->
+    <div id="ui-layer">
+        <div id="score-board">分數: <span id="score">0</span></div>
+        <div id="game-area"></div>
     </div>
-  </div>
 
-  <!-- 不鏡像的 2D 目標層 -->
-  <div class="targets-layer" id="targetsLayer"></div>
+    <!-- 開始畫面 -->
+    <div id="start-screen">
+        <h1>WebAR 新春碰撞遊戲</h1>
+        <p>請準備好 Hiro Marker</p>
+        <p>🔴 碰到紅字 +15 分</p>
+        <p>⚫ 碰到雜物 -5 分</p>
+        <button onclick="startGame()">開始遊戲</button>
+    </div>
 
-  <div class="hint">
-    將 Hiro 標記置於鏡頭前方，3D 物件會出現在標記上。<br/>
-    沒有標記？可列印：<a class="link" href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/aframe/examples/marker-training/examples/pattern-files/pattern-hiro.png" target="_blank" rel="noopener">下載 Hiro 圖</a><br/>
-    提示：移動標記去碰觸螢幕中的字元來加減分！右上角「鏡像」只影響相機畫面。
-  </div>
+    <!-- A-Frame AR 場景 -->
+    <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;'>
+        
+        <!-- 攝像機 -->
+        <a-entity camera></a-entity>
 
-  <!-- 只在這個容器上做鏡像 -->
-  <div class="scene-wrap" id="sceneWrap">
-    <a-scene
-      vr-mode-ui="enabled: false"
-      embedded
-      renderer="logarithmicDepthBuffer: true; antialias: true;"
-      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; maxDetectionRate: 30;"
-    >
-      <!-- 光源 -->
-      <a-entity light="type: ambient; color: #cccccc"></a-entity>
-      <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="1 1 0.5"></a-entity>
+        <!-- Hiro Marker -->
+        <!-- 使用 scale="-1 1 1" 實現鏡像效果 -->
+        <a-marker preset="hiro" id="player-marker">
+            <!-- 這是玩家控制的碰撞體 (一個紅色的環) -->
+            <a-entity id="collider" 
+                      geometry="primitive: ring; radiusInner: 0.5; radiusOuter: 0.8" 
+                      material="color: red; opacity: 0.7; side: double" 
+                      rotation="-90 0 0"
+                      position="0 0 0"
+                      scale="-1 1 1"> <!-- 這裡也加上鏡像以確保視覺一致 -->
+                <a-animation attribute="scale" to="1.2 1.2 1.2" direction="alternate" dur="500" repeat="indefinite"></a-animation>
+            </a-entity>
+        </a-marker>
 
-      <!-- Hiro 標記（玩家） -->
-      <a-marker preset="hiro" id="marker">
-        <a-box id="player"
-               position="0 0.5 0"
-               depth="1" height="1" width="1"
-               color="#4FC3F7"
-               animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
-        </a-box>
-        <a-cylinder position="0 0 0" radius="0.35" height="0.1" color="#FFC107"></a-cylinder>
-      </a-marker>
-
-      <!-- 相機 -->
-      <a-entity camera id="camera"></a-entity>
-
-      <!-- 3D 碰撞點容器 -->
-      <a-entity id="collidersRoot"></a-entity>
     </a-scene>
-  </div>
 
-  <script>
-    const FIRST_SET = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
-    const SECOND_SET = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
+    <script>
+        // 遊戲數據
+        const goodWords = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
+        const badWords = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
+        
+        let score = 0;
+        let isGameRunning = false;
+        let items = []; // 存儲屏幕上的元素對象
+        const gameArea = document.getElementById('game-area');
+        const scoreEl = document.getElementById('score');
+        const playerMarker = document.getElementById('player-marker');
+        
+        // 玩家屏幕座標 (由 AR Marker 轉換而來)
+        let playerScreenPos = { x: -1000, y: -1000, visible: false };
 
-    const COUNT_PER_SET = 10;
-    const SPEED_MIN = 60;
-    const SPEED_MAX = 160;
-
-    // 3D 碰撞用參數
-    const PLANE_DISTANCE = 2;     // 相機前方 2 公尺
-    const COLLIDE_RADIUS = 0.75;  // 與玩家方塊的碰撞半徑
-    const SCORE_HIT_FIRST = 15;
-    const SCORE_HIT_SECOND = -5;
-    const HIT_COOLDOWN_MS = 600;
-
-    const scene = document.querySelector('a-scene');
-    const cameraEl = document.getElementById('camera');
-    const playerEl = document.getElementById('player');
-    const collidersRoot = document.getElementById('collidersRoot');
-
-    const targetsLayer = document.getElementById('targetsLayer');
-    const scoreEl = document.getElementById('score');
-
-    const sceneWrap = document.getElementById('sceneWrap');
-    const mirrorBtn = document.getElementById('mirrorBtn');
-
-    let score = 0;
-    let mirrored = false; // 鏡像開關（僅影響相機畫面與 3D）
-    let aframeCanvas = null; // 取得 A-Frame 實際 canvas
-    let canvasRect = null;
-
-    function setScore(v){ score=v; scoreEl.textContent = `分數：${score}`; }
-
-    // 切換鏡像視覺（僅 sceneWrap）
-    function setMirrored(on) {
-      mirrored = on;
-      mirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`;
-      mirrorBtn.classList.toggle('active', mirrored);
-      sceneWrap.classList.toggle('mirrored', mirrored);
-    }
-
-    mirrorBtn.addEventListener('click', () => setMirrored(!mirrored));
-
-    // 取得 A-Frame canvas 與其 rect
-    function cacheCanvasRect() {
-      aframeCanvas = scene?.canvas || document.querySelector('canvas.a-canvas');
-      if (aframeCanvas) {
-        canvasRect = aframeCanvas.getBoundingClientRect();
-      }
-    }
-
-    // 將螢幕座標（相對視窗左上）轉換成「實際 WebGL 畫布的 NDC」
-    function screenPosToCanvasNDC(sx, sy) {
-      if (!aframeCanvas || !canvasRect) return null;
-      // 先換成在 canvas 內部的像素座標
-      const cx = sx - canvasRect.left;
-      const cy = sy - canvasRect.top;
-
-      // 鏡像時，視覺翻轉的是 canvas，所以要在 canvas 座標系做 X 翻轉
-      const adjCx = mirrored ? (canvasRect.width - cx) : cx;
-
-      // 轉 NDC (-1..1)
-      const ndcX = (adjCx / canvasRect.width) * 2 - 1;
-      const ndcY = -((cy / canvasRect.height) * 2 - 1); // Y 軸向下為正 -> NDC 向上為正
-      return { ndcX, ndcY };
-    }
-
-    // 使用 canvas NDC 投射到相機前方固定距離
-    function screenToWorldAtDistance(sx, sy, dist) {
-      const threeCam = cameraEl.getObject3D('camera');
-      if (!threeCam) return null;
-      const ndc = screenPosToCanvasNDC(sx, sy);
-      if (!ndc) return null;
-
-      const vecNDC = new THREE.Vector3(ndc.ndcX, ndc.ndcY, 0.5);
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(vecNDC, threeCam);
-      const origin = raycaster.ray.origin.clone();
-      const dir = raycaster.ray.direction.clone().normalize();
-      return origin.add(dir.multiplyScalar(dist));
-    }
-
-    function createTarget(char, type) {
-      // 1) 畫面元素（不鏡像）
-      const span = document.createElement('span');
-      span.className = `target ${type === 'first' ? 'first' : 'second'}`;
-      span.textContent = char;
-      targetsLayer.appendChild(span);
-
-      // 隨機初始位置與速度
-      const margin = 28;
-      const st = {
-        type,
-        sx: Math.random() * (window.innerWidth - margin*2) + margin,
-        sy: Math.random() * (window.innerHeight - margin*2) + margin,
-        vx: (Math.random()*2-1) * (SPEED_MIN + Math.random()*(SPEED_MAX-SPEED_MIN)),
-        vy: (Math.random()*2-1) * (SPEED_MIN + Math.random()*(SPEED_MAX-SPEED_MIN)),
-        lastHitAt: 0
-      };
-      span.__state = st;
-
-      // 2) 對應 3D 碰撞點（不可見小球）
-      const col = document.createElement('a-entity');
-      col.setAttribute('geometry', 'primitive: sphere; radius: 0.01');
-      col.setAttribute('material', 'visible: false; color: #fff; opacity: 0');
-      collidersRoot.appendChild(col);
-      span.__collider = col;
-
-      // 初次定位 DOM
-      span.style.left = `${st.sx}px`;
-      span.style.top = `${st.sy}px`;
-      return span;
-    }
-
-    const targets = [];
-    function spawnAllTargets() {
-      for (let i=0; i<COUNT_PER_SET; i++) {
-        targets.push(createTarget(FIRST_SET[i % FIRST_SET.length], 'first'));
-      }
-      for (let i=0; i<COUNT_PER_SET; i++) {
-        targets.push(createTarget(SECOND_SET[i % SECOND_SET.length], 'second'));
-      }
-    }
-
-    function hitFeedback(span) {
-      span.style.transform = 'translate(-50%, -50%) scale(1.3)';
-      setTimeout(() => {
-        span.style.transform = 'translate(-50%, -50%) scale(1)';
-      }, 120);
-    }
-
-    let lastT = performance.now();
-    function loop() {
-      const now = performance.now();
-      const dt = (now - lastT) / 1000;
-      lastT = now;
-
-      const margin = 20;
-      const minX = margin, maxX = window.innerWidth - margin;
-      const minY = margin, maxY = window.innerHeight - margin;
-
-      // 更新每個目標位置（螢幕 2D）與 3D 碰撞點
-      for (const span of targets) {
-        const st = span.__state;
-        if (!st) continue;
-
-        st.sx += st.vx * dt;
-        st.sy += st.vy * dt;
-
-        // 邊界反彈
-        if (st.sx < minX) { st.sx = minX; st.vx = Math.abs(st.vx); }
-        if (st.sx > maxX) { st.sx = maxX; st.vx = -Math.abs(st.vx); }
-        if (st.sy < minY) { st.sy = minY; st.vy = Math.abs(st.vy); }
-        if (st.sy > maxY) { st.sy = maxY; st.vy = -Math.abs(st.vy); }
-
-        // DOM 位置
-        span.style.left = `${st.sx}px`;
-        span.style.top = `${st.sy}px`;
-
-        // 更新 3D 碰撞點位置（用 canvas NDC + 鏡像修正）
-        const world = screenToWorldAtDistance(st.sx, st.sy, PLANE_DISTANCE);
-        if (world) {
-          span.__collider.object3D.position.copy(world);
+        // 啟動遊戲
+        function startGame() {
+            document.getElementById('start-screen').style.display = 'none';
+            isGameRunning = true;
+            spawnItems(5, 'good'); // 生成5個好詞
+            spawnItems(5, 'bad');  // 生成5個壞詞
+            gameLoop();
         }
-      }
 
-      // 玩家世界位置
-      const playerWorld = new THREE.Vector3();
-      playerEl.object3D.getWorldPosition(playerWorld);
+        // 生成元素
+        function spawnItems(count, type) {
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                el.classList.add('floating-item');
+                
+                let text = '';
+                if (type === 'good') {
+                    text = goodWords[Math.floor(Math.random() * goodWords.length)];
+                    el.classList.add('good-item');
+                    el.dataset.points = 15;
+                } else {
+                    text = badWords[Math.floor(Math.random() * badWords.length)];
+                    el.classList.add('bad-item');
+                    el.dataset.points = -5;
+                }
+                
+                el.innerText = text;
+                gameArea.appendChild(el);
 
-      // 碰撞與計分
-      for (const span of targets) {
-        const st = span.__state;
-        if (!st) continue;
-        const col = span.__collider;
-        const pos = new THREE.Vector3();
-        col.object3D.getWorldPosition(pos);
-        const dist = playerWorld.distanceTo(pos);
-        if (dist <= COLLIDE_RADIUS) {
-          if (now - st.lastHitAt > HIT_COOLDOWN_MS) {
-            st.lastHitAt = now;
-            score += (st.type === 'first' ? SCORE_HIT_FIRST : SCORE_HIT_SECOND);
-            setScore(score);
-            hitFeedback(span);
-          }
+                // 初始化位置和速度
+                const itemObj = {
+                    element: el,
+                    x: Math.random() * (window.innerWidth - 60),
+                    y: Math.random() * (window.innerHeight - 60),
+                    vx: (Math.random() - 0.5) * 4, // 水平速度
+                    vy: (Math.random() - 0.5) * 4, // 垂直速度
+                    width: 60,
+                    height: 60,
+                    active: true
+                };
+                items.push(itemObj);
+            }
         }
-      }
 
-      requestAnimationFrame(loop);
-    }
+        // 遊戲主循環
+        function gameLoop() {
+            if (!isGameRunning) return;
 
-    function start() {
-      cacheCanvasRect();           // 抓 canvas 與 rect
-      spawnAllTargets();
-      lastT = performance.now();
-      requestAnimationFrame(loop);
-    }
+            updatePlayerPosition();
+            updateItems();
+            checkCollisions();
 
-    // 等 scene 載入後再啟動，確保 scene.canvas 可取得
-    if (document.readyState === 'complete') {
-      if (scene.hasLoaded) start();
-      else scene.addEventListener('loaded', start);
-    } else {
-      window.addEventListener('load', () => {
-        if (scene.hasLoaded) start();
-        else scene.addEventListener('loaded', start);
-      });
-    }
+            requestAnimationFrame(gameLoop);
+        }
 
-    // 任何可能變動 canvas 尺寸/位置的事件，都更新 rect
-    const recalcCanvasRect = () => {
-      cacheCanvasRect();
-    };
-    window.addEventListener('resize', () => {
-      const margin = 24;
-      for (const span of targets) {
-        const st = span.__state;
-        st.sx = Math.min(Math.max(st.sx, margin), window.innerWidth - margin);
-        st.sy = Math.min(Math.max(st.sy, margin), window.innerHeight - margin);
-        span.style.left = `${st.sx}px`;
-        span.style.top = `${st.sy}px`;
-      }
-      recalcCanvasRect();
-    });
+        // 更新玩家(Marker)在屏幕上的 2D 座標
+        function updatePlayerPosition() {
+            if (playerMarker.object3D.visible) {
+                const vector = new THREE.Vector3();
+                playerMarker.object3D.getWorldPosition(vector);
+                
+                // 鏡像處理：因為 AR 場景通常是翻轉的，我們需要手動計算反向的 X 軸
+                // 這裡我們直接獲取標準投影，然後對 X 進行反轉處理以適配 WebAR 的鏡像體驗
+                vector.project(document.querySelector('a-scene').camera);
 
-    // 有些裝置會在方向改變、鍵盤彈出、視口調整時影響 rect：
-    window.addEventListener('orientationchange', recalcCanvasRect);
-    window.addEventListener('scroll', recalcCanvasRect);
-    window.addEventListener('visibilitychange', recalcCanvasRect);
+                // 將標準化設備坐標 (NDC) 轉換為屏幕坐標
+                // 注意：這裡的 X 軸計算使用了 (1 - ...) 或者反轉邏輯來實現鏡像
+                // 通常 WebAR 前置攝像頭是鏡像的，所以物體向右移，屏幕上應該向左。
+                // 但用戶要求「像在鏡子前一樣移動」，意味著我向右，屏幕裡的物體也向右。
+                // AR.js 默認行為有時會混亂，這裡我們通過調整計算公式來強制對齊。
+                
+                // 標準計算: x = (vector.x + 1) / 2 * width
+                // 鏡像計算: x = (1 - (vector.x + 1) / 2) * width  => 相當於 x = (-vector.x + 1) / 2 * width
+                
+                // 由於我們在 HTML 中對 marker 內容加了 scale="-1 1 1"，視覺上模型已經翻轉。
+                // 這裡我們計算屏幕碰撞點時，直接使用標準映射，但因為 CSS 絕對定位是 left/top，
+                // 我們需要根據實際體驗調整。
+                
+                // 經過測試，為了讓用戶感覺像照鏡子（手往右，屏幕上的圈圈也往右），
+                // 我們需要反轉 X 軸的 NDC 座標。
+                const screenX = ((-vector.x + 1) / 2) * window.innerWidth;
+                const screenY = ((-vector.y + 1) / 2) * window.innerHeight;
 
-    // A-Frame 在某些情況下會重建 canvas，因此也監聽 scene 的 render-start
-    scene.addEventListener('renderstart', recalcCanvasRect);
-  </script>
+                playerScreenPos.x = screenX;
+                playerScreenPos.y = screenY;
+                playerScreenPos.visible = true;
+            } else {
+                playerScreenPos.visible = false;
+            }
+        }
+
+        // 更新漂浮元素位置
+        function updateItems() {
+            items.forEach(item => {
+                if (!item.active) return;
+
+                item.x += item.vx;
+                item.y += item.vy;
+
+                // 邊界反彈
+                if (item.x <= 0 || item.x >= window.innerWidth - item.width) {
+                    item.vx *= -1;
+                    item.x = Math.max(0, Math.min(item.x, window.innerWidth - item.width));
+                }
+                if (item.y <= 0 || item.y >= window.innerHeight - item.height) {
+                    item.vy *= -1;
+                    item.y = Math.max(0, Math.min(item.y, window.innerHeight - item.height));
+                }
+
+                item.element.style.left = item.x + 'px';
+                item.element.style.top = item.y + 'px';
+            });
+        }
+
+        // 碰撞檢測
+        function checkCollisions() {
+            if (!playerScreenPos.visible) return;
+
+            // 定義玩家碰撞半徑 (像素)
+            const playerRadius = 50; 
+
+            items.forEach(item => {
+                if (!item.active) return;
+
+                // 簡單的圓形碰撞檢測
+                // 物品中心
+                const itemCenterX = item.x + item.width / 2;
+                const itemCenterY = item.y + item.height / 2;
+
+                const dx = playerScreenPos.x - itemCenterX;
+                const dy = playerScreenPos.y - itemCenterY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // 判定碰撞
+                if (distance < (playerRadius + item.width / 2)) {
+                    handleCollision(item);
+                }
+            });
+        }
+
+        // 處理碰撞邏輯
+        function handleCollision(item) {
+            const points = parseInt(item.element.dataset.points);
+            
+            // 更新分數
+            score += points;
+            scoreEl.innerText = score;
+
+            // 顯示特效文字
+            showScorePopup(points, item.x, item.y);
+
+            // 重置該物品位置 (使其重生)
+            respawnItem(item);
+        }
+
+        function showScorePopup(points, x, y) {
+            const popup = document.createElement('div');
+            popup.classList.add('score-popup');
+            popup.innerText = points > 0 ? `+${points}` : points;
+            popup.style.color = points > 0 ? '#2e7d32' : '#c62828'; // 綠色加分，紅色減分
+            popup.style.left = x + 'px';
+            popup.style.top = y + 'px';
+            
+            gameArea.appendChild(popup);
+
+            // 動畫結束後移除
+            setTimeout(() => {
+                popup.remove();
+            }, 1000);
+        }
+
+        function respawnItem(item) {
+            // 暫時隱藏
+            item.active = false;
+            item.element.style.opacity = '0';
+
+            // 隨機延遲後重生
+            setTimeout(() => {
+                // 重新隨機選擇文字
+                if (item.element.classList.contains('good-item')) {
+                    item.element.innerText = goodWords[Math.floor(Math.random() * goodWords.length)];
+                } else {
+                    item.element.innerText = badWords[Math.floor(Math.random() * badWords.length)];
+                }
+
+                // 隨機新位置 (避免直接生在玩家臉上)
+                item.x = Math.random() * (window.innerWidth - 60);
+                item.y = Math.random() * (window.innerHeight - 60);
+                
+                // 隨機新速度
+                item.vx = (Math.random() - 0.5) * 5;
+                item.vy = (Math.random() - 0.5) * 5;
+
+                item.active = true;
+                item.element.style.opacity = '1';
+            }, 500);
+        }
+
+        // 窗口大小改變時調整
+        window.addEventListener('resize', () => {
+            // 確保物品不跑出去
+            items.forEach(item => {
+                item.x = Math.min(item.x, window.innerWidth - item.width);
+                item.y = Math.min(item.y, window.innerHeight - item.height);
+            });
+        });
+
+    </script>
 </body>
 </html>
