@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (圖片游標版)</title>
+    <title>WebAR 新春碰撞遊戲 (大坑火龍真．還原版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     
@@ -24,7 +24,7 @@
         }
         #global-bg {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            /* 背景圖 */
+            /* 如果你有背景圖 image_1.png 請放在同目錄，沒有的話會透明 */
             background: url('image_1.png') no-repeat center center;
             background-size: cover; z-index: 1; pointer-events: none; opacity: 0.9;
         }
@@ -41,26 +41,118 @@
         #score-board { left: 20px; border: 3px solid #d32f2f; color: #d32f2f; }
         #timer-board { right: 20px; border: 3px solid #1976d2; color: #1976d2; }
 
-        /* 
-           --- 游標容器修改 --- 
-           1. 寬高改為 200px (原本是 100px，改為兩倍)
-           2. 內部使用 img 標籤
-        */
+        /* --- 游標容器 --- */
         #aim-cursor {
-            position: absolute; 
-            width: 200px;  /* <--- 修改：視覺大小變為兩倍 */
-            height: 200px; /* <--- 修改：視覺大小變為兩倍 */
+            position: absolute; width: 100px; height: 100px;
             transform: translate(-50%, -50%); display: none;
             justify-content: center; align-items: center;
             z-index: 15;
         }
+
+        /* 
+           ========================================
+           🔥 大坑火龍 (Fire Dragon) 樣式 🔥
+           ========================================
+        */
+        .dragon-head {
+            position: relative;
+            width: 60px; height: 70px;
+            background-color: #4e342e; 
+            background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 2px, transparent 2px, transparent 4px);
+            border-radius: 20px;
+            
+            /* 模擬密集的線香紅點 */
+            box-shadow: 
+                0 -15px 0 -5px #ff5722, 
+                15px -10px 0 -5px #ff5722, 
+                -15px -10px 0 -5px #ff5722,
+                0 -25px 4px -4px #ffeb3b,
+                25px -15px 4px -4px #ffeb3b,
+                -25px -15px 4px -4px #ffeb3b,
+                0 0 30px rgba(255, 87, 34, 0.6);
+                
+            animation: fire-flicker 0.1s infinite alternate;
+        }
+
+        .incense-bundle {
+            position: absolute; top: 50%; left: 50%;
+            width: 100%; height: 100%;
+            transform: translate(-50%, -50%); pointer-events: none;
+        }
         
-        /* 讓圖片充滿容器 */
-        #aim-cursor img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain; /* 保持圖片比例 */
-            filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.8)); /* 加一點發光效果讓它更明顯 */
+        .incense-bundle::before, .incense-bundle::after {
+            content: ''; position: absolute;
+            top: 50%; left: 50%;
+            background: transparent;
+            width: 2px; height: 2px;
+            border-radius: 50%;
+            box-shadow: 
+                0 -40px 2px #ff3d00, 
+                20px -35px 2px #ff9100, 
+                -20px -35px 2px #ff9100,
+                35px -20px 2px #ff3d00,
+                -35px -20px 2px #ff3d00,
+                40px 0px 2px #ff9100,
+                -40px 0px 2px #ff9100;
+            opacity: 0.9;
+        }
+        .incense-bundle::after {
+            transform: rotate(22deg);
+            box-shadow: 
+                0 -45px 1px #ffeb3b, 
+                25px -40px 1px #ff5722, 
+                -25px -40px 1px #ff5722;
+        }
+
+        .dragon-horn {
+            position: absolute; top: -10px;
+            width: 8px; height: 20px;
+            background: #5d4037;
+            border-radius: 4px; z-index: -1;
+        }
+        .horn-left { left: 10px; transform: rotate(-15deg); }
+        .horn-right { right: 10px; transform: rotate(15deg); }
+
+        .dragon-eye {
+            position: absolute; top: 20px;
+            width: 14px; height: 14px;
+            background: #00e676;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00e676;
+            z-index: 5; border: 1px solid #004d40;
+        }
+        .eye-left { left: 8px; }
+        .eye-right { right: 8px; }
+
+        .dragon-mouth {
+            position: absolute; bottom: 10px; left: 50%;
+            transform: translateX(-50%);
+            width: 40px; height: 20px;
+            background: #3e2723;
+            border-radius: 5px 5px 15px 15px;
+            border: 1px solid #281815; overflow: hidden;
+        }
+        .dragon-mouth::after {
+            content: ''; position: absolute; top: 0; left: 5px;
+            width: 0; height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 8px solid #fff;
+            box-shadow: 10px 0 0 #fff, 20px 0 0 #fff;
+        }
+
+        .dragon-whisker {
+            position: absolute; bottom: 5px;
+            width: 50px; height: 30px;
+            border-top: 3px solid #8d6e63;
+            border-radius: 50%; z-index: -1;
+        }
+        .whisker-left { right: 85%; transform: rotate(20deg); }
+        .whisker-right { left: 85%; transform: rotate(-20deg); }
+
+        @keyframes fire-flicker {
+            0% { opacity: 0.9; transform: scale(1); filter: brightness(1); }
+            100% { opacity: 1; transform: scale(1.02); filter: brightness(1.2); }
         }
 
         /* --- 掉落物體樣式 --- */
@@ -108,6 +200,7 @@
         <source src="https://actions.google.com/sounds/v1/science_fiction/scifi_industrial_loop.ogg" type="audio/ogg">
     </audio>
     
+    <!-- ✅ 修改：統一使用 Collect.mp3 作為碰撞音效 -->
     <audio id="sfx-collect">
         <source src="Collect.mp3" type="audio/mp3">
     </audio>
@@ -124,10 +217,18 @@
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="timer-board">時間: <span id="timer">60</span></div>
         
-        <!-- 游標：現在改為顯示圖片 -->
+        <!-- 大坑火龍游標 -->
         <div id="aim-cursor">
-            <!-- 請確保 image.png 在同一目錄下 -->
-            <img src="image.png" alt="Cursor">
+            <div class="dragon-head">
+                <div class="incense-bundle"></div>
+                <div class="dragon-horn horn-left"></div>
+                <div class="dragon-horn horn-right"></div>
+                <div class="dragon-eye eye-left"></div>
+                <div class="dragon-eye eye-right"></div>
+                <div class="dragon-mouth"></div>
+                <div class="dragon-whisker whisker-left"></div>
+                <div class="dragon-whisker whisker-right"></div>
+            </div>
         </div>
 
         <div id="game-area"></div>
@@ -158,7 +259,7 @@
         // --- 音效管理 ---
         const sounds = {
             bgm: document.getElementById('bgm'),
-            collect: document.getElementById('sfx-collect'),
+            collect: document.getElementById('sfx-collect'), // ✅ 統一碰撞音效
             end: document.getElementById('sfx-end')
         };
         let isMuted = false;
@@ -170,7 +271,7 @@
             if (isMuted) return;
             const audio = sounds[name];
             if (audio) {
-                audio.currentTime = 0;
+                audio.currentTime = 0; // 確保可以連續快速播放
                 audio.play().catch(e => console.log("Audio play failed:", e));
             }
         }
@@ -346,10 +447,6 @@
                 if (playerScreenPos.visible) {
                     const dx = playerScreenPos.x - (item.x + item.width/2);
                     const dy = playerScreenPos.y - (item.y + item.height/2);
-                    
-                    // ✅ 這裡保持不變！
-                    // 雖然 CSS 寬度是 200px (半徑100)，但我們這裡依然使用 50 (原本100px的半徑)
-                    // 這樣就達成了「圖片兩倍大，但碰撞範圍不變」的要求
                     if ((dx*dx + dy*dy) < (50 + 35)**2) {
                         handleHit(item);
                     }
@@ -364,6 +461,7 @@
             score += pts;
             scoreEl.innerText = score;
             
+            // ✅ 修改：無論好壞，只要碰撞就播放 collect 音效
             playSound('collect');
             
             const popup = document.createElement('div');
