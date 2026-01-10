@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>AR 抓寶遊戲 - 精緻版</title>
+  <title>AR 抓寶遊戲 - 透明背景修復版</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
@@ -22,7 +22,7 @@
         // 固定深度 (Z軸)
         const fixedZ = -2.5; 
 
-        // 隨機決定移動方向 (0:左到右, 1:右到左, 2:上到下, 3:下到上)
+        // 隨機決定移動方向
         const direction = Math.floor(Math.random() * 4);
         
         const limitX = 2.5;
@@ -100,8 +100,7 @@
             const dy = this.playerPos.y - this.myPos.y;
             const distance2D = Math.sqrt(dx * dx + dy * dy);
 
-            // --- 修改點：縮小判定範圍 ---
-            // 因為字卡變小了，判定距離改為 0.2 (原本是 0.35)
+            // 判定距離維持 0.2
             if (distance2D < 0.2) {
                 this.handleCollision();
             }
@@ -245,6 +244,9 @@
             canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
 
+            // --- 修改點 1：確保 Canvas 背景完全清空 ---
+            ctx.clearRect(0, 0, 256, 256);
+
             ctx.beginPath();
             ctx.arc(128, 128, 110, 0, 2 * Math.PI);
             ctx.fillStyle = isBad ? 'rgba(50, 50, 50, 0.9)' : 'rgba(200, 0, 0, 0.9)';
@@ -269,13 +271,18 @@
             
             const el = document.createElement('a-plane');
             
+            // --- 修改點 2：加入 alphaTest: 0.5 ---
+            // 這會讓透明度高的像素直接不被渲染，解決重疊時的白框問題
             el.setAttribute('material', {
                 src: createTextTexture(text, !isGood),
-                transparent: true, opacity: 1, shader: 'flat', side: 'double'
+                transparent: true, 
+                opacity: 1, 
+                alphaTest: 0.5, // 關鍵設定！
+                shader: 'flat', 
+                side: 'double'
             });
 
-            // --- 修改點：縮小尺寸 ---
-            // 從 0.6 改為 0.35
+            // 尺寸維持 0.35
             el.setAttribute('width', '0.35');
             el.setAttribute('height', '0.35');
             
