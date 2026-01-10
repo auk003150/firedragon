@@ -200,9 +200,14 @@
         <source src="https://actions.google.com/sounds/v1/science_fiction/scifi_industrial_loop.ogg" type="audio/ogg">
     </audio>
     
-    <!-- ✅ 修改：統一使用 Collect.mp3 作為碰撞音效 -->
+    <!-- 好運音效 -->
     <audio id="sfx-collect">
         <source src="Collect.mp3" type="audio/mp3">
+    </audio>
+    
+    <!-- 壞運音效 (新增) -->
+    <audio id="sfx-crunch">
+        <source src="Crunch.mp3" type="audio/mp3">
     </audio>
     
     <audio id="sfx-end">
@@ -259,13 +264,15 @@
         // --- 音效管理 ---
         const sounds = {
             bgm: document.getElementById('bgm'),
-            collect: document.getElementById('sfx-collect'), // ✅ 統一碰撞音效
+            collect: document.getElementById('sfx-collect'), // 好運音效
+            crunch: document.getElementById('sfx-crunch'),   // 壞運音效 (新增)
             end: document.getElementById('sfx-end')
         };
         let isMuted = false;
 
         sounds.bgm.volume = 0.4; 
         sounds.collect.volume = 0.8;
+        sounds.crunch.volume = 0.8; // 設定壞運音效音量
 
         function playSound(name) {
             if (isMuted) return;
@@ -461,8 +468,12 @@
             score += pts;
             scoreEl.innerText = score;
             
-            // ✅ 修改：無論好壞，只要碰撞就播放 collect 音效
-            playSound('collect');
+            // ✅ 修改：根據分數判斷播放哪個音效
+            if (pts > 0) {
+                playSound('collect'); // 新年字詞
+            } else {
+                playSound('crunch');  // 壞東西
+            }
             
             const popup = document.createElement('div');
             popup.classList.add('score-popup');
