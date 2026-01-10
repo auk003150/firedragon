@@ -2,180 +2,289 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>Hiro Marker AR Demo</title>
+  <title>AR 抓寶遊戲</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  
-  <!-- A-Frame 1.4.2 -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <!-- AR.js for A-Frame -->
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
 
   <style>
-    html, body { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; }
-    body { font-family: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+    body { margin: 0; overflow: hidden; font-family: sans-serif; }
     
-    /* 頂部遮罩與狀態列 */
-    .overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      display: flex; justify-content: space-between; align-items: flex-start;
-      padding: 16px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.8), rgba(0,0,0,0));
-      color: #fff; z-index: 10; pointer-events: none;
-      font-size: 14px;
+    /* UI 介面層 */
+    #ui-layer {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 100;
+      display: flex; flex-direction: column; justify-content: space-between;
     }
 
-    /* 底部提示區 */
-    .hint {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
+    /* 分數板 */
+    .score-board {
       padding: 20px;
-      padding-bottom: 30px; /* 避開某些手機的底部手勢區 */
-      background: linear-gradient(0deg, rgba(0,0,0,0.8), rgba(0,0,0,0));
-      color: #fff; z-index: 10; text-align: center;
-      font-size: 14px; pointer-events: none;
-      line-height: 1.5;
+      display: flex; justify-content: space-between; align-items: flex-start;
     }
-
-    /* 狀態標籤 */
-    .badge {
-      background: rgba(255,255,255,0.15);
-      backdrop-filter: blur(4px);
-      padding: 6px 12px;
-      border-radius: 20px;
-      border: 1px solid rgba(255,255,255,0.3);
-      pointer-events: auto;
-      font-weight: 500;
-      transition: all 0.3s ease;
-      display: flex; align-items: center; gap: 6px;
-    }
-
-    /* 偵測到標記時的樣式 */
-    .badge.active {
-      background: rgba(46, 204, 113, 0.8);
-      border-color: rgba(46, 204, 113, 1);
-      box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
-    }
-
-    /* 狀態圓點 */
-    .status-dot {
-      width: 8px; height: 8px;
-      background-color: #ff4757;
-      border-radius: 50%;
-      transition: background-color 0.3s;
-    }
-    .badge.active .status-dot {
-      background-color: #fff;
-    }
-
-    .link {
-      color: #74b9ff; text-decoration: none; 
-      border-bottom: 1px dashed #74b9ff;
-      pointer-events: auto;
+    .score-box {
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 12px;
+      border: 2px solid #fff;
+      font-size: 24px;
       font-weight: bold;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .score-change {
+      position: absolute;
+      font-size: 40px;
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 0.5s, transform 0.5s;
     }
 
-    @media (max-width: 640px) {
-      .overlay { font-size: 13px; padding: 12px; }
-      .hint { font-size: 13px; padding: 15px; }
+    /* 底部提示 */
+    .footer {
+      background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+      color: white;
+      text-align: center;
+      padding: 20px;
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
 
   <!-- UI 介面 -->
-  <div class="overlay">
-    <div class="badge" id="status-badge">
-      <div class="status-dot"></div>
-      <span id="status-text">搜尋標記中...</span>
+  <div id="ui-layer">
+    <div class="score-board">
+      <div class="score-box">分數: <span id="score-val">0</span></div>
+      <div id="score-anim" class="score-change"></div>
+    </div>
+    <div class="footer">
+      移動 Hiro 標記去觸碰漂浮的字！<br>
+      <span style="color: #4cd137">吉祥話 +15</span> | <span style="color: #e84118">雜物 -5</span>
     </div>
   </div>
 
-  <div class="hint">
-    請將鏡頭對準 Hiro 標記<br/>
-    沒有標記？<a class="link" href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/aframe/examples/marker-training/examples/pattern-files/pattern-hiro.png" target="_blank" rel="noopener">點此下載並列印</a>
-  </div>
-
-  <!-- AR 場景 -->
-  <!-- 
-       vr-mode-ui="enabled: false" : 隱藏 VR 眼鏡按鈕
-       renderer : 優化渲染效果，減少破圖與鋸齒
-       arjs : 設定使用 Webcam，關閉除錯介面
-  -->
+  <!-- A-Frame 場景 -->
   <a-scene
     vr-mode-ui="enabled: false"
     embedded
-    renderer="logarithmicDepthBuffer: true; antialias: true; colorManagement: true;"
-    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; maxDetectionRate: 60;"
+    renderer="logarithmicDepthBuffer: true; antialias: true;"
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono;"
   >
     
-    <!-- 燈光設定 -->
-    <a-entity light="type: ambient; color: #BBB"></a-entity>
-    <a-entity light="type: directional; color: #FFF; intensity: 1.2" position="-0.5 1 1"></a-entity>
+    <!-- 遊戲邏輯管理器 (不可見) -->
+    <a-entity id="game-manager"></a-entity>
 
-    <!-- Hiro 標記 -->
-    <!-- 加入 emitevents="true" 以便 JS 監聽事件 -->
-    <a-marker preset="hiro" id="hiro-marker" emitevents="true" smooth="true">
-      
-      <!-- 3D 群組容器 -->
-      <a-entity position="0 0 0" scale="1 1 1">
-        
-        <!-- 核心立方體 (半透明) -->
-        <a-box 
-          position="0 0.5 0" 
-          depth="1" height="1" width="1"
-          material="color: #00a8ff; opacity: 0.7; transparent: true; metalness: 0.5; roughness: 0.2"
-          animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear">
-        </a-box>
-
-        <!-- 內部線框 (增加科技感) -->
-        <a-box 
-          position="0 0.5 0" 
-          depth="1.05" height="1.05" width="1.05"
-          material="wireframe: true; color: #fff; opacity: 0.5"
-          animation="property: rotation; to: 0 -360 0; loop: true; dur: 10000; easing: linear">
-        </a-box>
-
-        <!-- 底座圓環 -->
-        <a-ring 
-          position="0 0.05 0" 
-          rotation="-90 0 0" 
-          radius-inner="0.6" 
-          radius-outer="0.7" 
-          color="#fbc531"
-          animation="property: scale; dir: alternate; to: 1.2 1.2 1.2; loop: true; dur: 1000; easing: easeInOutSine">
-        </a-ring>
-
+    <!-- 玩家 (Hiro Marker) -->
+    <a-marker preset="hiro" id="player-marker">
+      <!-- 這是玩家的「網子」或「準心」，用來碰撞物體 -->
+      <a-entity id="player-collider">
+        <!-- 視覺上的準心 -->
+        <a-ring radius-inner="0.3" radius-outer="0.35" color="#f1c40f" rotation="-90 0 0"></a-ring>
+        <a-cone radius-bottom="0.35" radius-top="0" height="0.5" color="#f1c40f" opacity="0.3" rotation="0 0 0" position="0 0.25 0"></a-cone>
+        <!-- 核心碰撞點顯示 -->
+        <a-sphere radius="0.1" color="red" position="0 0.25 0" opacity="0.8"></a-sphere>
       </a-entity>
-
     </a-marker>
 
-    <!-- 相機 -->
-    <a-entity camera></a-entity>
+    <!-- 相機：漂浮文字將會作為相機的子物件生成，這樣它們會永遠在螢幕前方 -->
+    <a-entity camera id="camera-rig"></a-entity>
+
   </a-scene>
 
-  <!-- 互動邏輯腳本 -->
   <script>
-    // 等待頁面載入完成
-    window.addEventListener('load', () => {
-      const marker = document.querySelector('#hiro-marker');
-      const badge = document.querySelector('#status-badge');
-      const statusText = document.querySelector('#status-text');
+    // --- 遊戲設定 ---
+    const GOOD_WORDS = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
+    const BAD_WORDS = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
+    
+    const SPAWN_INTERVAL = 1500; // 毫秒：生成速度
+    const MOVE_SPEED = 0.005;    // 移動速度
+    const COLLISION_DISTANCE = 0.4; // 碰撞距離判定 (米)
 
-      // 當偵測到標記時
-      marker.addEventListener('markerFound', () => {
-        badge.classList.add('active');
-        statusText.textContent = '已鎖定目標';
-        console.log("Marker Found");
-      });
+    let score = 0;
+    const scoreEl = document.getElementById('score-val');
+    const scoreAnimEl = document.getElementById('score-anim');
+    const scene = document.querySelector('a-scene');
+    const cameraRig = document.querySelector('#camera-rig');
+    const playerCollider = document.querySelector('#player-collider');
+    const playerMarker = document.querySelector('#player-marker');
 
-      // 當標記遺失時
-      marker.addEventListener('markerLost', () => {
-        badge.classList.remove('active');
-        statusText.textContent = '搜尋標記中...';
-        console.log("Marker Lost");
-      });
+    // --- 輔助函式：用 Canvas 繪製文字貼圖 ---
+    // 這解決了 A-Frame 預設不支援中文和 Emoji 的問題
+    function createTextTexture(text, isBad) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      // 背景圓圈
+      ctx.beginPath();
+      ctx.arc(128, 128, 120, 0, 2 * Math.PI);
+      ctx.fillStyle = isBad ? 'rgba(50, 50, 50, 0.8)' : 'rgba(200, 0, 0, 0.8)';
+      ctx.fill();
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = isBad ? '#7f8c8d' : '#f1c40f';
+      ctx.stroke();
+
+      // 文字
+      ctx.font = '140px Arial, "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'white';
+      ctx.fillText(text, 128, 138); // 微調垂直位置
+
+      return canvas.toDataURL();
+    }
+
+    // --- 遊戲邏輯元件 ---
+    AFRAME.registerComponent('floating-item', {
+      schema: {
+        type: { type: 'string', default: 'good' }, // good or bad
+        value: { type: 'string', default: '' }
+      },
+      init: function() {
+        this.isHit = false;
+        
+        // 隨機初始位置 (在相機前方)
+        // X: -2 ~ 2 (左右)
+        // Y: -1 ~ 1 (上下)
+        // Z: -3 ~ -5 (深度，從遠處出現)
+        const startX = (Math.random() - 0.5) * 4;
+        const startY = (Math.random() - 0.5) * 3;
+        const startZ = -4 - (Math.random() * 2); 
+        
+        this.el.setAttribute('position', `${startX} ${startY} ${startZ}`);
+        
+        // 隨機移動方向 (稍微飄動)
+        this.direction = {
+          x: (Math.random() - 0.5) * 0.01,
+          y: (Math.random() - 0.5) * 0.01,
+          z: 0.02 + Math.random() * 0.01 // 主要是往相機方向飛 (Z軸正向)
+        };
+      },
+      tick: function() {
+        if (this.isHit) return;
+
+        const pos = this.el.getAttribute('position');
+        
+        // 移動
+        pos.x += this.direction.x;
+        pos.y += this.direction.y;
+        pos.z += this.direction.z;
+        this.el.setAttribute('position', pos);
+
+        // 旋轉效果
+        this.el.object3D.rotation.z += 0.01;
+
+        // 如果太靠近相機 (穿過螢幕)，就移除
+        if (pos.z > 1) {
+          this.el.parentNode.removeChild(this.el);
+          return;
+        }
+
+        // --- 碰撞偵測 ---
+        // 只有當標記被偵測到時才計算
+        if (playerMarker.object3D.visible) {
+          // 取得「玩家碰撞器」的世界座標
+          const playerPos = new THREE.Vector3();
+          playerCollider.object3D.getWorldPosition(playerPos);
+
+          // 取得「自己」的世界座標
+          const myPos = new THREE.Vector3();
+          this.el.object3D.getWorldPosition(myPos);
+
+          // 計算距離
+          const distance = playerPos.distanceTo(myPos);
+
+          if (distance < COLLISION_DISTANCE) {
+            this.handleCollision();
+          }
+        }
+      },
+      handleCollision: function() {
+        this.isHit = true;
+        
+        // 更新分數
+        const points = this.data.type === 'good' ? 15 : -5;
+        updateScore(points);
+
+        // 播放簡單的消失動畫
+        this.el.setAttribute('animation', {
+          property: 'scale',
+          to: '0 0 0',
+          dur: 200,
+          easing: 'easeInQuad'
+        });
+
+        // 動畫結束後移除 DOM
+        setTimeout(() => {
+          if (this.el.parentNode) {
+            this.el.parentNode.removeChild(this.el);
+          }
+        }, 200);
+      }
     });
+
+    // --- 分數更新 UI ---
+    function updateScore(points) {
+      score += points;
+      scoreEl.innerText = score;
+
+      // 顯示浮動分數動畫
+      scoreAnimEl.innerText = points > 0 ? `+${points}` : points;
+      scoreAnimEl.style.color = points > 0 ? '#4cd137' : '#e84118';
+      scoreAnimEl.style.opacity = '1';
+      scoreAnimEl.style.transform = 'translateY(-20px)';
+      
+      // 取得標記在螢幕上的大概位置 (簡化處理，直接顯示在分數板旁)
+      // 這裡為了簡單，固定在左上角顯示動畫
+      
+      setTimeout(() => {
+        scoreAnimEl.style.opacity = '0';
+        scoreAnimEl.style.transform = 'translateY(0)';
+      }, 600);
+    }
+
+    // --- 生成器 ---
+    setInterval(() => {
+      // 決定生成哪一種 (70% 機率是字詞, 30% 是雜物)
+      const isGood = Math.random() > 0.3;
+      const dataSet = isGood ? GOOD_WORDS : BAD_WORDS;
+      const text = dataSet[Math.floor(Math.random() * dataSet.length)];
+      
+      // 建立實體
+      const el = document.createElement('a-plane');
+      
+      // 設定材質 (使用 Canvas 生成的圖片)
+      const textureUrl = createTextTexture(text, !isGood);
+      el.setAttribute('material', {
+        src: textureUrl,
+        transparent: true,
+        opacity: 1,
+        shader: 'flat' // 不受光照影響，保持清晰
+      });
+
+      el.setAttribute('width', '1');
+      el.setAttribute('height', '1');
+      el.setAttribute('scale', '0.5 0.5 0.5');
+      
+      // 加入自定義元件
+      el.setAttribute('floating-item', {
+        type: isGood ? 'good' : 'bad',
+        value: text
+      });
+
+      // 讓物件面向相機 (Billboard 效果)
+      el.setAttribute('look-at', '[camera]');
+
+      // 將物件掛在 cameraRig 下，這樣它會跟著手機轉動 (HUD 模式)
+      // 或者掛在 scene 下 (World 模式)。
+      // 為了讓遊戲好玩，我們掛在 camera 下，這樣字會一直出現在螢幕視野內，
+      // 玩家必須移動「手上的標記」去追這些字。
+      cameraRig.appendChild(el);
+
+    }, SPAWN_INTERVAL);
+
   </script>
 </body>
 </html>
