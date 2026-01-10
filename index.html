@@ -1,16 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (座標修正版)</title>
+    <title>WebAR 新春碰撞遊戲 (完美鏡像版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <!-- 引入 A-Frame 和 AR.js -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; }
         
+        /* 強制將 Webcam 畫面進行鏡像翻轉，確保視覺上像照鏡子 */
+        #arjs-video {
+            transform: scaleX(-1) !important;
+        }
+
         /* UI 介面層 */
         #ui-layer {
             position: absolute;
@@ -41,15 +45,15 @@
             position: absolute;
             width: 100px;
             height: 100px;
-            border: 3px dashed #FFD700; /* 金色虛線 */
+            border: 3px dashed #FFD700;
             border-radius: 50%;
-            transform: translate(-50%, -50%); /* 居中定位 */
-            display: none; /* 初始隱藏 */
+            transform: translate(-50%, -50%);
+            display: none;
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
             transition: opacity 0.2s;
+            /* 準心也要確保不會被父層影響，雖然它在 UI 層通常沒事 */
         }
 
-        /* 漂浮元素的樣式 */
         .floating-item {
             position: absolute;
             font-size: 45px;
@@ -70,13 +74,11 @@
         .good-item { color: #d32f2f; border: 3px solid #d32f2f; }
         .bad-item { color: #333; border: 3px solid #555; }
 
-        /* 碰撞時的閃爍效果 */
         .hit-effect {
             transform: scale(1.3);
             background: #fffacd !important;
         }
 
-        /* 分數特效 */
         .score-popup {
             position: absolute;
             font-size: 40px;
@@ -123,14 +125,12 @@
 </head>
 <body>
 
-    <!-- UI 層 -->
     <div id="ui-layer">
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="aim-cursor"></div>
         <div id="game-area"></div>
     </div>
 
-    <!-- 開始畫面 -->
     <div id="start-screen">
         <h1 style="font-size: 36px; margin-bottom: 10px;">🧧 WebAR 新春大碰撞 🧧</h1>
         <p style="font-size: 18px; color: #ddd;">請準備好 Hiro Marker</p>
@@ -142,29 +142,22 @@
         <button onclick="startGame()">開始遊戲</button>
     </div>
 
-    <!-- A-Frame AR 場景 -->
     <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;'>
-        
         <a-entity camera></a-entity>
-
-        <!-- Hiro Marker -->
         <a-marker preset="hiro" id="player-marker">
-            <!-- 3D 視覺模型 (紅環) -->
+            <!-- 注意：這裡的 3D 模型不用反轉，因為 CSS 已經翻轉了整個畫面 -->
             <a-entity id="collider" 
                       geometry="primitive: ring; radiusInner: 0.6; radiusOuter: 0.9" 
                       material="color: red; opacity: 0.6; side: double" 
                       rotation="-90 0 0"
-                      position="0 0 0"
-                      scale="-1 1 1">
+                      position="0 0 0">
                 <a-animation attribute="scale" to="1.1 1.1 1.1" direction="alternate" dur="600" repeat="indefinite"></a-animation>
             </a-entity>
             <a-circle color="yellow" radius="0.1" rotation="-90 0 0" position="0 0 0"></a-circle>
         </a-marker>
-
     </a-scene>
 
     <script>
-        // 遊戲數據
         const goodWords = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
         const badWords = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
         
@@ -222,11 +215,9 @@
 
         function gameLoop() {
             if (!isGameRunning) return;
-
             updatePlayerPosition();
             updateItems();
             checkCollisions();
-
             requestAnimationFrame(gameLoop);
         }
 
@@ -238,19 +229,23 @@
                 const camera = document.querySelector('a-scene').camera;
                 vector.project(camera);
 
-                // --- 修正重點 ---
-                // 之前是: ((-vector.x + 1) / 2) -> 導致左右相反
-                // 現在改為: ((vector.x + 1) / 2) -> 正常映射 (左邊是 -1, 右邊是 +1)
-                const screenX = ((vector.x + 1) / 2) * window.innerWidth;
+                // --- 關鍵修正 ---
+                // 1. 我們在 CSS 中使用了 transform: scaleX(-1) 來翻轉 Video 畫面。
+                // 2. 這意味著視覺上：右邊變左邊，左邊變右邊。
+                // 3. 因此，計算座標時，我們必須配合這個視覺翻轉，使用 (-vector.x)
+                // 
+                // 公式解釋：
+                // 如果 vector.x 是 0.5 (右邊)，視覺上它被翻到了左邊。
+                // 我們計算 screenX 時，必須把它當作 -0.5 (左邊) 來計算。
+                // (-0.5 + 1) / 2 = 0.25 (螢幕左側) -> 正確！
                 
-                // Y 軸保持不變 (Three.js Y向上為正，HTML Y向下為正，所以要反轉)
+                const screenX = ((-vector.x + 1) / 2) * window.innerWidth;
                 const screenY = ((-vector.y + 1) / 2) * window.innerHeight;
 
                 playerScreenPos.x = screenX;
                 playerScreenPos.y = screenY;
                 playerScreenPos.visible = true;
 
-                // 更新 2D 準心位置
                 aimCursor.style.display = 'block';
                 aimCursor.style.left = screenX + 'px';
                 aimCursor.style.top = screenY + 'px';
@@ -270,7 +265,6 @@
         function updateItems() {
             items.forEach(item => {
                 if (!item.active) return;
-
                 item.x += item.vx;
                 item.y += item.vy;
 
@@ -290,20 +284,15 @@
 
         function checkCollisions() {
             if (!playerScreenPos.visible) return;
-
-            // 保持高靈敏度設置
             const playerReachRadius = 90; 
 
             items.forEach(item => {
                 if (!item.active) return;
-
                 const itemRadius = item.width / 2;
                 const itemCenterX = item.x + itemRadius;
                 const itemCenterY = item.y + itemRadius;
-
                 const dx = playerScreenPos.x - itemCenterX;
                 const dy = playerScreenPos.y - itemCenterY;
-                
                 const distSq = dx*dx + dy*dy;
                 const threshold = playerReachRadius + itemRadius;
 
@@ -315,10 +304,8 @@
 
         function handleCollision(item) {
             const points = parseInt(item.element.dataset.points);
-            
             score += points;
             scoreEl.innerText = score;
-
             item.element.classList.add('hit-effect');
             showScorePopup(points, item.x, item.y);
             respawnItem(item);
@@ -331,17 +318,12 @@
             popup.style.color = points > 0 ? '#2e7d32' : '#d32f2f';
             popup.style.left = (x + 20) + 'px';
             popup.style.top = (y - 20) + 'px';
-            
             gameArea.appendChild(popup);
-
-            setTimeout(() => {
-                popup.remove();
-            }, 800);
+            setTimeout(() => { popup.remove(); }, 800);
         }
 
         function respawnItem(item) {
             item.active = false;
-            
             item.element.style.transition = 'opacity 0.2s, transform 0.2s';
             item.element.style.opacity = '0';
             item.element.style.transform = 'scale(0)';
@@ -369,10 +351,8 @@
 
                 item.x = newX;
                 item.y = newY;
-                
                 item.vx = (Math.random() - 0.5) * 6;
                 item.vy = (Math.random() - 0.5) * 6;
-
                 item.active = true;
                 
                 requestAnimationFrame(() => {
@@ -390,7 +370,6 @@
                 item.y = Math.min(item.y, window.innerHeight - item.height);
             });
         });
-
     </script>
 </body>
 </html>
