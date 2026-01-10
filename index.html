@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (竹龍升級版)</title>
+    <title>WebAR 新春碰撞遊戲 (大坑火龍真．還原版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     
@@ -10,57 +10,31 @@
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <style>
-        /* --- 基礎設定 --- */
+        /* --- 基礎設定 (保持不變) --- */
         html, body { 
-            margin: 0; 
-            padding: 0; 
-            width: 100%; 
-            height: 100%; 
-            overflow: hidden; 
-            font-family: 'Microsoft YaHei', sans-serif; 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; 
             background-color: #000; 
         }
-
         #arjs-video {
-            width: 100vw !important;
-            height: 100vh !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            z-index: 0 !important;
-            margin: 0 !important;
-            object-fit: cover !important;
-            transform: scaleX(-1) !important;
+            width: 100vw !important; height: 100vh !important;
+            position: absolute !important; top: 0 !important; left: 0 !important;
+            z-index: 0 !important; margin: 0 !important;
+            object-fit: cover !important; transform: scaleX(-1) !important;
         }
-
         #global-bg {
-            position: absolute;
-            top: 0; left: 0; 
-            width: 100%; height: 100%;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: url('image_1.png') no-repeat center center;
-            background-size: cover;
-            z-index: 1; 
-            pointer-events: none; 
-            opacity: 0.9;
+            background-size: cover; z-index: 1; pointer-events: none; opacity: 0.9;
         }
-
         #ui-layer {
-            position: absolute;
-            top: 0; left: 0; 
-            width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 10;
-            overflow: hidden;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 10; overflow: hidden;
         }
-
         #score-board, #timer-board {
-            position: absolute;
-            top: 20px;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 10px 20px;
-            border-radius: 15px;
-            font-size: 20px;
-            font-weight: bold;
+            position: absolute; top: 20px;
+            background: rgba(255, 255, 255, 0.8); padding: 10px 20px;
+            border-radius: 15px; font-size: 20px; font-weight: bold;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
         #score-board { left: 20px; border: 3px solid #d32f2f; color: #d32f2f; }
@@ -68,197 +42,176 @@
 
         /* --- 游標容器 --- */
         #aim-cursor {
-            position: absolute;
-            width: 100px; height: 100px;
-            transform: translate(-50%, -50%);
-            display: none;
+            position: absolute; width: 100px; height: 100px;
+            transform: translate(-50%, -50%); display: none;
             justify-content: center; align-items: center;
             z-index: 15;
-            background: transparent;
-            border: none;
-            box-shadow: none;
         }
 
-        /* --- 關鍵修改：竹子材質龍頭 --- */
+        /* 
+           ========================================
+           🔥 核心修改：大坑火龍 (Fire Dragon) 風格 🔥
+           ========================================
+        */
+
         .dragon-head {
             position: relative;
-            width: 70px; height: 80px;
+            width: 60px; height: 70px;
             
-            /* 1. 基礎竹綠色 */
-            background-color: #558b2f; 
+            /* 1. 草紮/藤編的深色底色 */
+            background-color: #4e342e; 
             
-            /* 2. 複合背景：
-               - 第一層：左右漸層模擬圓柱體光澤 (Highlight/Shadow)
-               - 第二層：上下重複的漸層模擬竹節 (Bamboo Joints)
-            */
-            background-image: 
-                linear-gradient(90deg, rgba(0,0,0,0.3) 0%, rgba(255,255,255,0.2) 30%, rgba(255,255,255,0.2) 60%, rgba(0,0,0,0.3) 100%),
-                repeating-linear-gradient(0deg, transparent 0px, transparent 18px, rgba(0,50,0,0.4) 19px, rgba(0,50,0,0.4) 20px);
+            /* 2. 粗糙的紋理 */
+            background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 2px, transparent 2px, transparent 4px);
             
-            border-radius: 25px 25px 35px 35px;
-            border: 2px solid #33691e; /* 深綠色邊框 */
+            border-radius: 20px;
             
-            /* 模擬線香燃燒的光暈 */
-            box-shadow: 0 0 20px rgba(255, 87, 34, 0.8), inset 0 0 10px rgba(0,0,0,0.5);
-            animation: incense-pulse 1.5s infinite alternate;
+            /* 3. 關鍵魔法：利用 box-shadow 模擬密密麻麻的線香頭 
+               這會產生一圈向外發散的紅點，模擬照片中爆炸般的視覺效果 */
+            box-shadow: 
+                /* 內層密集紅點 */
+                0 -15px 0 -5px #ff5722, 
+                15px -10px 0 -5px #ff5722, 
+                -15px -10px 0 -5px #ff5722,
+                /* 外層發光紅點 */
+                0 -25px 4px -4px #ffeb3b,
+                25px -15px 4px -4px #ffeb3b,
+                -25px -15px 4px -4px #ffeb3b,
+                /* 整體光暈 */
+                0 0 30px rgba(255, 87, 34, 0.6);
+                
+            animation: fire-flicker 0.1s infinite alternate; /* 快速閃爍模擬燃燒 */
         }
 
-        /* 龍角 (木頭質感) */
-        .dragon-horn {
+        /* 模擬插在龍頭上的線香束 (放射狀) */
+        .incense-bundle {
             position: absolute;
-            top: -15px;
-            width: 10px; height: 25px;
-            background: #795548;
-            /* 增加木紋感 */
-            background-image: linear-gradient(90deg, #5d4037 0%, #8d6e63 50%, #5d4037 100%);
-            border-radius: 5px;
-            z-index: -1;
-            border: 1px solid #3e2723;
-        }
-        .horn-left { left: 10px; transform: rotate(-20deg); }
-        .horn-right { right: 10px; transform: rotate(20deg); }
-
-        /* 龍眼 */
-        .dragon-eye {
-            position: absolute;
-            top: 20px;
-            width: 18px; height: 18px;
-            background: radial-gradient(circle at 30% 30%, white 10%, #fff176 80%);
-            border-radius: 50%;
-            border: 2px solid #000;
-            box-shadow: 0 0 8px #ffeb3b;
-            z-index: 2;
-        }
-        .dragon-eye::after {
-            content: ''; position: absolute;
-            top: 50%; left: 50%; width: 6px; height: 8px;
+            top: 50%; left: 50%;
+            width: 100%; height: 100%;
             transform: translate(-50%, -50%);
-            background: black; border-radius: 50%;
+            pointer-events: none;
+        }
+        
+        /* 使用偽元素畫出更多向外輻射的線香 */
+        .incense-bundle::before, .incense-bundle::after {
+            content: ''; position: absolute;
+            top: 50%; left: 50%;
+            background: transparent;
+            width: 2px; height: 2px;
+            border-radius: 50%;
+            /* 利用 box-shadow 畫出散開的點 */
+            box-shadow: 
+                0 -40px 2px #ff3d00, 
+                20px -35px 2px #ff9100, 
+                -20px -35px 2px #ff9100,
+                35px -20px 2px #ff3d00,
+                -35px -20px 2px #ff3d00,
+                40px 0px 2px #ff9100,
+                -40px 0px 2px #ff9100;
+            opacity: 0.9;
+        }
+        .incense-bundle::after {
+            transform: rotate(22deg); /* 錯開角度 */
+            box-shadow: 
+                0 -45px 1px #ffeb3b, 
+                25px -40px 1px #ff5722, 
+                -25px -40px 1px #ff5722;
+        }
+
+        /* 龍角 (稍微隱沒在線香中) */
+        .dragon-horn {
+            position: absolute; top: -10px;
+            width: 8px; height: 20px;
+            background: #5d4037;
+            border-radius: 4px; z-index: -1;
+        }
+        .horn-left { left: 10px; transform: rotate(-15deg); }
+        .horn-right { right: 10px; transform: rotate(15deg); }
+
+        /* 龍眼 (發光的綠色或黃色，在煙霧中很亮) */
+        .dragon-eye {
+            position: absolute; top: 20px;
+            width: 14px; height: 14px;
+            background: #00e676; /* 螢光綠眼珠，對比紅色線香 */
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00e676;
+            z-index: 5;
+            border: 1px solid #004d40;
         }
         .eye-left { left: 8px; }
         .eye-right { right: 8px; }
 
-        /* 龍鼻 (竹子材質，橫向) */
-        .dragon-nose {
-            position: absolute;
-            bottom: 15px; left: 50%;
+        /* 龍嘴 (張開的深色口) */
+        .dragon-mouth {
+            position: absolute; bottom: 10px; left: 50%;
             transform: translateX(-50%);
-            width: 34px; height: 22px;
-            background-color: #689f38;
-            /* 鼻子的竹節 */
-            background-image: 
-                linear-gradient(90deg, rgba(0,0,0,0.2) 0%, rgba(255,255,255,0.3) 50%, rgba(0,0,0,0.2) 100%),
-                repeating-linear-gradient(0deg, transparent 0px, transparent 8px, rgba(0,50,0,0.3) 9px, rgba(0,50,0,0.3) 10px);
-            border-radius: 12px;
-            border: 1px solid #33691e;
-            z-index: 2;
+            width: 40px; height: 20px;
+            background: #3e2723;
+            border-radius: 5px 5px 15px 15px;
+            border: 1px solid #281815;
+            overflow: hidden;
         }
-        /* 鼻孔 */
-        .dragon-nose::before, .dragon-nose::after {
-            content: ''; position: absolute;
-            bottom: 5px; width: 6px; height: 6px;
-            background: #1b5e20; border-radius: 50%;
+        /* 牙齒 */
+        .dragon-mouth::after {
+            content: ''; position: absolute; top: 0; left: 5px;
+            width: 0; height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 8px solid #fff; /* 上排牙齒 */
+            box-shadow: 10px 0 0 #fff, 20px 0 0 #fff; /* 複製牙齒 */
         }
-        .dragon-nose::before { left: 6px; }
-        .dragon-nose::after { right: 6px; }
 
-        /* 龍鬚 (更有彈性的感覺) */
+        /* 龍鬚 (草繩質感) */
         .dragon-whisker {
-            position: absolute;
-            bottom: 12px;
-            width: 45px; height: 25px;
-            border-top: 4px solid #fdd835; /* 金黃色 */
-            border-radius: 50%;
-            z-index: -1;
-            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+            position: absolute; bottom: 5px;
+            width: 50px; height: 30px;
+            border-top: 3px solid #8d6e63; /* 褐色草繩 */
+            border-radius: 50%; z-index: -1;
         }
-        .whisker-left { right: 82%; transform: rotate(25deg); }
-        .whisker-right { left: 82%; transform: rotate(-25deg); }
+        .whisker-left { right: 85%; transform: rotate(20deg); }
+        .whisker-right { left: 85%; transform: rotate(-20deg); }
 
-        /* 線香紅點 */
-        .incense-dot {
-            position: absolute;
-            width: 5px; height: 5px;
-            background: #ff3d00; /* 更亮的紅 */
-            border-radius: 50%;
-            box-shadow: 0 0 6px #ff3d00, 0 0 12px #ff9100; /* 雙層光暈 */
-            animation: glow 0.3s infinite alternate;
-        }
-        /* 增加更多香點，讓它看起來更像火龍 */
-        .dot-1 { top: -2px; left: 32px; }
-        .dot-2 { top: 8px; left: 4px; }
-        .dot-3 { top: 8px; right: 4px; }
-        .dot-4 { bottom: 35px; left: -2px; }
-        .dot-5 { bottom: 35px; right: -2px; }
-        .dot-6 { top: 45px; left: 50%; transform: translateX(-50%); } /* 額頭 */
-
-        @keyframes incense-pulse {
-            0% { box-shadow: 0 0 15px rgba(255, 87, 34, 0.5); }
-            100% { box-shadow: 0 0 35px rgba(255, 87, 34, 0.9); }
-        }
-        @keyframes glow {
-            0% { opacity: 0.6; transform: scale(1); }
-            100% { opacity: 1; transform: scale(1.4); }
+        /* 燃燒閃爍動畫 */
+        @keyframes fire-flicker {
+            0% { opacity: 0.9; transform: scale(1); filter: brightness(1); }
+            100% { opacity: 1; transform: scale(1.02); filter: brightness(1.2); }
         }
 
-        /* --- 掉落物體樣式 --- */
+        /* --- 掉落物體樣式 (保持不變) --- */
         .floating-item {
-            position: absolute;
-            font-size: 40px;
-            font-weight: bold;
+            position: absolute; font-size: 40px; font-weight: bold;
             display: flex; justify-content: center; align-items: center;
-            width: 70px; height: 70px;
-            border-radius: 50%;
+            width: 70px; height: 70px; border-radius: 50%;
             background: rgba(255, 255, 255, 0.9);
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            z-index: 5;
-            will-change: transform, left, top;
+            z-index: 5; will-change: transform, left, top;
         }
         .good-item { color: #d32f2f; border: 3px solid #d32f2f; }
         .bad-item { color: #333; border: 3px solid #555; }
-
         .score-popup {
-            position: absolute;
-            font-size: 36px; font-weight: 900;
-            text-shadow: 1px 1px 0 #fff;
-            animation: floatUp 0.8s ease-out forwards;
+            position: absolute; font-size: 36px; font-weight: 900;
+            text-shadow: 1px 1px 0 #fff; animation: floatUp 0.8s ease-out forwards;
             z-index: 20;
         }
         @keyframes floatUp {
             0% { opacity: 1; transform: translateY(0); }
             100% { opacity: 0; transform: translateY(-60px); }
         }
-
         .overlay-screen {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); 
-            display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            z-index: 30;
-            pointer-events: auto;
-            color: white;
-            text-align: center;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 30;
+            pointer-events: auto; color: white; text-align: center;
         }
         button {
-            padding: 15px 40px; font-size: 22px;
-            background: #d32f2f; color: white;
-            border: none; border-radius: 50px;
-            cursor: pointer; margin-top: 20px;
-            font-weight: bold;
-            box-shadow: 0 0 15px #ff5252;
+            padding: 15px 40px; font-size: 22px; background: #d32f2f; color: white;
+            border: none; border-radius: 50px; cursor: pointer; margin-top: 20px;
+            font-weight: bold; box-shadow: 0 0 15px #ff5252;
         }
-        
         #mute-btn {
-            position: absolute;
-            bottom: 20px; right: 20px;
-            z-index: 40;
-            background: rgba(255,255,255,0.5);
-            border: none; padding: 10px;
-            border-radius: 50%;
-            font-size: 24px;
-            cursor: pointer;
-            pointer-events: auto;
+            position: absolute; bottom: 20px; right: 20px; z-index: 40;
+            background: rgba(255,255,255,0.5); border: none; padding: 10px;
+            border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto;
         }
     </style>
 </head>
@@ -286,23 +239,19 @@
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="timer-board">時間: <span id="timer">60</span></div>
         
-        <!-- 竹龍游標結構 -->
+        <!-- 🔥 大坑火龍游標結構 🔥 -->
         <div id="aim-cursor">
             <div class="dragon-head">
+                <!-- 這一層負責畫出爆炸般的線香 -->
+                <div class="incense-bundle"></div>
+                
                 <div class="dragon-horn horn-left"></div>
                 <div class="dragon-horn horn-right"></div>
                 <div class="dragon-eye eye-left"></div>
                 <div class="dragon-eye eye-right"></div>
-                <div class="dragon-nose"></div>
+                <div class="dragon-mouth"></div> <!-- 嘴巴 -->
                 <div class="dragon-whisker whisker-left"></div>
                 <div class="dragon-whisker whisker-right"></div>
-                <!-- 線香紅點 -->
-                <div class="incense-dot dot-1"></div>
-                <div class="incense-dot dot-2"></div>
-                <div class="incense-dot dot-3"></div>
-                <div class="incense-dot dot-4"></div>
-                <div class="incense-dot dot-5"></div>
-                <div class="incense-dot dot-6"></div>
             </div>
         </div>
 
@@ -312,16 +261,16 @@
 
     <!-- 開始畫面 -->
     <div id="start-screen" class="overlay-screen">
-        <h1>🧧 新春大碰撞 🧧</h1>
+        <h1>🔥 舞火龍大碰撞 🔥</h1>
         <p>請準備好 Hiro Marker!!!!!!</p>
-        <button onclick="startGame()">開始遊戲</button>
+        <button onclick="startGame()">開始舞動</button>
     </div>
 
     <!-- 結束畫面 -->
     <div id="game-over-screen" class="overlay-screen" style="display: none;">
         <h1>時間到！</h1>
         <p>最終分數: <span id="final-score" style="font-size: 40px; font-weight: bold;">0</span></p>
-        <button onclick="startGame()">再玩一次</button>
+        <button onclick="startGame()">再舞一次</button>
     </div>
 
     <!-- AR 場景 -->
