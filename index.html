@@ -23,7 +23,7 @@
     img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 1; mix-blend-mode: lighten; }
     canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
 
-    /* 頂部：改為兩行（第一行：開始 + 選單；第二行：分數 HUD） */
+    /* 頂部：兩行 */
     .ui {
       position: absolute; left: 0; right: 0; top: 0;
       display: grid; gap: 6px; padding: 10px 12px;
@@ -54,9 +54,6 @@
     }
     .ok { color: #22c55e; }
     .bad { color: #f97316; }
-
-    /* 選單觸發鈕（移入 topbar，不再使用絕對定位） */
-    .menuBtn { padding: 8px 12px; font-weight: 700; border-radius: 10px; }
 
     /* 面板與遮罩 */
     .panel-backdrop {
@@ -90,9 +87,9 @@
 
     input[type="range"] { width: 160px; }
     .sliderRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
-    .val { font-variant-numeric: tabular-nums; color: #fcd34d; min-width: 40px; text-align: right; }
+    .val { font-variant-numeric: tabular-nums; color: #fcd34d; min-width: 46px; text-align: right; font-weight: 700; }
 
-    /* 隱藏原底部 bar（改放到面板內） */
+    /* 隱藏原底部 bar */
     .bar { display: none; }
   </style>
 </head>
@@ -150,6 +147,7 @@
           </div>
         </div>
       </div>
+
       <div class="section" style="border-top:1px solid rgba(255,255,255,0.1)">
         <div class="sliderRow">
           <div class="label">Hmin</div>
@@ -201,18 +199,88 @@
           </div>
         </div>
       </div>
+
+      <!-- 新增：Hiro 偵測靈敏度設定 -->
+      <div class="section" style="border-top:1px solid rgba(255,255,255,0.1)">
+        <div class="row" style="justify-content:flex-start; color:#cbd5e1; font-size:13px;">
+          偵測過於靈敏時，可提高面積/周長/方形嚴格度，或增大區塊大小/偏移。
+        </div>
+        <div class="sliderRow">
+          <div class="label">最小面積 (‰)</div>
+          <div class="controls">
+            <input id="areaPpm" type="range" min="1" max="15" value="3">
+            <span id="areaPpmVal" class="val">3‰</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">最小邊長 (px)</div>
+          <div class="controls">
+            <input id="minSide" type="range" min="8" max="80" value="26">
+            <span id="minSideVal" class="val">26</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">邊長比例上限</div>
+          <div class="controls">
+            <input id="ratioTol" type="range" min="110" max="140" step="1" value="118">
+            <span id="ratioTolVal" class="val">1.18×</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">角度容差 (cos)</div>
+          <div class="controls">
+            <input id="angleCos" type="range" min="5" max="35" step="1" value="22">
+            <span id="angleCosVal" class="val">0.22</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">最小周長 (px)</div>
+          <div class="controls">
+            <input id="minPeri" type="range" min="40" max="200" value="80">
+            <span id="minPeriVal" class="val">80</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">區塊大小 S</div>
+          <div class="controls">
+            <input id="thrBlock" type="range" min="9" max="39" step="2" value="19">
+            <span id="thrBlockVal" class="val">19</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">對比偏移 T</div>
+          <div class="controls">
+            <input id="thrOffset" type="range" min="2" max="30" value="8">
+            <span id="thrOffsetVal" class="val">8</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">連續找到幀</div>
+          <div class="controls">
+            <input id="foundFrames" type="range" min="1" max="8" value="3">
+            <span id="foundFramesVal" class="val">3</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">連續遺失幀</div>
+          <div class="controls">
+            <input id="lostFrames" type="range" min="2" max="15" value="8">
+            <span id="lostFramesVal" class="val">8</span>
+          </div>
+        </div>
+      </div>
     </aside>
 
     <div id="hint" class="hint">按「開始」允許相機權限。請將 Hiro 標記展示在鏡頭前。</div>
   </div>
 
-  <!-- 嵌入 js-aruco 以偵測 Hiro marker（增強穩定性） -->
+  <!-- js-aruco（含可調閾值） -->
   <script>
     /*
-     * js-aruco (MIT) - minimal embed with minor enhancements:
-     * - 3x3 box blur before adaptive threshold
-     * - adjustable adaptive threshold parameters
-     * - retains simple square-based detection (Hiro-only)
+     * js-aruco (精簡版，附加：
+     * - 3x3 box blur
+     * - 可調 Adaptive Threshold (S, T)
+     * - 加強幾何過濾以減少誤檢
      */
     /*! js-aruco embedded */
     (function(global){
@@ -325,22 +393,58 @@
       };
 
       AR.Detector = function(){};
-      AR.Detector.prototype.detect = function(imageData){
+      AR.Detector.prototype.detect = function(imageData, cfg){
+        cfg = cfg || {};
+        var S = cfg.blockSize || 19;
+        var T = cfg.offset   || 8;
+        var minArea    = cfg.minArea || 0;
+        var minSide    = cfg.minSide || 0;
+        var ratioTol   = cfg.ratioTol || 1.25;
+        var angleCosTol= cfg.angleCos || 0.3;
+        var minPeri    = cfg.minPeri || 60;
+
         var gray = CV.grayscale(imageData);
         var smooth = CV.boxBlur3(gray);
-        var bin = CV.adaptiveThreshold(smooth, 19, 8); // tuned S,T
+        var bin = CV.adaptiveThreshold(smooth, S, T);
         var contours = CV.findContours(bin);
         var markers=[];
         for(var c of contours){
-          var peri = CV.perimeter(c);
-          if(peri < 60) continue;
-          var w = Math.hypot(c[0].x - c[1].x, c[0].y - c[1].y);
-          var h = Math.hypot(c[1].x - c[2].x, c[1].y - c[2].y);
-          var ratio = w/h;
-          if(ratio<0.8 || ratio>1.25) continue;
-          var approx = CV.approxPolyDP(c, 0.02*peri);
-          if(approx.length !== 4) continue;
-          markers.push(new AR.Marker(0, approx));
+          // 邊長與比例
+          var l01 = Math.hypot(c[0].x - c[1].x, c[0].y - c[1].y);
+          var l12 = Math.hypot(c[1].x - c[2].x, c[1].y - c[2].y);
+          var l23 = Math.hypot(c[2].x - c[3].x, c[2].y - c[3].y);
+          var l30 = Math.hypot(c[3].x - c[0].x, c[3].y - c[0].y);
+          var minL = Math.min(l01,l12,l23,l30);
+          var maxL = Math.max(l01,l12,l23,l30);
+          if (minL < minSide) continue;
+          if (maxL / minL > ratioTol) continue;
+
+          var peri = l01+l12+l23+l30;
+          if (peri < minPeri) continue;
+
+          // 角度接近 90 度
+          function cosAt(i){
+            var p0 = c[(i+3)%4], p1 = c[i], p2 = c[(i+1)%4];
+            var v1x = p0.x - p1.x, v1y = p0.y - p1.y;
+            var v2x = p2.x - p1.x, v2y = p2.y - p1.y;
+            var dot = v1x*v2x + v1y*v2y;
+            var n1 = Math.hypot(v1x,v1y), n2=Math.hypot(v2x,v2y);
+            if (n1===0||n2===0) return 1;
+            return dot/(n1*n2);
+          }
+          var maxCos = Math.max(Math.abs(cosAt(0)), Math.abs(cosAt(1)), Math.abs(cosAt(2)), Math.abs(cosAt(3)));
+          if (maxCos > angleCosTol) continue;
+
+          // 面積
+          var area = 0;
+          for (let i=0;i<4;i++){
+            var a=c[i], b=c[(i+1)%4];
+            area += a.x*b.y - b.x*a.y;
+          }
+          area = Math.abs(area)*0.5;
+          if (area < minArea) continue;
+
+          markers.push(new AR.Marker(0, c));
         }
         return markers;
       };
@@ -391,6 +495,26 @@
     const densityVal = document.getElementById('densityVal');
     const speedVal = document.getElementById('speedVal');
 
+    // 新增：偵測閾值滑桿
+    const areaPpmEl = document.getElementById('areaPpm');
+    const minSideEl = document.getElementById('minSide');
+    const ratioTolEl = document.getElementById('ratioTol');
+    const angleCosEl = document.getElementById('angleCos');
+    const minPeriEl = document.getElementById('minPeri');
+    const thrBlockEl = document.getElementById('thrBlock');
+    const thrOffsetEl = document.getElementById('thrOffset');
+    const foundFramesEl = document.getElementById('foundFrames');
+    const lostFramesEl = document.getElementById('lostFrames');
+    const areaPpmVal = document.getElementById('areaPpmVal');
+    const minSideVal = document.getElementById('minSideVal');
+    const ratioTolVal = document.getElementById('ratioTolVal');
+    const angleCosVal = document.getElementById('angleCosVal');
+    const minPeriVal = document.getElementById('minPeriVal');
+    const thrBlockVal = document.getElementById('thrBlockVal');
+    const thrOffsetVal = document.getElementById('thrOffsetVal');
+    const foundFramesVal = document.getElementById('foundFramesVal');
+    const lostFramesVal = document.getElementById('lostFramesVal');
+
     // ========= 狀態 =========
     let running = false;
     let gameOver = false;
@@ -406,16 +530,27 @@
     let useEnvironment = true;
     let mirrored = false;
 
-    // 偵測節流與滯後
+    // 偵測節流
     const detectInterval = 55; // ms
     let lastDetectTime = 0;
     let lastMarkerResult = null;
     let consecutiveFound = 0;
     let consecutiveLost = 0;
-    const foundThreshold = 3; // 連續偵測幀數才算找到
-    const lostThreshold  = 8; // 連續遺失幀數才算丟失
     let detected = false;
     let lastHintState = 'idle';
+
+    // 偵測配置（可調）
+    const detectCfg = {
+      areaPpm: 3,       // ‰ of scaled frame
+      minSide: 26,      // px
+      ratioTol: 1.18,   // max longest/shortest side
+      angleCos: 0.22,   // |cos(theta)| tolerance to 90°
+      minPeri: 80,      // px
+      blockSize: 19,    // adaptive threshold S (odd)
+      offset: 8,        // adaptive threshold T
+      foundFrames: 3,   // frames to confirm found
+      lostFrames: 8     // frames to confirm lost
+    };
 
     // ========= 單張貼圖（無旋轉）=========
     const dragonImg = new Image();
@@ -516,7 +651,7 @@
       toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`;
     }
 
-    // ========= Hiro 標記偵測（增穩版） =========
+    // ========= Hiro 標記偵測 =========
     const workCanvas = document.createElement('canvas');
     const wctx = workCanvas.getContext('2d', { willReadFrequently: true });
     const detector = new AR.Detector();
@@ -550,17 +685,29 @@
       }
 
       const imageData = wctx.getImageData(0, 0, w, h);
-      const markers = detector.detect(imageData);
+
+      // 計算當前最小面積（依螢幕比例）
+      const minAreaAbs = w * h * (detectCfg.areaPpm / 1000);
+
+      const markers = detector.detect(imageData, {
+        blockSize: detectCfg.blockSize,
+        offset: detectCfg.offset,
+        minArea: minAreaAbs,
+        minSide: detectCfg.minSide,
+        ratioTol: detectCfg.ratioTol,
+        angleCos: detectCfg.angleCos,
+        minPeri: detectCfg.minPeri
+      });
+
       if (!markers || markers.length === 0) return lastMarkerResult = null;
 
-      // choose the largest marker (area) above threshold
-      const areaMin = w * h * 0.0025;
+      // 選最大面積
       let best = null, bestArea = 0;
       for (let i=0;i<markers.length;i++){
         const a = markerArea(markers[i]);
         if (a > bestArea) { bestArea = a; best = markers[i]; }
       }
-      if (!best || bestArea < areaMin) return lastMarkerResult = null;
+      if (!best || bestArea < minAreaAbs) return lastMarkerResult = null;
 
       const corners = best.corners;
       let cx = 0, cy = 0;
@@ -750,7 +897,7 @@
       if (raw) {
         consecutiveFound++;
         consecutiveLost = 0;
-        if (!detected && consecutiveFound >= foundThreshold) {
+        if (!detected && consecutiveFound >= detectCfg.foundFrames) {
           detected = true;
           updateHint('found');
         }
@@ -761,11 +908,11 @@
       } else {
         consecutiveFound = 0;
         consecutiveLost++;
-        if (detected && consecutiveLost >= lostThreshold) {
+        if (detected && consecutiveLost >= detectCfg.lostFrames) {
           detected = false;
           updateHint('search');
         }
-        // 在短暫失連期間保持最後位置，不跳回中心
+        // 短暫遺失時保留最後位置
       }
 
       updateItems(dt);
@@ -874,8 +1021,8 @@
     panelBackdrop.addEventListener('click', closePanel);
 
     // ======== 滑桿數值同步 ========
-    function bindVal(input, labelEl) {
-      const sync = () => labelEl.textContent = input.value;
+    function bindVal(input, labelEl, formatter = v => v) {
+      const sync = () => labelEl.textContent = formatter(input.value);
       input.addEventListener('input', sync);
       sync();
     }
@@ -886,6 +1033,25 @@
     bindVal(sensEl, sensVal);
     bindVal(densEl, densityVal);
     bindVal(speedEl, speedVal);
+
+    // 偵測閾值綁定
+    function bindCfg(input, labelEl, key, mapFn, fmtFn) {
+      const sync = () => {
+        detectCfg[key] = mapFn(input.value);
+        labelEl.textContent = fmtFn(input.value);
+      };
+      input.addEventListener('input', sync);
+      sync();
+    }
+    bindCfg(areaPpmEl, areaPpmVal, 'areaPpm', v => parseInt(v,10), v => `${v}‰`);
+    bindCfg(minSideEl, minSideVal, 'minSide', v => parseInt(v,10), v => `${v}`);
+    bindCfg(ratioTolEl, ratioTolVal, 'ratioTol', v => parseInt(v,10)/100, v => (parseInt(v,10)/100).toFixed(2)+'×');
+    bindCfg(angleCosEl, angleCosVal, 'angleCos', v => parseInt(v,10)/100, v => (parseInt(v,10)/100).toFixed(2));
+    bindCfg(minPeriEl, minPeriVal, 'minPeri', v => parseInt(v,10), v => `${v}`);
+    bindCfg(thrBlockEl, thrBlockVal, 'blockSize', v => parseInt(v,10)|1, v => `${v}`);
+    bindCfg(thrOffsetEl, thrOffsetVal, 'offset', v => parseInt(v,10), v => `${v}`);
+    bindCfg(foundFramesEl, foundFramesVal, 'foundFrames', v => parseInt(v,10), v => `${v}`);
+    bindCfg(lostFramesEl, lostFramesVal, 'lostFrames', v => parseInt(v,10), v => `${v}`);
 
     // 初始
     centroid = { x: W/2, y: H/2 };
