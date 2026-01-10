@@ -1,354 +1,83 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="zh-Hant">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-<title>Hiro Marker Test</title>
-<style>
-  html,body { margin:0; padding:0; width:100%; height:100%; background:#000; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif; color:#fff; }
-  .wrap { position:relative; width:100%; height:100%; background:#000; }
-  video, canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-  .ui { position:absolute; left:0; right:0; top:0; display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:linear-gradient(180deg,rgba(0,0,0,0.6),rgba(0,0,0,0)); z-index:5; }
-  .btn { background:#e11d48; border:none; color:#fff; border-radius:10px; padding:10px 14px; font-weight:700; box-shadow:0 4px 12px rgba(225,29,72,0.35); }
-  .status { font-weight:800; text-shadow:0 2px 8px rgba(0,0,0,0.7); }
-  .ok { color:#22c55e; }
-  .bad { color:#f59e0b; }
-  .hint { position:absolute; left:0; right:0; bottom:0; padding:14px 12px; text-align:center; background:linear-gradient(0deg,rgba(0,0,0,0.7),rgba(0,0,0,0)); font-weight:600; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AR.js Hiro Marker Demo</title>
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- AR.js (marker-based for A-Frame) -->
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: "Noto Sans TC", system-ui, -apple-system, sans-serif;
+      background: #000;
+      height: 100%;
+    }
+    .overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 12px;
+    }
+    .hint {
+      pointer-events: auto;
+      max-width: 480px;
+      width: 100%;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.5;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    .hint strong { color: #4ade80; }
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <video id="cam" playsinline autoplay muted></video>
-  <canvas id="overlay"></canvas>
-  <div class="ui">
-    <button id="startBtn" class="btn">開始</button>
-    <div id="stat" class="status">狀態：待機</div>
+  <div class="overlay">
+    <div class="hint">
+      ✅ 將相機對準 <strong>Hiro</strong> 標記即可看到 3D 方塊。<br>
+      📷 請允許相機權限，並在光線充足、標記平整的環境下使用。
+    </div>
   </div>
-  <div id="hint" class="hint">請用經典 ARToolKit「Hiro」標記：黑框＋白底＋「Hiro」文字，放在鏡頭前 20–60cm。</div>
-</div>
 
-<script>
-(function(global){
-  var CV = {
-    grayscale: function(imageSrc){
-      var src=imageSrc.data, dst=new Uint8Array(imageSrc.width*imageSrc.height);
-      for(var i=0,j=0;i<src.length;i+=4,++j){
-        dst[j]=(src[i]*0.299 + src[i+1]*0.587 + src[i+2]*0.114)|0;
-      }
-      return {width:imageSrc.width,height:imageSrc.height,data:dst};
-    },
-    boxBlur3: function(imageGray){
-      var w=imageGray.width, h=imageGray.height, src=imageGray.data;
-      var dst=new Uint8Array(src.length);
-      for(var y=0;y<h;y++){
-        var ym1 = y>0? y-1 : y, yp1 = y<h-1? y+1 : y;
-        for(var x=0;x<w;x++){
-          var xm1 = x>0? x-1 : x, xp1 = x<w-1? x+1 : x;
-          var sum = src[ym1*w + xm1] + src[ym1*w + x] + src[ym1*w + xp1]
-                  + src[y*w   + xm1] + src[y*w   + x] + src[y*w   + xp1]
-                  + src[yp1*w + xm1] + src[yp1*w + x] + src[yp1*w + xp1];
-          dst[y*w + x] = (sum/9)|0;
-        }
-      }
-      return {width:w,height:h,data:dst};
-    },
-    integralImage: function(imageSrc){
-      var w=imageSrc.width,h=imageSrc.height, src=imageSrc.data, sum=new Int32Array(w*h);
-      for(var y=0;y<h;++y){
-        var row=y*w, rowsum=0;
-        for(var x=0;x<w;++x){
-          rowsum += src[row+x];
-          sum[row+x] = rowsum + (y>0?sum[row-w+x]:0);
-        }
-      }
-      return {width:w,height:h,data:sum};
-    },
-    adaptiveThreshold: function(imageSrc, S, T){
-      var ii=this.integralImage(imageSrc), w=imageSrc.width, h=imageSrc.height, src=imageSrc.data, dst=new Uint8Array(src.length);
-      var s2=S>>1;
-      for(var y=0;y<h;++y){
-        var y0=Math.max(y-s2,0), y1=Math.min(y+s2,h-1);
-        for(var x=0;x<w;++x){
-          var x0=Math.max(x-s2,0), x1=Math.min(x+s2,w-1);
-          var count=(x1-x0+1)*(y1-y0+1);
-          var sum=ii.data[y1*w+x1] - (y0>0?ii.data[(y0-1)*w+x1]:0) - (x0>0?ii.data[y1*w+x0-1]:0) + (x0>0&&y0>0?ii.data[(y0-1)*w+x0-1]:0);
-          dst[y*w+x] = src[y*w+x]*count <= sum*(100-T)/100 ? 0:255;
-        }
-      }
-      return {width:w,height:h,data:dst};
-    },
-    findContours: function(imageSrc){
-      var labels=new Int32Array(imageSrc.data.length), label=1, comps=[];
-      var w=imageSrc.width, h=imageSrc.height, data=imageSrc.data;
-      function bfs(seed){
-        var q=[seed], minx=w, miny=h, maxx=0, maxy=0;
-        labels[seed]=label;
-        while(q.length){
-          var idx=q.pop();
-          var x=idx%w, y=idx/w|0;
-          if(x<minx)minx=x; if(x>maxx)maxx=x; if(y<miny)miny=y; if(y>maxy)maxy=y;
-          var n=[idx-1,idx+1,idx-w,idx+w];
-          for(var k=0;k<4;++k){
-            var ni=n[k];
-            if(ni<0||ni>=data.length) continue;
-            if(labels[ni]||data[ni]) continue;
-            labels[ni]=label; q.push(ni);
-          }
-        }
-        comps.push({minx,miny,maxx,maxy});
-      }
-      for(var i=0;i<data.length;++i){
-        if(data[i]===0 && labels[i]===0){ bfs(i); label++; }
-      }
-      var contours=[];
-      for(var c of comps){
-        contours.push([
-          {x:c.minx,y:c.miny},
-          {x:c.maxx,y:c.miny},
-          {x:c.maxx,y:c.maxy},
-          {x:c.minx,y:c.maxy}
-        ]);
-      }
-      return contours;
-    }
-  };
+  <a-scene
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true"
+    embedded
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+  >
+    <!-- 追蹤 Hiro 標記 -->
+    <a-marker preset="hiro">
+      <!-- 3D 方塊 -->
+      <a-box
+        position="0 0.5 0"
+        depth="1"
+        height="1"
+        width="1"
+        material="color: #4ade80; opacity: 0.9; metalness: 0.1; roughness: 0.6;"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"
+        animation__float="property: position; dir: alternate; loop: true; dur: 1600; easing: easeInOutSine; to: 0 0.7 0"
+      ></a-box>
+      <!-- 光源 -->
+      <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="1 2 1"></a-entity>
+      <a-entity light="type: ambient; color: #cccccc; intensity: 0.5"></a-entity>
+    </a-marker>
 
-  // 取樣工具
-  function bilerp(p0,p1,p2,p3,u,v){
-    var x = (1-u)*(1-v)*p0.x + u*(1-v)*p1.x + u*v*p2.x + (1-u)*v*p3.x;
-    var y = (1-u)*(1-v)*p0.y + u*(1-v)*p1.y + u*v*p2.y + (1-u)*v*p3.y;
-    return {x,y};
-  }
-  function sampleGray(gray, x, y){
-    var w=gray.width,h=gray.height;
-    x=Math.max(0, Math.min(w-1.001, x));
-    y=Math.max(0, Math.min(h-1.001, y));
-    var x0=x|0, y0=y|0;
-    var x1=Math.min(w-1, x0+1), y1=Math.min(h-1, y0+1);
-    var fx=x-x0, fy=y-y0;
-    var d=gray.data;
-    var i00=d[y0*w+x0], i10=d[y0*w+x1], i01=d[y1*w+x0], i11=d[y1*w+x1];
-    return i00*(1-fx)*(1-fy) + i10*fx*(1-fy) + i01*(1-fx)*fy + i11*fx*fy;
-  }
-  function sampleGrid7x7(gray, corners){
-    var pts = corners;
-    var grid = Array.from({length:7}, ()=>Array(7).fill(0));
-    var min=255, max=0, vals=[];
-    for(var r=0;r<7;r++){
-      for(var c=0;c<7;c++){
-        var u=(c+0.5)/7, v=(r+0.5)/7;
-        var p=bilerp(pts[0],pts[1],pts[2],pts[3],u,v);
-        var g=sampleGray(gray,p.x,p.y);
-        vals.push(g);
-        if(g<min)min=g; if(g>max)max=g;
-      }
-    }
-    var thr=(min+max)*0.5;
-    var idx=0;
-    var dark=0, bright=0;
-    for(var r=0;r<7;r++){
-      for(var c=0;c<7;c++,idx++){
-        var bit = vals[idx] < thr ? 1:0;
-        grid[r][c]=bit;
-        if(bit) dark++; else bright++;
-      }
-    }
-    return { grid7:grid, contrast:max-min, thr };
-  }
-
-  // 經典 Hiro：僅要求黑邊框 + 內部多為白色，允許內文字
-  function checkClassicHiro(samp){
-    var g=samp.grid7;
-    // 外框至少 46/48 為黑
-    var borderBlack=0;
-    for(var i=0;i<7;i++){
-      borderBlack += g[0][i] + g[6][i] + g[i][0] + g[i][6];
-    }
-    if(borderBlack < 46) return {ok:false};
-    // 內部白比例 >= 60%，黑比例 <= 40%（允許文字）
-    var innerBlack=0, innerTotal=25;
-    for(var r=1;r<=5;r++){
-      for(var c=1;c<=5;c++){
-        innerBlack += g[r][c];
-      }
-    }
-    var innerWhite = innerTotal - innerBlack;
-    if(innerWhite < innerTotal*0.60) return {ok:false};
-    // 對比要夠
-    if(samp.contrast < 30) return {ok:false};
-    return {ok:true};
-  }
-
-  var AR = {};
-  AR.Marker = function(id,corners){ this.id=id; this.corners=corners; };
-
-  AR.Detector = function(){};
-  AR.Detector.prototype.detect = function(imageData, cfg){
-    cfg = cfg || {};
-    var S = cfg.blockSize || 17;
-    var T = cfg.offset   || 12;
-    var minSide    = cfg.minSide || 24;
-    var ratioTol   = cfg.ratioTol || 1.12;
-    var angleCosTol= cfg.angleCos || 0.22;
-    var minPeri    = cfg.minPeri || 90;
-
-    var gray = CV.grayscale(imageData);
-    var smooth = CV.boxBlur3(gray);
-    var bin = CV.adaptiveThreshold(smooth, S, T);
-    var contours = CV.findContours(bin);
-    var markers=[];
-    for(var c of contours){
-      // 邊長與比例
-      var l01 = Math.hypot(c[0].x - c[1].x, c[0].y - c[1].y);
-      var l12 = Math.hypot(c[1].x - c[2].x, c[1].y - c[2].y);
-      var l23 = Math.hypot(c[2].x - c[3].x, c[2].y - c[3].y);
-      var l30 = Math.hypot(c[3].x - c[0].x, c[3].y - c[0].y);
-      var minL = Math.min(l01,l12,l23,l30);
-      var maxL = Math.max(l01,l12,l23,l30);
-      if (minL < minSide) continue;
-      if (maxL / minL > ratioTol) continue;
-      var peri = l01+l12+l23+l30;
-      if (peri < minPeri) continue;
-      // 角度近 90 度
-      function cosAt(i){
-        var p0=c[(i+3)%4], p1=c[i], p2=c[(i+1)%4];
-        var v1x=p0.x-p1.x, v1y=p0.y-p1.y;
-        var v2x=p2.x-p1.x, v2y=p2.y-p1.y;
-        var dot=v1x*v2x+v1y*v2y;
-        var n1=Math.hypot(v1x,v1y), n2=Math.hypot(v2x,v2y);
-        if(n1===0||n2===0) return 1;
-        return dot/(n1*n2);
-      }
-      var maxCos=Math.max(Math.abs(cosAt(0)),Math.abs(cosAt(1)),Math.abs(cosAt(2)),Math.abs(cosAt(3)));
-      if (maxCos > angleCosTol) continue;
-
-      // 取樣檢查
-      var samp = sampleGrid7x7(smooth, c);
-      var chk = checkClassicHiro(samp);
-      if (!chk.ok) continue;
-
-      markers.push(new AR.Marker(0, c));
-    }
-    return markers;
-  };
-
-  global.CV = CV;
-  global.AR = AR;
-})(window);
-</script>
-
-<script>
-const video = document.getElementById('cam');
-const canvas = document.getElementById('overlay');
-const ctx = canvas.getContext('2d', { alpha:true });
-const startBtn = document.getElementById('startBtn');
-const statEl = document.getElementById('stat');
-const hintEl = document.getElementById('hint');
-
-let W=0,H=0,dpr=1;
-function resize(){
-  dpr = Math.min(window.devicePixelRatio||1, 2);
-  const r = canvas.getBoundingClientRect();
-  W=r.width; H=r.height;
-  canvas.width = Math.round(W*dpr);
-  canvas.height= Math.round(H*dpr);
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-}
-window.addEventListener('resize', resize, {passive:true});
-resize();
-
-let stream=null;
-async function stopCam(){ if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } }
-async function startCam(){
-  await stopCam();
-  const facing = { ideal:'environment' };
-  const tries = [
-    { width:{ideal:1280}, height:{ideal:720} },
-    { width:{ideal:960}, height:{ideal:540} },
-    { width:{ideal:640}, height:{ideal:480} },
-  ];
-  let lastErr=null;
-  for(const c of tries){
-    try{
-      const st = await navigator.mediaDevices.getUserMedia({ video:{...c,facingMode:facing}, audio:false });
-      stream=st; video.srcObject=st; await video.play(); return true;
-    }catch(e){ lastErr=e; }
-  }
-  console.error(lastErr);
-  return false;
-}
-
-const work = document.createElement('canvas');
-const wctx = work.getContext('2d',{willReadFrequently:true});
-const detector = new AR.Detector();
-let lastDetect=0, detectMs=70;
-let found=false, consFound=0, consLost=0;
-
-function drawCorners(c){
-  ctx.strokeStyle = '#22c55e';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(c[0].x,c[0].y);
-  ctx.lineTo(c[1].x,c[1].y);
-  ctx.lineTo(c[2].x,c[2].y);
-  ctx.lineTo(c[3].x,c[3].y);
-  ctx.closePath();
-  ctx.stroke();
-}
-
-function tick(now){
-  ctx.clearRect(0,0,W,H);
-  const vw=video.videoWidth|0, vh=video.videoHeight|0;
-  if(vw && vh && now - lastDetect > detectMs){
-    lastDetect = now;
-    const scale=0.7;
-    const w=Math.min(640, Math.max(96, Math.round(vw*scale)));
-    const h=Math.min(640, Math.max(96, Math.round(vh*scale)));
-    work.width=w; work.height=h;
-    wctx.drawImage(video,0,0,w,h);
-    const img = wctx.getImageData(0,0,w,h);
-    const markers = detector.detect(img,{
-      blockSize:17, offset:12,
-      minSide:32, ratioTol:1.12,
-      angleCos:0.22, minPeri:120
-    });
-    if(markers.length){
-      consFound++; consLost=0;
-      if(consFound>=2) found=true;
-      const m=markers[0];
-      // 映射到畫布座標
-      for(const p of m.corners){
-        p.x = p.x / w * W;
-        p.y = p.y / h * H;
-      }
-      drawCorners(m.corners);
-    }else{
-      consFound=0; consLost++;
-      if(consLost>=4) found=false;
-    }
-  }
-  statEl.textContent = found ? '狀態：Found（已偵測到 Hiro）' : '狀態：Searching（未偵測到）';
-  statEl.className = 'status ' + (found?'ok':'bad');
-  requestAnimationFrame(tick);
-}
-
-startBtn.addEventListener('click', async ()=>{
-  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
-    hintEl.textContent='此瀏覽器不支援相機，請改用新版 Chrome / Safari（HTTPS）。';
-    statEl.textContent='狀態：不支援';
-    return;
-  }
-  startBtn.disabled=true;
-  const ok = await startCam();
-  if(!ok){
-    hintEl.textContent='相機啟動失敗，請檢查權限或改用其他裝置。';
-    startBtn.disabled=false;
-    return;
-  }
-  hintEl.textContent='請將 Hiro 標記置中，距離 20–60cm，保持平整與均勻光線。';
-  requestAnimationFrame(tick);
-});
-
-</script>
+    <!-- 相機 -->
+    <a-entity camera></a-entity>
+  </a-scene>
 </body>
 </html>
