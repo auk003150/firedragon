@@ -1,102 +1,84 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hiro 標記 AR 示例 (A-Frame + AR.js)</title>
-  <!-- A-Frame 與 AR.js（含 aframe-ar.js）CDN -->
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>Hiro Marker AR Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <!-- AR.js for A-Frame -->
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
   <style>
-    html, body {
-      margin: 0;
-      overflow: hidden;
-      height: 100%;
-      background: #000;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
-    }
-    .ui {
+    html, body { margin: 0; padding: 0; overflow: hidden; }
+    body { font-family: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+    .overlay {
       position: fixed;
-      left: 0; right: 0; top: 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.5rem 0.75rem;
-      color: #fff;
-      z-index: 10;
-      pointer-events: none;
+      top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 16px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0));
+      color: #fff; z-index: 10; pointer-events: none;
+      font-size: 14px;
+    }
+    .hint {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      padding: 10px 14px;
+      background: linear-gradient(0deg, rgba(0,0,0,0.7), rgba(0,0,0,0));
+      color: #fff; z-index: 10; text-align: center;
+      font-size: 13px; pointer-events: none;
     }
     .badge {
-      background: rgba(0,0,0,0.45);
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 9999px;
-      padding: 0.25rem 0.6rem;
-      font-size: 0.85rem;
+      background: rgba(255,255,255,0.12);
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.2);
+      pointer-events: auto;
     }
-    .help {
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: 0.75rem;
-      color: #fff;
-      background: rgba(0,0,0,0.45);
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 0.5rem;
-      padding: 0.5rem 0.75rem;
-      font-size: 0.9rem;
-      z-index: 10;
-      pointer-events: none;
-      text-align: center;
-      max-width: 90vw;
-      line-height: 1.4;
+    .link {
+      color: #9ad6ff; text-decoration: underline; pointer-events: auto;
+    }
+    @media (max-width: 640px) {
+      .overlay { font-size: 13px; padding: 10px 12px; }
+      .hint { font-size: 12px; padding: 8px 12px; }
     }
   </style>
 </head>
 <body>
-  <!-- 簡單的 UI 說明 -->
-  <div class="ui">
-    <div class="badge">AR.js + A-Frame</div>
-    <div class="badge">Hiro Marker</div>
+  <div class="overlay">
+    <div class="badge">Hiro Marker AR</div>
+    <div>
+      若未顯示，請確認已允許「攝影機」權限
+    </div>
   </div>
-  <div class="help">
-    請允許攝影機權限，將 Hiro 標記置於鏡頭前（亮度充足、避免反光）。<br/>
-    偵測到標記後會顯示 3D 方塊。
+  <div class="hint">
+    將 Hiro 標記置於鏡頭前方，3D 物件會出現在標記上。<br/>
+    沒有標記？可列印：<a class="link" href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/aframe/examples/marker-training/examples/pattern-files/pattern-hiro.png" target="_blank" rel="noopener">下載 Hiro 圖</a>
   </div>
 
-  <!--
-    arjs 屬性說明：
-    - sourceType: webcam 使用筆電攝影機
-    - detectionMode: mono（單一黑白標記）
-    - matrixCodeType: 以 pattern 為主時可省略；此處採預設
-    - debugUIEnabled: false 關閉內建偵錯 UI（需要可設 true）
-  -->
   <a-scene
-    embedded
     vr-mode-ui="enabled: false"
-    renderer="colorManagement: true; physicallyCorrectLights: true; logarithmicDepthBuffer: true;"
-    arjs="sourceType: webcam; detectionMode: mono; debugUIEnabled: false;"
+    embedded
+    renderer="logarithmicDepthBuffer: true; antialias: true;"
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; maxDetectionRate: 30;"
   >
-    <!-- 環境光與方向光，提高模型可見度 -->
-    <a-entity light="type: ambient; color: #ffffff; intensity: 0.6"></a-entity>
-    <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="1 2 1"></a-entity>
+    <!-- 光源 -->
+    <a-entity light="type: ambient; color: #cccccc"></a-entity>
+    <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="1 1 0.5"></a-entity>
 
-    <!-- Hiro 標記：preset=hiro -->
-    <a-marker type="pattern" preset="hiro">
-      <!-- 在標記上顯示一個立方體，尺寸 1（約等於標記邊長），略高於標記表面 -->
-      <a-box position="0 0.5 0" rotation="0 45 0" depth="1" height="1" width="1" color="#4FC3F7"
-             material="metalness: 0.1; roughness: 0.6;"></a-box>
-      <!-- 可附加文字 -->
-      <a-entity position="0 1.1 0" rotation="-90 0 0"
-                text="value: Hello AR (Hiro)!; align: center; color: #ffffff; width: 2;">
-      </a-entity>
+    <!-- Hiro 標記 -->
+    <a-marker preset="hiro">
+      <!-- 3D 物件：一個旋轉的立方體 -->
+      <a-box position="0 0.5 0" depth="1" height="1" width="1"
+             color="#4FC3F7"
+             animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
+      </a-box>
+      <!-- 一個小圓柱當底座 -->
+      <a-cylinder position="0 0 0" radius="0.35" height="0.1" color="#FFC107"></a-cylinder>
     </a-marker>
 
-    <!-- 當未偵測到任何標記時，AR.js 會隱藏對應的物件 -->
+    <!-- 相機 -->
     <a-entity camera></a-entity>
   </a-scene>
-
-  <!-- 連結：Hiro 標記範本（可於手機顯示或列印）
-       https://raw.githubusercontent.com/AR-js-org/AR.js/master/three.js/data/hiro.patt
-       圖像參考（PDF/PNG 可自行搜尋 "Hiro marker"） -->
 </body>
 </html>
