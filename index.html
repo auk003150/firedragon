@@ -219,13 +219,16 @@
 <body>
 
     <audio id="bgm" loop>
-        <source src="https://actions.google.com/sounds/v1/ambiences/carnival_atmosphere.ogg" type="audio/ogg">
+        <source src="bgm.mp3" type="audio/mp3">
     </audio>
     <audio id="sfx-collect">
         <source src="Collect.mp3" type="audio/mp3">
     </audio>
     <audio id="sfx-crunch">
         <source src="Crunch.mp3" type="audio/mp3">
+    </audio>
+    <audio id="sfx-end">
+        <source src="end.mp3" type="audio/mp3">
     </audio>
 
     <div id="global-bg"></div>
@@ -281,6 +284,7 @@
             bgm: document.getElementById('bgm'),
             collect: document.getElementById('sfx-collect'),
             crunch: document.getElementById('sfx-crunch'), 
+            end: document.getElementById('sfx-end')
         };
         let isMuted = false;
         sounds.bgm.volume = 0.3; 
@@ -557,3 +561,4 @@
     </script>
 </body>
 </html>
+
