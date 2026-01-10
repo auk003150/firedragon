@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (大坑火龍．雙音效版)</title>
+    <title>WebAR 新春碰撞遊戲 (大坑火龍．草紮質感版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     
@@ -58,20 +58,38 @@
 
         /* 
            ========================================
-           🔥 真．大坑火龍 (樣式區) 🔥
+           🔥 真．大坑火龍 (草紮質感優化區) 🔥
            ========================================
         */
         
+        /* 通用的草紮材質 Class */
         .straw-texture {
-            background-color: #3e2723;
-            background-image: repeating-linear-gradient(
-                90deg,
-                rgba(255,255,255,0.1) 0px,
-                rgba(255,255,255,0.1) 1px,
-                transparent 1px,
-                transparent 3px
-            );
-            box-shadow: inset 0 0 5px #000;
+            /* 1. 底色：深褐色的乾草色 */
+            background-color: #5D4037; 
+            
+            background-image: 
+                /* 層次 1: 圓柱體光影 (中間亮，上下暗，模擬立體圓柱) */
+                linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.1) 60%, rgba(0,0,0,0.7) 100%),
+                
+                /* 層次 2: 綑綁的草繩紋理 (橫向的不規則線條) */
+                repeating-linear-gradient(175deg, 
+                    rgba(0,0,0,0) 0px, 
+                    rgba(0,0,0,0) 8px, 
+                    rgba(0,0,0,0.4) 9px, 
+                    rgba(0,0,0,0.4) 11px
+                ),
+
+                /* 層次 3: 草的纖維質感 (密集的直條紋) */
+                repeating-linear-gradient(90deg, 
+                    rgba(255,255,255,0.05) 0px, 
+                    rgba(255,255,255,0.05) 1px, 
+                    transparent 1px, 
+                    transparent 3px
+                );
+            
+            /* 增加內陰影，讓邊緣更厚實 */
+            box-shadow: inset 0 0 10px #281814;
+            border: 1px solid #3e2723;
         }
 
         /* --- 龍頭樣式 --- */
@@ -91,25 +109,49 @@
         .dh-whisker { position: absolute; top: 50px; width: 60px; height: 40px; border-top: 4px solid #8d6e63; border-radius: 50%; z-index: 2; opacity: 0.8; }
         .whisker-left { right: 75px; transform: rotate(20deg); } .whisker-right { left: 75px; transform: rotate(-20deg); }
 
-        /* --- 龍身樣式 --- */
+        /* --- 龍身樣式 (優化版) --- */
         .dragon-body-segment {
             position: absolute;
             width: 60px; height: 60px;
-            border-radius: 50%;
+            /* 讓形狀稍微不規則，不要完美的圓形，更像一捆草 */
+            border-radius: 40% 50% 45% 55%; 
             transform: translate(-50%, -50%);
             display: none; 
+            z-index: 15;
         }
+
+        /* 這是龍身上的「香火」效果：利用 box-shadow 產生多個發光紅點 */
+        .dragon-body-segment::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 4px; height: 4px;
+            background: #ff3d00;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.9;
+            /* 隨機分佈的紅點 (香頭) */
+            box-shadow: 
+                10px -15px 1px #ff1744, 
+                -12px 10px 1px #ff1744, 
+                15px 5px 1px #ff9100,
+                -5px -18px 1px #ff9100,
+                0px 20px 2px #ff3d00,
+                20px 0px 2px #ff3d00,
+                -20px -5px 2px #ff3d00;
+            animation: incense-flicker 0.1s infinite alternate;
+        }
+
+        /* 外部的光暈 (燃燒效果) */
         .dragon-body-segment::after {
             content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            border-radius: 50%;
+            border-radius: 45%;
+            /* 減少原本過強的外部光暈，讓草的質感露出來 */
             box-shadow: 
-                0 -25px 2px #ff3d00, 
-                20px -15px 2px #ff9100, 
-                -20px -15px 2px #ff9100,
-                0 25px 2px #ff3d00,
-                25px 0 2px #ff9100,
-                -25px 0 2px #ff3d00;
+                0 -20px 15px rgba(255, 61, 0, 0.4), 
+                0 20px 15px rgba(255, 61, 0, 0.4);
             animation: burn-twinkle 0.3s infinite alternate;
+            mix-blend-mode: screen; /* 讓光暈疊加更自然 */
         }
 
         /* --- 龍尾樣式 --- */
@@ -137,6 +179,12 @@
         @keyframes smoke-rise { 0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); } 50% { opacity: 0.6; } 100% { opacity: 0; transform: translate(-50%, -60px) scale(2); } }
         @keyframes float-head { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
         @keyframes chew { 0% { transform: translateY(0); } 100% { transform: translateY(3px); } }
+        
+        /* 新增：香火閃爍動畫 */
+        @keyframes incense-flicker {
+            0% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+        }
 
         /* --- 掉落物體樣式 --- */
         .floating-item { position: absolute; font-size: 40px; font-weight: bold; display: flex; justify-content: center; align-items: center; width: 70px; height: 70px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 5; will-change: transform, left, top; }
@@ -159,7 +207,7 @@
     <audio id="sfx-collect">
         <source src="Collect.mp3" type="audio/mp3">
     </audio>
-    <!-- 倒霉字音效 (新增) -->
+    <!-- 倒霉字音效 -->
     <audio id="sfx-crunch">
         <source src="Crunch.mp3" type="audio/mp3">
     </audio>
@@ -221,13 +269,13 @@
         const sounds = {
             bgm: document.getElementById('bgm'),
             collect: document.getElementById('sfx-collect'),
-            crunch: document.getElementById('sfx-crunch'), // 新增
+            crunch: document.getElementById('sfx-crunch'), 
             end: document.getElementById('sfx-end')
         };
         let isMuted = false;
         sounds.bgm.volume = 0.3; 
         sounds.collect.volume = 0.8;
-        sounds.crunch.volume = 0.8; // 設定音量
+        sounds.crunch.volume = 0.8; 
 
         function playSound(name) {
             if (isMuted) return;
@@ -477,13 +525,11 @@
             score += pts;
             scoreEl.innerText = score;
             
-            // --- 這裡修改了音效邏輯 ---
             if (pts > 0) {
-                playSound('collect'); // 吉祥字
+                playSound('collect'); 
             } else {
-                playSound('crunch');  // 倒霉字
+                playSound('crunch');  
             }
-            // ------------------------
 
             const popup = document.createElement('div');
             popup.classList.add('score-popup');
