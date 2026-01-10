@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (全螢幕修正版)</title>
+    <title>WebAR 新春碰撞遊戲 (含音效版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     
@@ -30,21 +30,20 @@
             left: 0 !important;
             z-index: 0 !important;
             margin: 0 !important;
-            object-fit: cover !important; /* 關鍵：裁切畫面以填滿螢幕 */
-            transform: scaleX(-1) !important; /* 鏡像翻轉 */
+            object-fit: cover !important;
+            transform: scaleX(-1) !important;
         }
 
-        /* --- 背景圖層：覆蓋全螢幕並設為 30% 透明度 --- */
+        /* --- 背景圖層 --- */
         #global-bg {
             position: absolute;
             top: 0; left: 0; 
             width: 100%; height: 100%;
-            /* 請確保 image_1.png 存在，或換成您的圖片路徑 */
             background: url('image_1.png') no-repeat center center;
             background-size: cover;
             z-index: 1; 
             pointer-events: none; 
-            opacity: 0.9; /* 透明度 30% */
+            opacity: 0.9;
         }
 
         /* --- UI 層 --- */
@@ -57,7 +56,6 @@
             overflow: hidden;
         }
 
-        /* 分數與時間 */
         #score-board, #timer-board {
             position: absolute;
             top: 20px;
@@ -71,21 +69,19 @@
         #score-board { left: 20px; border: 3px solid #d32f2f; color: #d32f2f; }
         #timer-board { right: 20px; border: 3px solid #1976d2; color: #1976d2; }
 
-        /* 準心 */
         #aim-cursor {
             position: absolute;
             width: 80px; height: 80px;
             border: 3px dashed #FFD700;
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            display: none; /* 偵測到 Marker 才顯示 */
+            display: none;
             justify-content: center; align-items: center;
             z-index: 15;
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
         }
         #aim-cursor::after { content: '+'; color: #FFD700; font-size: 24px; font-weight: bold; }
 
-        /* 漂浮物體 */
         .floating-item {
             position: absolute;
             font-size: 40px;
@@ -101,9 +97,6 @@
         .good-item { color: #d32f2f; border: 3px solid #d32f2f; }
         .bad-item { color: #333; border: 3px solid #555; }
 
-        .hit-effect { transform: scale(1.3); background: #fffacd !important; }
-
-        /* 分數跳出動畫 */
         .score-popup {
             position: absolute;
             font-size: 36px; font-weight: 900;
@@ -116,7 +109,6 @@
             100% { opacity: 0; transform: translateY(-60px); }
         }
 
-        /* 遮罩層 */
         .overlay-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -136,9 +128,37 @@
             font-weight: bold;
             box-shadow: 0 0 15px #ff5252;
         }
+        
+        /* 音效開關按鈕 (選用) */
+        #mute-btn {
+            position: absolute;
+            bottom: 20px; right: 20px;
+            z-index: 40;
+            background: rgba(255,255,255,0.5);
+            border: none; padding: 10px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            pointer-events: auto;
+        }
     </style>
 </head>
 <body>
+
+    <!-- 音效資源 (請替換成你真實的音效連結，這裡使用範例連結) -->
+    <!-- 如果你有自己的 mp3，請把 src 改成本地路徑，例如 'sounds/bgm.mp3' -->
+    <audio id="bgm" loop>
+        <source src="https://actions.google.com/sounds/v1/science_fiction/scifi_industrial_loop.ogg" type="audio/ogg">
+    </audio>
+    <audio id="sfx-good">
+        <source src="https://actions.google.com/sounds/v1/cartoon/pop.ogg" type="audio/ogg">
+    </audio>
+    <audio id="sfx-bad">
+        <source src="https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg" type="audio/ogg">
+    </audio>
+    <audio id="sfx-end">
+        <source src="https://actions.google.com/sounds/v1/cartoon/clown_horn.ogg" type="audio/ogg">
+    </audio>
 
     <!-- 背景圖層 -->
     <div id="global-bg"></div>
@@ -149,6 +169,7 @@
         <div id="timer-board">時間: <span id="timer">60</span></div>
         <div id="aim-cursor"></div>
         <div id="game-area"></div>
+        <button id="mute-btn" onclick="toggleMute()">🔊</button>
     </div>
 
     <!-- 開始畫面 -->
@@ -166,13 +187,47 @@
     </div>
 
     <!-- AR 場景 -->
-    <!-- 注意：vr-mode-ui="enabled: false" 隱藏 VR 按鈕 -->
     <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;' vr-mode-ui="enabled: false">
         <a-entity camera></a-entity>
         <a-marker preset="hiro" id="player-marker"></a-marker>
     </a-scene>
 
     <script>
+        // --- 音效管理 ---
+        const sounds = {
+            bgm: document.getElementById('bgm'),
+            good: document.getElementById('sfx-good'),
+            bad: document.getElementById('sfx-bad'),
+            end: document.getElementById('sfx-end')
+        };
+        let isMuted = false;
+
+        // 設定音量
+        sounds.bgm.volume = 0.4; // 背景音樂小聲一點
+        sounds.good.volume = 0.8;
+        sounds.bad.volume = 0.8;
+
+        function playSound(name) {
+            if (isMuted) return;
+            const audio = sounds[name];
+            if (audio) {
+                audio.currentTime = 0; // 每次播放都重頭開始，適合連擊
+                audio.play().catch(e => console.log("Audio play failed:", e));
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const btn = document.getElementById('mute-btn');
+            if (isMuted) {
+                sounds.bgm.pause();
+                btn.innerText = '🔇';
+            } else {
+                if(isGameRunning) sounds.bgm.play();
+                btn.innerText = '🔊';
+            }
+        }
+
         // --- 遊戲邏輯變數 ---
         const goodWords = ['福', '春', '財', '吉', '祥', '旺'];
         const badWords = ['💣', '💩', '🕷️', '🐍', '🥀'];
@@ -199,33 +254,26 @@
         function fixVideoSize() {
             const video = document.getElementById('arjs-video');
             if (video) {
-                // 強制設定寬高為視窗大小
                 video.style.width = window.innerWidth + 'px';
                 video.style.height = window.innerHeight + 'px';
-                // 強制 object-fit
                 video.style.objectFit = 'cover';
-                // 移除可能導致偏移的 margin
                 video.style.marginLeft = '0px';
                 video.style.marginTop = '0px';
             }
         }
 
-        // 監聽視窗變化並持續修正
         window.addEventListener('resize', () => {
             gameWidth = window.innerWidth;
             gameHeight = window.innerHeight;
             fixVideoSize();
         });
 
-        // 定時檢查影片是否存在並修正 (因為 AR.js 載入需要時間)
         const videoCheckInterval = setInterval(() => {
             const video = document.getElementById('arjs-video');
             if (video) {
                 fixVideoSize();
-                // 監聽影片本身的載入事件
                 video.addEventListener('loadedmetadata', fixVideoSize);
                 video.addEventListener('play', fixVideoSize);
-                // 稍微延遲後停止檢查，避免效能浪費，但 AR.js 有時會重設，所以保留 resize 監聽
                 clearInterval(videoCheckInterval);
             }
         }, 500);
@@ -233,6 +281,11 @@
 
         // --- 遊戲主流程 ---
         function startGame() {
+            // 1. 播放背景音樂 (必須在使用者點擊後觸發)
+            if (!isMuted) {
+                sounds.bgm.play().catch(e => console.log("BGM play failed:", e));
+            }
+
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
             
@@ -244,10 +297,7 @@
             items = [];
             isGameRunning = true;
 
-            // 修正一次影片大小
             fixVideoSize();
-
-            // 生成物體
             spawnItems(6, 'good'); 
             spawnItems(4, 'bad');  
             
@@ -264,6 +314,12 @@
         function endGame() {
             isGameRunning = false;
             clearInterval(timerInterval);
+            
+            // 停止 BGM，播放結束音效
+            sounds.bgm.pause();
+            sounds.bgm.currentTime = 0;
+            playSound('end');
+
             finalScoreEl.innerText = score;
             gameOverScreen.style.display = 'flex';
         }
@@ -296,12 +352,10 @@
         function gameLoop() {
             if (!isGameRunning) return;
             
-            // 1. 更新玩家位置 (Marker)
             if (playerMarker.object3D.visible) {
                 const vector = new THREE.Vector3();
                 playerMarker.object3D.getWorldPosition(vector);
                 
-                // 投影 3D 座標到 2D 螢幕
                 const camera = document.querySelector('a-scene').camera;
                 vector.project(camera);
 
@@ -318,30 +372,24 @@
                 aimCursor.style.display = 'none';
             }
 
-            // 2. 更新漂浮物體位置與碰撞
             items.forEach(item => {
                 if (!item.active) return;
                 
-                // 移動
                 item.x += item.vx;
                 item.y += item.vy;
 
-                // 邊界反彈
                 if (item.x <= 0 || item.x >= gameWidth - item.width) item.vx *= -1;
                 if (item.y <= 0 || item.y >= gameHeight - item.height) item.vy *= -1;
 
-                // 限制在畫面內
                 item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
                 item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
 
                 item.element.style.left = item.x + 'px';
                 item.element.style.top = item.y + 'px';
 
-                // 碰撞偵測
                 if (playerScreenPos.visible) {
                     const dx = playerScreenPos.x - (item.x + item.width/2);
                     const dy = playerScreenPos.y - (item.y + item.height/2);
-                    // 距離小於 (準心半徑 + 物體半徑)
                     if ((dx*dx + dy*dy) < (40 + 35)**2) {
                         handleHit(item);
                     }
@@ -356,7 +404,13 @@
             score += pts;
             scoreEl.innerText = score;
             
-            // 顯示分數特效
+            // 播放對應音效
+            if (pts > 0) {
+                playSound('good');
+            } else {
+                playSound('bad');
+            }
+            
             const popup = document.createElement('div');
             popup.classList.add('score-popup');
             popup.innerText = pts > 0 ? `+${pts}` : pts;
@@ -366,7 +420,6 @@
             gameArea.appendChild(popup);
             setTimeout(() => popup.remove(), 800);
 
-            // 重生物體
             item.active = false;
             item.element.style.opacity = '0';
             setTimeout(() => {
