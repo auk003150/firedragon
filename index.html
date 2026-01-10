@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (純 2D 準心版)</title>
+    <title>WebAR 新春碰撞遊戲 (計時挑戰版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
@@ -10,54 +10,59 @@
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; }
         
-        /* 強制將 Webcam 畫面進行鏡像翻轉，確保視覺上像照鏡子 */
         #arjs-video {
             transform: scaleX(-1) !important;
         }
 
-        /* UI 介面層 */
         #ui-layer {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
             z-index: 10;
         }
 
+        /* 左上角：分數板 */
         #score-board {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 20px; left: 20px;
             background: rgba(255, 255, 255, 0.9);
-            padding: 15px 25px;
+            padding: 10px 20px;
             border-radius: 15px;
             border: 3px solid #d32f2f;
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
             color: #d32f2f;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
 
-        /* 2D 輔助準心 (這是您主要的操作介面) */
+        /* 右上角：計時器 (新增) */
+        #timer-board {
+            position: absolute;
+            top: 20px; right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 15px;
+            border: 3px solid #1976d2;
+            font-size: 24px;
+            font-weight: bold;
+            color: #1976d2;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
         #aim-cursor {
             position: absolute;
-            width: 100px;
-            height: 100px;
-            border: 3px dashed #FFD700; /* 黃色虛線 */
+            width: 100px; height: 100px;
+            border: 3px dashed #FFD700;
             border-radius: 50%;
             transform: translate(-50%, -50%);
             display: none;
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
             transition: opacity 0.2s;
-            /* 增加一個中心點讓瞄準更明確 */
             display: flex;
             justify-content: center;
             align-items: center;
         }
         
-        /* 準心中間的小十字，幫助對準 */
         #aim-cursor::after {
             content: '+';
             color: #FFD700;
@@ -74,8 +79,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            width: 70px;
-            height: 70px;
+            width: 70px; height: 70px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.85);
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
@@ -104,7 +108,8 @@
             100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
         }
 
-        #start-screen {
+        /* 通用全螢幕遮罩 (開始畫面 & 結束畫面) */
+        .overlay-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85);
@@ -119,14 +124,14 @@
         }
 
         button {
-            padding: 20px 40px;
-            font-size: 24px;
+            padding: 15px 35px;
+            font-size: 22px;
             background: #d32f2f;
             color: white;
             border: none;
             border-radius: 50px;
             cursor: pointer;
-            margin-top: 30px;
+            margin-top: 25px;
             font-weight: bold;
             box-shadow: 0 0 15px #ff5252;
             transition: transform 0.1s;
@@ -138,30 +143,38 @@
 
     <div id="ui-layer">
         <div id="score-board">分數: <span id="score">0</span></div>
+        <!-- 新增計時器顯示 -->
+        <div id="timer-board">時間: <span id="timer">60</span></div>
+        
         <div id="aim-cursor"></div>
         <div id="game-area"></div>
     </div>
 
-    <div id="start-screen">
+    <!-- 開始畫面 -->
+    <div id="start-screen" class="overlay-screen">
         <h1 style="font-size: 36px; margin-bottom: 10px;">🧧 WebAR 新春大碰撞 🧧</h1>
         <p style="font-size: 18px; color: #ddd;">請準備好 Hiro Marker</p>
         <div style="margin: 20px; text-align: left; display: inline-block;">
+            <p>⏱️ 限時：<span style="color:#4fc3f7; font-weight:bold;">60 秒</span></p>
             <p>🔴 碰到紅字：<span style="color:#ff5252; font-weight:bold;">+15 分</span></p>
             <p>⚫ 碰到雜物：<span style="color:#aaa; font-weight:bold;">-5 分</span></p>
         </div>
-        <p style="font-size: 14px; color: #aaa;">(移動卡片控制黃色虛線框)</p>
         <button onclick="startGame()">開始遊戲</button>
+    </div>
+
+    <!-- 遊戲結束畫面 (新增) -->
+    <div id="game-over-screen" class="overlay-screen" style="display: none;">
+        <h1 style="font-size: 40px; color: #FFD700;">時間到！</h1>
+        <p style="font-size: 24px;">最終分數</p>
+        <div style="font-size: 60px; font-weight: bold; color: #fff; margin: 10px 0;">
+            <span id="final-score">0</span>
+        </div>
+        <button onclick="startGame()">再玩一次</button>
     </div>
 
     <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;'>
         <a-entity camera></a-entity>
-        
-        <!-- 
-             這裡保留了 a-marker 標籤，因為我們需要它來計算位置 (Tracking)，
-             但是裡面是空的，所以不會有任何 3D 物件顯示出來。
-        -->
-        <a-marker preset="hiro" id="player-marker">
-        </a-marker>
+        <a-marker preset="hiro" id="player-marker"></a-marker>
     </a-scene>
 
     <script>
@@ -169,21 +182,71 @@
         const badWords = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
         
         let score = 0;
+        let timeLeft = 60; // 遊戲時間
         let isGameRunning = false;
         let items = []; 
+        let timerInterval = null;
+
         const gameArea = document.getElementById('game-area');
         const scoreEl = document.getElementById('score');
+        const timerEl = document.getElementById('timer');
         const playerMarker = document.getElementById('player-marker');
         const aimCursor = document.getElementById('aim-cursor');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalScoreEl = document.getElementById('final-score');
         
         let playerScreenPos = { x: -1000, y: -1000, visible: false };
 
         function startGame() {
-            document.getElementById('start-screen').style.display = 'none';
+            // 重置 UI 狀態
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            
+            // 重置遊戲數據
+            score = 0;
+            timeLeft = 60;
+            scoreEl.innerText = score;
+            timerEl.innerText = timeLeft;
+            timerEl.style.color = '#1976d2'; // 重置顏色
+
+            // 清空場上舊物件
+            gameArea.innerHTML = '';
+            items = [];
+
             isGameRunning = true;
+            
+            // 生成新物件
             spawnItems(6, 'good'); 
             spawnItems(4, 'bad');  
+            
+            // 啟動遊戲迴圈
             gameLoop();
+
+            // 啟動計時器
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.innerText = timeLeft;
+
+                // 最後 10 秒變紅色警示
+                if (timeLeft <= 10) {
+                    timerEl.style.color = '#d32f2f';
+                }
+
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function endGame() {
+            isGameRunning = false;
+            clearInterval(timerInterval);
+            
+            // 顯示結算畫面
+            finalScoreEl.innerText = score;
+            gameOverScreen.style.display = 'flex';
         }
 
         function spawnItems(count, type) {
@@ -236,7 +299,6 @@
                 const camera = document.querySelector('a-scene').camera;
                 vector.project(camera);
 
-                // 鏡像翻轉計算
                 const screenX = ((-vector.x + 1) / 2) * window.innerWidth;
                 const screenY = ((-vector.y + 1) / 2) * window.innerHeight;
 
@@ -244,11 +306,10 @@
                 playerScreenPos.y = screenY;
                 playerScreenPos.visible = true;
 
-                aimCursor.style.display = 'flex'; // 確保顯示
+                aimCursor.style.display = 'flex';
                 aimCursor.style.left = screenX + 'px';
                 aimCursor.style.top = screenY + 'px';
                 
-                // 超出邊界時變色提示
                 if (screenX < 0 || screenX > window.innerWidth || screenY < 0 || screenY > window.innerHeight) {
                     aimCursor.style.borderColor = '#ccc';
                     aimCursor.style.opacity = '0.5';
@@ -285,8 +346,7 @@
 
         function checkCollisions() {
             if (!playerScreenPos.visible) return;
-            // 碰撞判定半徑，配合 2D 準心的大小
-            const playerReachRadius = 50; // 準心寬度的一半
+            const playerReachRadius = 50; 
 
             items.forEach(item => {
                 if (!item.active) return;
@@ -331,6 +391,8 @@
             item.element.style.transform = 'scale(0)';
 
             setTimeout(() => {
+                if (!isGameRunning) return; // 如果遊戲已結束就不重生了
+
                 item.element.classList.remove('hit-effect');
                 item.element.style.transition = 'none'; 
                 
