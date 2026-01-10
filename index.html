@@ -3,8 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>大坑舞火龍 AR 小遊戲（Hiro 標記 AR）</title>
+  <title>Hiro Marker AR 小遊戲（計分版）</title>
 
   <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
@@ -13,46 +12,53 @@
 
   <style>
     html, body {
-      margin: 0; padding: 0;
-      height: 100%;
+      margin: 0; padding: 0; height: 100%;
       background: #000; color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "Noto Sans CJK", "PingFang HK", "Heiti TC", Arial, sans-serif;
       overflow: hidden;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      touch-action: manipulation;
     }
-    .wrap { position: relative; width: 100%; height: 100%; background: #000; overflow: hidden; }
-    /* 頂部提示區 */
-    .overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 14px;
+    .wrap { position: relative; width: 100%; height: 100%; background: #000; }
+    /* HUD */
+    .hud {
+      position: fixed; inset: 0 auto auto 0; width: 100%;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      padding: 10px 12px;
       background: linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0));
-      color: #fff; z-index: 10; pointer-events: none;
-      font-size: 14px;
+      z-index: 10; box-sizing: border-box;
     }
-    .badge {
-      background: rgba(255,255,255,0.12);
-      padding: 6px 10px;
-      border-radius: 999px;
+    .pill {
+      background: rgba(0,0,0,0.5);
       border: 1px solid rgba(255,255,255,0.2);
-      pointer-events: auto;
+      border-radius: 999px;
+      padding: 8px 12px;
       font-weight: 700;
+      display: inline-flex; gap: 6px; align-items: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+    }
+    .btn {
+      border: none; border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 800; letter-spacing: 0.2px;
+      color: #fff; background: #e11d48;
+      box-shadow: 0 4px 12px rgba(225,29,72,0.35);
+      cursor: pointer;
+    }
+    .btn.ghost {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: none;
     }
     .hint {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      padding: 10px 14px;
+      position: fixed; left: 0; right: 0; bottom: 0;
+      text-align: center; padding: 10px 14px;
       background: linear-gradient(0deg, rgba(0,0,0,0.7), rgba(0,0,0,0));
-      color: #fff; z-index: 10; text-align: center;
-      font-size: 13px; pointer-events: none;
+      color: #fff; font-size: 13px; z-index: 10;
+      pointer-events: none;
     }
     @media (max-width: 640px) {
-      .overlay { font-size: 13px; padding: 10px 12px; }
+      .hud { gap: 8px; padding: 10px; }
+      .pill { font-size: 14px; }
+      .btn { padding: 10px 12px; }
       .hint { font-size: 12px; padding: 8px 12px; }
     }
     /* 讓 A-Frame 場景填滿容器 */
@@ -66,13 +72,15 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="overlay">
-      <div class="badge">Hiro Marker AR</div>
-      <div>請允許「攝影機」權限後，將 Hiro 標記置於鏡頭前。</div>
+    <!-- HUD -->
+    <div class="hud">
+      <div class="pill">分數：<span id="score">0</span></div>
+      <div class="pill">時間：<span id="time">60</span>s</div>
+      <div class="pill">狀態：<span id="status">等待開始</span></div>
+      <button id="startBtn" class="btn">開始</button>
+      <button id="resetBtn" class="btn ghost">重置</button>
     </div>
-    <div class="hint">
-      若未顯示，請確認已允許攝影機權限，並保持標記平整、光線均勻。
-    </div>
+    <div class="hint" id="hint">請按「開始」並允許攝影機；將 Hiro 標記置於鏡頭前。</div>
 
     <!-- A-Frame + AR.js 場景 -->
     <a-scene
@@ -86,19 +94,106 @@
       <a-entity light="type: directional; color: #ffffff; intensity: 0.85" position="1 1 0.6"></a-entity>
 
       <!-- Hiro 標記 -->
-      <a-marker preset="hiro">
-        <!-- 3D 物件：旋轉立方體 -->
-        <a-box position="0 0.5 0" depth="1" height="1" width="1"
+      <a-marker preset="hiro" id="hiroMarker">
+        <!-- 目標：可點擊的立方體 -->
+        <a-box id="targetBox" class="target"
+               position="0 0.5 0" depth="1" height="1" width="1"
                color="#4FC3F7"
-               animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
+               animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
         </a-box>
         <!-- 底座 -->
         <a-cylinder position="0 0 0" radius="0.35" height="0.1" color="#FFC107"></a-cylinder>
       </a-marker>
 
-      <!-- 相機 -->
-      <a-entity camera></a-entity>
+      <!-- 相機 + 滑鼠射線游標（桌面可點擊） -->
+      <a-entity camera
+                cursor="rayOrigin: mouse; fuse: false"
+                raycaster="objects: .target">
+      </a-entity>
     </a-scene>
   </div>
+
+  <script>
+    const scoreEl = document.getElementById('score');
+    const timeEl = document.getElementById('time');
+    const statusEl = document.getElementById('status');
+    const hintEl = document.getElementById('hint');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const markerEl = document.getElementById('hiroMarker');
+    const targetEl = document.getElementById('targetBox');
+
+    let running = false;
+    let score = 0;
+    let timeLeft = 60;
+    let timerId = null;
+    let markerVisible = false;
+
+    function setStatus(text) { statusEl.textContent = text; }
+    function setHint(text) { hintEl.textContent = text; }
+
+    function startGame() {
+      if (running) return;
+      score = 0; timeLeft = 60; running = true;
+      scoreEl.textContent = score;
+      timeEl.textContent = timeLeft;
+      setStatus('進行中');
+      setHint('偵測到標記時，點擊立方體可得分！');
+      startBtn.disabled = true;
+
+      timerId = setInterval(() => {
+        if (!running) return;
+        timeLeft -= 1;
+        timeEl.textContent = timeLeft;
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+    }
+
+    function endGame() {
+      running = false;
+      startBtn.disabled = false;
+      clearInterval(timerId);
+      setStatus('時間到');
+      setHint('遊戲結束！按「開始」再玩一次。');
+    }
+
+    function resetGame() {
+      running = false;
+      startBtn.disabled = false;
+      clearInterval(timerId);
+      score = 0; timeLeft = 60; markerVisible = false;
+      scoreEl.textContent = score;
+      timeEl.textContent = timeLeft;
+      setStatus('已重置，等待開始');
+      setHint('按「開始」並允許攝影機；將 Hiro 標記置於鏡頭前。');
+    }
+
+    // 標記顯示/消失事件
+    markerEl.addEventListener('markerFound', () => {
+      markerVisible = true;
+      if (running) setStatus('偵測到 Hiro');
+    });
+    markerEl.addEventListener('markerLost', () => {
+      markerVisible = false;
+      if (running) setStatus('標記遺失，請重新對準');
+    });
+
+    // 點擊立方體得分
+    targetEl.addEventListener('click', () => {
+      if (!running || !markerVisible) return;
+      score += 10;
+      scoreEl.textContent = score;
+      // 短暫變色提示命中
+      targetEl.setAttribute('color', '#4ade80');
+      setTimeout(() => targetEl.setAttribute('color', '#4FC3F7'), 180);
+    });
+
+    // 按鈕事件
+    startBtn.addEventListener('click', startGame);
+    resetBtn.addEventListener('click', resetGame);
+
+    // 初始狀態
+    resetGame();
+  </script>
 </body>
 </html>
