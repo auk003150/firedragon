@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (紅眼火龍版)</title>
+    <title>WebAR 新春碰撞遊戲 (白眼火龍版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     
@@ -77,20 +77,20 @@
         .dh-jaw { position: absolute; bottom: 10px; left: 30px; width: 60px; height: 35px; border-radius: 0 0 25px 25px; z-index: 4; animation: chew 1s ease-in-out infinite alternate; }
         
         /* 
-           👀 修改處：龍眼樣式 (紅色版) 👀 
+           👀 修改處：龍眼樣式 (白色版) 👀 
         */
         .dh-eye { 
             position: absolute; top: 20px; width: 24px; height: 24px; 
             /* 
-               1. 漸層改為紅色系：亮紅 (#ff5252) -> 深紅 (#b71c1c) 
+               1. 漸層改為白色系：中心純白 -> 邊緣微灰 (#cfd8dc) 
             */
-            background: radial-gradient(circle, #ff5252 40%, #b71c1c 100%);
+            background: radial-gradient(circle, #fff 40%, #cfd8dc 100%);
             border-radius: 50%; 
             border: 3px solid #3e2723; 
             /* 
-               2. 發光改為紅色光暈 
+               2. 發光改為白色光暈 
             */
-            box-shadow: 0 0 15px rgba(255, 0, 0, 0.8); 
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.9); 
             z-index: 7; 
         }
         
@@ -308,8 +308,8 @@
         }
 
         // --- 遊戲變數 ---
-        const goodWords = ['福', '春', '財', '吉', '祥', '旺', '平安', '健康'];
-        const badWords = ['💣', '💩', '🕷️', '🥀', '霉'];
+        const goodWords = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '馬', '年'];
+        const badWords = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
         let score = 0;
         let timeLeft = 60;
         let isGameRunning = false;
