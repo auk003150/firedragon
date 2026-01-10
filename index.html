@@ -1,17 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (計時挑戰版)</title>
+    <title>WebAR 新春碰撞遊戲 (全螢幕計時版)</title>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <!-- 增加 viewport-fit=cover 以適應 iPhone 瀏海屏 -->
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; }
+        /* 使用 100dvh 來處理手機網址列伸縮問題 */
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100dvh; 
+            overflow: hidden; 
+            font-family: 'Microsoft YaHei', sans-serif; 
+            background-color: black;
+        }
         
         #arjs-video {
             transform: scaleX(-1) !important;
+            max-width: none !important;
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
         }
 
         #ui-layer {
@@ -35,7 +49,7 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
 
-        /* 右上角：計時器 (新增) */
+        /* 右上角：計時器 */
         #timer-board {
             position: absolute;
             top: 20px; right: 20px;
@@ -108,7 +122,7 @@
             100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
         }
 
-        /* 通用全螢幕遮罩 (開始畫面 & 結束畫面) */
+        /* 全螢幕遮罩 */
         .overlay-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -135,6 +149,8 @@
             font-weight: bold;
             box-shadow: 0 0 15px #ff5252;
             transition: transform 0.1s;
+            /* 防止手機點擊產生藍色框 */
+            -webkit-tap-highlight-color: transparent;
         }
         button:active { transform: scale(0.95); }
     </style>
@@ -143,7 +159,6 @@
 
     <div id="ui-layer">
         <div id="score-board">分數: <span id="score">0</span></div>
-        <!-- 新增計時器顯示 -->
         <div id="timer-board">時間: <span id="timer">60</span></div>
         
         <div id="aim-cursor"></div>
@@ -159,10 +174,10 @@
             <p>🔴 碰到紅字：<span style="color:#ff5252; font-weight:bold;">+15 分</span></p>
             <p>⚫ 碰到雜物：<span style="color:#aaa; font-weight:bold;">-5 分</span></p>
         </div>
-        <button onclick="startGame()">開始遊戲</button>
+        <button onclick="startGame()">開始遊戲 (全螢幕)</button>
     </div>
 
-    <!-- 遊戲結束畫面 (新增) -->
+    <!-- 遊戲結束畫面 -->
     <div id="game-over-screen" class="overlay-screen" style="display: none;">
         <h1 style="font-size: 40px; color: #FFD700;">時間到！</h1>
         <p style="font-size: 24px;">最終分數</p>
@@ -172,7 +187,7 @@
         <button onclick="startGame()">再玩一次</button>
     </div>
 
-    <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;'>
+    <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;' vr-mode-ui="enabled: false">
         <a-entity camera></a-entity>
         <a-marker preset="hiro" id="player-marker"></a-marker>
     </a-scene>
@@ -182,7 +197,7 @@
         const badWords = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
         
         let score = 0;
-        let timeLeft = 60; // 遊戲時間
+        let timeLeft = 60;
         let isGameRunning = false;
         let items = []; 
         let timerInterval = null;
@@ -198,38 +213,54 @@
         
         let playerScreenPos = { x: -1000, y: -1000, visible: false };
 
+        // 嘗試進入全螢幕的函式
+        function enterFullScreen() {
+            const doc = document.documentElement;
+            if (doc.requestFullscreen) {
+                doc.requestFullscreen().catch(err => console.log(err));
+            } else if (doc.mozRequestFullScreen) { /* Firefox */
+                doc.mozRequestFullScreen();
+            } else if (doc.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+                doc.webkitRequestFullscreen();
+            } else if (doc.msRequestFullscreen) { /* IE/Edge */
+                doc.msRequestFullscreen();
+            }
+        }
+
         function startGame() {
-            // 重置 UI 狀態
+            // 1. 嘗試觸發全螢幕 (必須在使用者點擊事件中呼叫)
+            enterFullScreen();
+
+            // 2. 重置 UI 狀態
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
             
-            // 重置遊戲數據
+            // 3. 重置遊戲數據
             score = 0;
             timeLeft = 60;
             scoreEl.innerText = score;
             timerEl.innerText = timeLeft;
-            timerEl.style.color = '#1976d2'; // 重置顏色
+            timerEl.style.color = '#1976d2';
 
-            // 清空場上舊物件
+            // 4. 清空場上舊物件
             gameArea.innerHTML = '';
             items = [];
 
             isGameRunning = true;
             
-            // 生成新物件
+            // 5. 生成新物件
             spawnItems(6, 'good'); 
             spawnItems(4, 'bad');  
             
-            // 啟動遊戲迴圈
+            // 6. 啟動遊戲迴圈
             gameLoop();
 
-            // 啟動計時器
+            // 7. 啟動計時器
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 timeLeft--;
                 timerEl.innerText = timeLeft;
 
-                // 最後 10 秒變紅色警示
                 if (timeLeft <= 10) {
                     timerEl.style.color = '#d32f2f';
                 }
@@ -243,8 +274,6 @@
         function endGame() {
             isGameRunning = false;
             clearInterval(timerInterval);
-            
-            // 顯示結算畫面
             finalScoreEl.innerText = score;
             gameOverScreen.style.display = 'flex';
         }
@@ -391,7 +420,7 @@
             item.element.style.transform = 'scale(0)';
 
             setTimeout(() => {
-                if (!isGameRunning) return; // 如果遊戲已結束就不重生了
+                if (!isGameRunning) return;
 
                 item.element.classList.remove('hit-effect');
                 item.element.style.transition = 'none'; 
