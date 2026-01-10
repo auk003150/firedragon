@@ -1,15 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (無全螢幕版)</title>
+    <title>WebAR 新春碰撞遊戲 (背景優化版)</title>
     <meta charset="utf-8">
-    <!-- 增加 viewport-fit=cover 以適應 iPhone 瀏海屏 -->
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <style>
-        /* 使用 100dvh 來處理手機網址列伸縮問題 */
         html, body { 
             margin: 0; 
             padding: 0; 
@@ -26,6 +24,19 @@
             width: 100% !important;
             height: 100% !important;
             object-fit: cover !important;
+            z-index: 0 !important; /* 確保影片在最底層 */
+        }
+
+        /* --- 新增：全域背景圖層 --- */
+        #global-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('image_1.png') no-repeat center center;
+            background-size: cover;
+            z-index: 1; /* 在影片之上，但在 UI 之下 */
+            pointer-events: none; /* 讓點擊穿透 */
+            transition: opacity 1s ease; /* 平滑淡出效果 */
+            opacity: 1; /* 初始狀態：完全顯示 */
         }
 
         #ui-layer {
@@ -35,7 +46,6 @@
             z-index: 10;
         }
 
-        /* 左上角：分數板 */
         #score-board {
             position: absolute;
             top: 20px; left: 20px;
@@ -49,7 +59,6 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
 
-        /* 右上角：計時器 */
         #timer-board {
             position: absolute;
             top: 20px; right: 20px;
@@ -122,18 +131,11 @@
             100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
         }
 
-        /* 全螢幕遮罩 (開始與結束畫面) */
+        /* 遮罩層現在只負責黑色半透明遮罩，不再負責背景圖 */
         .overlay-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            
-            /* --- 背景圖設定 --- */
-            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('image_1.png');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            /* ------------------ */
-
+            background: rgba(0,0,0,0.6); /* 黑色半透明，讓下方的 global-bg 透出來 */
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -162,6 +164,9 @@
     </style>
 </head>
 <body>
+
+    <!-- 獨立的背景圖層 -->
+    <div id="global-bg"></div>
 
     <div id="ui-layer">
         <div id="score-board">分數: <span id="score">0</span></div>
@@ -216,16 +221,18 @@
         const startScreen = document.getElementById('start-screen');
         const gameOverScreen = document.getElementById('game-over-screen');
         const finalScoreEl = document.getElementById('final-score');
+        const globalBg = document.getElementById('global-bg'); // 取得背景圖層
         
         let playerScreenPos = { x: -1000, y: -1000, visible: false };
 
-        // 已移除 enterFullScreen 函式
-
         function startGame() {
-            // 1. 重置 UI 狀態
+            // 1. UI 狀態切換
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
             
+            // 關鍵修改：將背景圖透明度降低，讓攝影機畫面透出來
+            globalBg.style.opacity = '0.3'; 
+
             // 2. 重置遊戲數據
             score = 0;
             timeLeft = 60;
@@ -266,6 +273,10 @@
             isGameRunning = false;
             clearInterval(timerInterval);
             finalScoreEl.innerText = score;
+            
+            // 關鍵修改：遊戲結束時，恢復背景圖亮度
+            globalBg.style.opacity = '1';
+            
             gameOverScreen.style.display = 'flex';
         }
 
