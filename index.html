@@ -87,14 +87,12 @@
     
     let score = 0;
     let markerVisible = false;
-    let markerPosition = new THREE.Vector3();
 
     // 註冊一個組件來處理遊戲邏輯
     AFRAME.registerComponent('game-logic', {
       init: function () {
         this.marker = document.querySelector('#hiro-marker');
         this.scene = document.querySelector('a-scene');
-        this.camera = document.querySelector('[camera]');
         
         // 監聽 Marker 狀態
         this.marker.addEventListener('markerFound', () => {
@@ -108,110 +106,114 @@
           document.getElementById('status-text').style.color = "#ff9800";
         });
 
-        // 定時生成物體 (每 1.5 秒)
+        // 定時生成物體 (每 1.2 秒)
         setInterval(() => {
-          if (document.hidden) return; // 頁面隱藏時不生成
+          if (document.hidden) return; 
           this.spawnItem();
-        }, 1500);
+        }, 1200);
       },
 
       tick: function () {
         if (!markerVisible) return;
 
-        // 更新 Marker 的世界座標
-        // 注意：在 AR.js 中，Marker 通常是固定的，Camera 在動，
-        // 但為了計算相對距離，我們需要獲取 Marker 內容物體的世界座標。
         const playerObj = document.querySelector('#player-box');
         const playerPos = new THREE.Vector3();
         playerObj.object3D.getWorldPosition(playerPos);
 
-        // 檢查所有漂浮物體
         const items = document.querySelectorAll('.floating-item');
         items.forEach(item => {
-          if (item.getAttribute('data-hit') === 'true') return; // 已經撞過的忽略
+          if (item.getAttribute('data-hit') === 'true') return; 
 
           const itemPos = new THREE.Vector3();
           item.object3D.getWorldPosition(itemPos);
 
-          // 計算距離 (簡單的球體碰撞檢測)
           const distance = playerPos.distanceTo(itemPos);
 
-          // 閾值設為 0.8 (根據物體大小調整)
-          if (distance < 0.8) {
-            this.handleCollision(item, playerPos);
+          // 碰撞距離閾值
+          if (distance < 0.7) {
+            this.handleCollision(item);
           }
         });
       },
 
       spawnItem: function () {
-        // 隨機決定是好詞還是壞詞 (60% 機率出好詞)
         const isGood = Math.random() > 0.4;
         const textSet = isGood ? GOOD_WORDS : BAD_WORDS;
         const text = textSet[Math.floor(Math.random() * textSet.length)];
-        const color = isGood ? '#FFD700' : '#FF5252'; // 金色 vs 紅色
+        const color = isGood ? '#FFD700' : '#FF5252';
 
         const el = document.createElement('a-entity');
         el.setAttribute('class', 'floating-item');
         el.setAttribute('data-type', isGood ? 'good' : 'bad');
         el.setAttribute('data-hit', 'false');
 
-        // 隨機位置生成 (在相機視野前方的一個範圍內)
-        // X: -3 到 3, Y: -1 到 3, Z: -5 到 -2 (相機前方)
-        // 這裡我們將物體放在世界座標系中，而不是綁定在 Marker 上
-        const x = (Math.random() - 0.5) * 6;
-        const y = (Math.random() - 0.5) * 4; 
-        const z = - (Math.random() * 3 + 2); // 距離相機 2~5 米處
-
-        el.setAttribute('position', `${x} ${y} ${z}`);
-
-        // 創建文字實體 (為了支援中文，需要使用支援 unicode 的字體，或者這裡用 text 組件的默認字體可能不支援中文)
-        // 由於 A-Frame 默認字體不支援中文，這裡我們使用一個開源的中文字體 MSDF，或者簡單地用圖片代替。
-        // 為了演示方便且確保代碼單一性，我們使用 A-Frame 默認 text，但這通常無法顯示中文。
-        // **修正策略**：為了確保中文顯示，我們使用 HTML Canvas 繪製文字轉為 Texture，或者使用 a-text 的 custom font。
-        // 這裡採用最簡單的替代方案：如果無法加載中文字體，建議用 Emoji 或簡單圖形。
-        // 但既然題目要求特定中文字，我們嘗試使用開源的 Noto Sans CJK MSDF 字體 URL (如果有)，
-        // 或者更穩健的方法：使用 Canvas 貼圖。下面我用一個簡單的 Canvas 貼圖組件來解決中文顯示問題。
+        // --- 位置與移動邏輯修改 ---
         
+        // 1. 設定初始位置
+        // X: 左右範圍 (-3 到 3)
+        // Y: 上下範圍 (-1 到 3)
+        // Z: 深度固定在 -2 到 -4 之間 (這樣大小看起來比較一致，且在手臂可及範圍內)
+        const startX = (Math.random() - 0.5) * 6;
+        const startY = (Math.random() - 0.5) * 4 + 1; 
+        const fixedZ = - (Math.random() * 2 + 2); // Z 軸固定，不參與動畫變化
+
+        el.setAttribute('position', `${startX} ${startY} ${fixedZ}`);
+
+        // 2. 設定漂浮目標位置 (上下左右隨機移動)
+        // 我們讓它在初始位置的基礎上，隨機偏移一點點
+        const moveX = (Math.random() - 0.5) * 3; // 左右漂移幅度
+        const moveY = (Math.random() - 0.5) * 3; // 上下漂移幅度
+
+        // 3. 設定動畫
+        // property: position
+        // to: 新的 X, Y, 但 Z 保持不變 (這樣視覺尺寸就不會變)
+        // dir: alternate (來回移動，像在漂浮)
+        // loop: true (循環)
+        // easing: easeInOutSine (平滑的正弦波移動)
+        el.setAttribute('animation', `
+          property: position; 
+          to: ${startX + moveX} ${startY + moveY} ${fixedZ}; 
+          dur: ${3000 + Math.random() * 2000}; 
+          easing: easeInOutSine; 
+          loop: true; 
+          dir: alternate
+        `);
+        
+        // 繪製文字
         el.setAttribute('canvas-text', `text: ${text}; color: ${color}`);
         
-        // 添加動畫：緩慢飄向相機或隨機移動
-        el.setAttribute('animation', `property: position; to: ${x} ${y + 1} ${z + 2}; dur: 8000; easing: linear`);
-        
-        // 添加自毀計時器 (10秒後消失)
+        // 12秒後自動消失，避免場景物件過多
         setTimeout(() => {
           if (el.parentNode) el.parentNode.removeChild(el);
-        }, 10000);
+        }, 12000);
 
-        // 讓文字始終面向相機
+        // 始終面向相機
         el.setAttribute('look-at', '[camera]');
 
         this.scene.appendChild(el);
       },
 
-      handleCollision: function (item, pos) {
+      handleCollision: function (item) {
         item.setAttribute('data-hit', 'true');
         const type = item.getAttribute('data-type');
         
-        // 計算分數
         let points = 0;
         if (type === 'good') {
           points = 15;
           score += 15;
-          // 播放一個簡單的縮放動畫表示被吃掉
+          // 吃到時變大消失 (僅作為反饋動畫)
           item.setAttribute('animation__hit', 'property: scale; to: 2 2 2; dur: 200; easing: easeOutQuad');
           item.setAttribute('animation__fade', 'property: opacity; to: 0; dur: 200; easing: easeOutQuad');
         } else {
           points = -5;
           score -= 5;
-          // 壞東西縮小消失
+          // 扣分時縮小消失
           item.setAttribute('animation__hit', 'property: scale; to: 0.1 0.1 0.1; dur: 200; easing: easeInQuad');
         }
 
-        // 更新 UI
         document.getElementById('score-val').innerText = score;
         this.showFloatingScore(points);
 
-        // 移除物體
         setTimeout(() => {
           if (item.parentNode) item.parentNode.removeChild(item);
         }, 200);
@@ -229,7 +231,7 @@
       }
     });
 
-    // 解決中文顯示問題的組件：將文字畫在 Canvas 上並作為貼圖
+    // 文字貼圖組件
     AFRAME.registerComponent('canvas-text', {
       schema: {
         text: {type: 'string', default: ''},
@@ -258,10 +260,8 @@
         const ctx = this.ctx;
         const w = this.canvas.width;
         const h = this.canvas.height;
-        
         ctx.clearRect(0, 0, w, h);
         
-        // 畫圓形背景
         ctx.beginPath();
         ctx.arc(w/2, h/2, w/2 - 10, 0, 2 * Math.PI);
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -270,16 +270,15 @@
         ctx.lineWidth = 10;
         ctx.stroke();
 
-        // 畫文字
         ctx.font = 'bold 140px "Microsoft JhengHei", Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = this.data.color;
-        ctx.fillText(this.data.text, w/2, h/2 + 15); // 微調垂直位置
+        ctx.fillText(this.data.text, w/2, h/2 + 15);
       }
     });
 
-    // Look-at Component (簡化版，讓物體面向相機)
+    // 面向相機組件
     AFRAME.registerComponent('look-at', {
       schema: { type: 'selector' },
       tick: function () {
@@ -288,7 +287,6 @@
         }
       }
     });
-
   </script>
 </head>
 <body>
@@ -315,24 +313,20 @@
     renderer="logarithmicDepthBuffer: true; antialias: true;"
     arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; maxDetectionRate: 30;"
   >
-    <!-- 光源 -->
     <a-entity light="type: ambient; color: #ffffff; intensity: 0.7"></a-entity>
     <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="-1 1 0"></a-entity>
 
-    <!-- Hiro 標記 (玩家控制器) -->
+    <!-- Hiro 標記 (玩家) -->
     <a-marker id="hiro-marker" preset="hiro">
-      <!-- 玩家的碰撞體 (視覺化為一個半透明盒子) -->
       <a-box id="player-box" 
              position="0 0.5 0" 
              depth="0.8" height="0.8" width="0.8"
              material="color: #4FC3F7; opacity: 0.5; transparent: true"
              animation="property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear">
       </a-box>
-      <!-- 核心 -->
       <a-sphere position="0 0.5 0" radius="0.2" color="#fff"></a-sphere>
     </a-marker>
 
-    <!-- 相機 -->
     <a-entity camera></a-entity>
   </a-scene>
 </body>
