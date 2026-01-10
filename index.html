@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (含音效版)</title>
+    <title>WebAR 新春碰撞遊戲 (舞火龍版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     
@@ -69,19 +69,110 @@
         #score-board { left: 20px; border: 3px solid #d32f2f; color: #d32f2f; }
         #timer-board { right: 20px; border: 3px solid #1976d2; color: #1976d2; }
 
+        /* --- 改造後的舞火龍游標 (CSS Art) --- */
         #aim-cursor {
             position: absolute;
-            width: 80px; height: 80px;
-            border: 3px dashed #FFD700;
-            border-radius: 50%;
+            width: 100px; height: 100px;
             transform: translate(-50%, -50%);
-            display: none;
+            display: none; /* JS 控制顯示 */
             justify-content: center; align-items: center;
             z-index: 15;
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            /* 移除舊的邊框，改用透明背景容器 */
+            background: transparent;
+            border: none;
+            box-shadow: none;
         }
-        #aim-cursor::after { content: '+'; color: #FFD700; font-size: 24px; font-weight: bold; }
 
+        /* 龍頭主體 (綠色竹草) */
+        .dragon-head {
+            position: relative;
+            width: 70px; height: 80px;
+            background: #2E7D32; /* 竹子綠 */
+            border-radius: 25px 25px 35px 35px;
+            border: 2px solid #FFD700;
+            /* 模擬線香燃燒的光暈 */
+            box-shadow: 0 0 20px rgba(255, 87, 34, 0.8), inset 0 0 10px rgba(0,0,0,0.5);
+            animation: incense-pulse 1.5s infinite alternate;
+        }
+
+        /* 龍角 */
+        .dragon-horn {
+            position: absolute;
+            top: -15px;
+            width: 10px; height: 25px;
+            background: #8D6E63;
+            border-radius: 5px;
+            z-index: -1;
+        }
+        .horn-left { left: 10px; transform: rotate(-20deg); }
+        .horn-right { right: 10px; transform: rotate(20deg); }
+
+        /* 龍眼 */
+        .dragon-eye {
+            position: absolute;
+            top: 20px;
+            width: 16px; height: 16px;
+            background: white;
+            border-radius: 50%;
+            border: 2px solid #000;
+            box-shadow: 0 0 5px #ffeb3b;
+        }
+        .dragon-eye::after {
+            content: ''; position: absolute;
+            top: 4px; left: 4px; width: 6px; height: 6px;
+            background: black; border-radius: 50%;
+        }
+        .eye-left { left: 10px; }
+        .eye-right { right: 10px; }
+
+        /* 龍鼻/嘴 */
+        .dragon-nose {
+            position: absolute;
+            bottom: 15px; left: 50%;
+            transform: translateX(-50%);
+            width: 30px; height: 20px;
+            background: #1B5E20;
+            border-radius: 15px;
+        }
+
+        /* 龍鬚 (CSS 線條) */
+        .dragon-whisker {
+            position: absolute;
+            bottom: 10px;
+            width: 40px; height: 20px;
+            border-top: 3px solid #FFEB3B;
+            border-radius: 50%;
+            z-index: -1;
+        }
+        .whisker-left { right: 85%; transform: rotate(20deg); }
+        .whisker-right { left: 85%; transform: rotate(-20deg); }
+
+        /* 線香紅點裝飾 (模擬插在龍頭上的香) */
+        .incense-dot {
+            position: absolute;
+            width: 6px; height: 6px;
+            background: #FF5722;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #FF5722;
+            animation: glow 0.5s infinite alternate;
+        }
+        /* 隨機分布幾個紅點 */
+        .dot-1 { top: -5px; left: 30px; }
+        .dot-2 { top: 5px; left: 5px; }
+        .dot-3 { top: 5px; right: 5px; }
+        .dot-4 { bottom: 30px; left: -5px; }
+        .dot-5 { bottom: 30px; right: -5px; }
+
+        @keyframes incense-pulse {
+            0% { box-shadow: 0 0 15px rgba(255, 87, 34, 0.6); }
+            100% { box-shadow: 0 0 30px rgba(255, 87, 34, 1); }
+        }
+        @keyframes glow {
+            0% { opacity: 0.7; transform: scale(1); }
+            100% { opacity: 1; transform: scale(1.3); }
+        }
+
+        /* --- 掉落物體樣式 --- */
         .floating-item {
             position: absolute;
             font-size: 40px;
@@ -129,7 +220,6 @@
             box-shadow: 0 0 15px #ff5252;
         }
         
-        /* 音效開關按鈕 (選用) */
         #mute-btn {
             position: absolute;
             bottom: 20px; right: 20px;
@@ -145,8 +235,7 @@
 </head>
 <body>
 
-    <!-- 音效資源 (請替換成你真實的音效連結，這裡使用範例連結) -->
-    <!-- 如果你有自己的 mp3，請把 src 改成本地路徑，例如 'sounds/bgm.mp3' -->
+    <!-- 音效資源 -->
     <audio id="bgm" loop>
         <source src="https://actions.google.com/sounds/v1/science_fiction/scifi_industrial_loop.ogg" type="audio/ogg">
     </audio>
@@ -167,7 +256,26 @@
     <div id="ui-layer">
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="timer-board">時間: <span id="timer">60</span></div>
-        <div id="aim-cursor"></div>
+        
+        <!-- 改造後的舞火龍游標結構 -->
+        <div id="aim-cursor">
+            <div class="dragon-head">
+                <div class="dragon-horn horn-left"></div>
+                <div class="dragon-horn horn-right"></div>
+                <div class="dragon-eye eye-left"></div>
+                <div class="dragon-eye eye-right"></div>
+                <div class="dragon-nose"></div>
+                <div class="dragon-whisker whisker-left"></div>
+                <div class="dragon-whisker whisker-right"></div>
+                <!-- 線香紅點 -->
+                <div class="incense-dot dot-1"></div>
+                <div class="incense-dot dot-2"></div>
+                <div class="incense-dot dot-3"></div>
+                <div class="incense-dot dot-4"></div>
+                <div class="incense-dot dot-5"></div>
+            </div>
+        </div>
+
         <div id="game-area"></div>
         <button id="mute-btn" onclick="toggleMute()">🔊</button>
     </div>
@@ -202,8 +310,7 @@
         };
         let isMuted = false;
 
-        // 設定音量
-        sounds.bgm.volume = 0.4; // 背景音樂小聲一點
+        sounds.bgm.volume = 0.4; 
         sounds.good.volume = 0.8;
         sounds.bad.volume = 0.8;
 
@@ -211,7 +318,7 @@
             if (isMuted) return;
             const audio = sounds[name];
             if (audio) {
-                audio.currentTime = 0; // 每次播放都重頭開始，適合連擊
+                audio.currentTime = 0; 
                 audio.play().catch(e => console.log("Audio play failed:", e));
             }
         }
@@ -281,7 +388,6 @@
 
         // --- 遊戲主流程 ---
         function startGame() {
-            // 1. 播放背景音樂 (必須在使用者點擊後觸發)
             if (!isMuted) {
                 sounds.bgm.play().catch(e => console.log("BGM play failed:", e));
             }
@@ -315,7 +421,6 @@
             isGameRunning = false;
             clearInterval(timerInterval);
             
-            // 停止 BGM，播放結束音效
             sounds.bgm.pause();
             sounds.bgm.currentTime = 0;
             playSound('end');
@@ -390,7 +495,8 @@
                 if (playerScreenPos.visible) {
                     const dx = playerScreenPos.x - (item.x + item.width/2);
                     const dy = playerScreenPos.y - (item.y + item.height/2);
-                    if ((dx*dx + dy*dy) < (40 + 35)**2) {
+                    // 碰撞判定範圍稍微調大一點，配合龍頭大小
+                    if ((dx*dx + dy*dy) < (50 + 35)**2) {
                         handleHit(item);
                     }
                 }
@@ -404,7 +510,6 @@
             score += pts;
             scoreEl.innerText = score;
             
-            // 播放對應音效
             if (pts > 0) {
                 playSound('good');
             } else {
