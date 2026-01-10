@@ -1,50 +1,207 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-HK">
 <head>
-  <meta charset="UTF-8" />
-  <title>Hiro Marker AR Demo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- A-Frame -->
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <!-- AR.js for A-Frame -->
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>大坑舞火龍 AR 小遊戲</title>
   <style>
-    html, body { margin: 0; padding: 0; overflow: hidden; }
-    body { font-family: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
-    .overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 16px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0));
-      color: #fff; z-index: 10; pointer-events: none;
-      font-size: 14px;
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%; background: #000; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans HK", "Noto Sans CJK", "PingFang HK", "Heiti TC", Arial, sans-serif;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      touch-action: manipulation;
     }
+    .wrap { position: relative; width: 100%; height: 100%; background: #000; }
+    video#cam {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      transform: none; background: #000;
+    }
+    img#bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 1; mix-blend-mode: lighten; }
+    canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; pointer-events: none; }
+
+    /* 頂部：兩行 */
+    .ui {
+      position: absolute; left: 0; right: 0; top: 0;
+      display: grid; gap: 6px; padding: 10px 12px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0));
+      user-select: none; z-index: 20;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      flex-wrap: nowrap;
+    }
+    .hudbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+
+    .btn { background: #e11d48; border: none; color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(225,29,72,0.35); }
+    .btn.secondary { background:#334155; box-shadow: 0 4px 12px rgba(15,23,42,0.35); }
+    .btn.ghost { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; box-shadow: none; }
+    .btn:disabled { opacity: 0.6; }
+    .btn:active { transform: translateY(1px); }
+
+    .hud { display: flex; gap: 10px; align-items: center; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,0.6); flex-wrap: wrap; }
+    .chip { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 6px 10px; font-size: 14px; }
+
+    /* 底部提示 */
     .hint {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      padding: 10px 14px;
-      background: linear-gradient(0deg, rgba(0,0,0,0.7), rgba(0,0,0,0));
-      color: #fff; z-index: 10; text-align: center;
-      font-size: 13px; pointer-events: none;
+      position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+      text-align: center; padding: 0 16px; color: #ffd166; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.7); z-index: 5;
     }
-    .badge {
-      background: rgba(255,255,255,0.12);
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.2);
-      pointer-events: auto;
+    .ok { color: #22c55e; }
+    .bad { color: #f97316; }
+
+    /* 面板與遮罩 */
+    .panel-backdrop {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.4); z-index: 30;
+      opacity: 0; pointer-events: none; transition: opacity .2s ease;
     }
-    .link {
-      color: #9ad6ff; text-decoration: underline; pointer-events: auto;
+    .panel {
+      position: absolute; top: 0; right: 0; height: 100%;
+      background: rgba(17,24,39,0.9); backdrop-filter: blur(10px);
+      border-left: 1px solid rgba(255,255,255,0.12);
+      width: min(420px, 92vw);
+      transform: translateX(100%);
+      transition: transform .25s ease;
+      z-index: 31; color: #fff; overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
-    @media (max-width: 640px) {
-      .overlay { font-size: 13px; padding: 10px 12px; }
-      .hint { font-size: 12px; padding: 8px 12px; }
+    .panel.open { transform: translateX(0); }
+    .panel-backdrop.open { opacity: 1; pointer-events: auto; }
+
+    .panel header {
+      position: sticky; top: 0; background: rgba(17,24,39,0.95);
+      padding: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1);
     }
+    .panel h2 { margin: 0; font-size: 16px; }
+    .panel .section { padding: 12px; display: grid; gap: 12px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .row .label { font-size: 14px; color: #e5e7eb; }
+    .row .controls { display: flex; align-items: center; gap: 8px; }
+    .mini { padding: 8px 10px; font-weight: 600; font-size: 12px; border-radius: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2); color: #fff; }
+    .danger { background: #7f1d1d; border-color: rgba(255,255,255,0.25); }
+
+    input[type="range"] { width: 160px; }
+    .sliderRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+    .val { font-variant-numeric: tabular-nums; color: #fcd34d; min-width: 52px; text-align: right; font-weight: 700; }
+
+    /* 隱藏原底部 bar */
+    .bar { display: none; }
   </style>
 </head>
 <body>
+  <div class="wrap">
+    <video id="cam" playsinline autoplay muted></video>
+    <img id="bg" alt="背景" src="image_1.png" />
+    <canvas id="game"></canvas>
+
+    <!-- 頂部：分兩行 -->
+    <div class="ui">
+      <div class="topbar">
+        <button id="startBtn" class="btn">開始</button>
+        <button id="menuBtn" class="btn ghost menuBtn">≡ 選單</button>
+      </div>
+      <div class="hudbar">
+        <div class="hud">
+          <div class="chip">分數：<span id="score">0</span></div>
+          <div class="chip">Combo：<span id="combo">0</span></div>
+          <div class="chip">時間：<span id="time">60</span>s</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 面板與遮罩 -->
+    <div id="panelBackdrop" class="panel-backdrop"></div>
+    <aside id="panel" class="panel" aria-hidden="true">
+      <header>
+        <h2>設定</h2>
+        <button id="closePanel" class="btn ghost" aria-label="關閉">✕</button>
+      </header>
+      <div class="section">
+        <div class="row">
+          <div class="label">鏡頭</div>
+          <div class="controls">
+            <button id="toggleFacing" class="mini">切換鏡頭</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="label">鏡像</div>
+          <div class="controls">
+            <button id="toggleMirror" class="mini">鏡像：關</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="label">螢幕</div>
+          <div class="controls">
+            <button id="fullscreenBtn" class="mini">全屏</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="label">遊戲</div>
+          <div class="controls">
+            <button id="resetBtn" class="mini danger">重置</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" style="border-top:1px solid rgba(255,255,255,0.1)">
+        <div class="sliderRow">
+          <div class="label">Hmin</div>
+          <div class="controls">
+            <input id="hMin" type="range" min="0" max="360" value="330">
+            <span id="hMinVal" class="val">330</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">Hmax</div>
+          <div class="controls">
+            <input id="hMax" type="range" min="0" max="360" value="20">
+            <span id="hMaxVal" class="val">20</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">Smin</div>
+          <div class="controls">
+            <input id="sMin" type="range" min="0" max="100" value="50">
+            <span id="sMinVal" class="val">50</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">Vmin</div>
+          <div class="controls">
+            <input id="vMin" type="range" min="0" max="100" value="40">
+            <span id="vMinVal" class="val">40</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">靈敏度</div>
+          <div class="controls">
+            <input id="sens" type="range" min="0" max="300" value="80">
+            <span id="sensVal" class="val">80</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">目標密度</div>
+          <div class="controls">
+            <input id="density" type="range" min="1" max="10" value="4">
+            <span id="densityVal" class="val">4</span>
+          </div>
+        </div>
+        <div class="sliderRow">
+          <div class="label">速度</div>
+          <div class="controls">
+            <input id="speed" type="range" min="1" max="10" value="5">
+            <span id="speedVal" class="val">5</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
   <div class="overlay">
     <div class="badge">Hiro Marker AR</div>
     <div>
@@ -80,5 +237,607 @@
     <!-- 相機 -->
     <a-entity camera></a-entity>
   </a-scene>
+
+  <script>
+    // ========= DOM =========
+    const video = document.getElementById('cam');
+    const bgImg = document.getElementById('bg');
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d', { alpha: true });
+
+    const startBtn = document.getElementById('startBtn');
+
+    // 面板 DOM
+    const menuBtn = document.getElementById('menuBtn');
+    const panel = document.getElementById('panel');
+    const panelBackdrop = document.getElementById('panelBackdrop');
+    const closePanelBtn = document.getElementById('closePanel');
+
+    const resetBtn = document.getElementById('resetBtn');
+    const toggleFacingBtn = document.getElementById('toggleFacing');
+    const toggleMirrorBtn = document.getElementById('toggleMirror');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+    const scoreEl = document.getElementById('score');
+    const comboEl = document.getElementById('combo');
+    const timeEl = document.getElementById('time');
+    const hintEl = document.getElementById('hint');
+
+    // 滑桿與數值
+    const hMinEl = document.getElementById('hMin');
+    const hMaxEl = document.getElementById('hMax');
+    const sMinEl = document.getElementById('sMin');
+    const vMinEl = document.getElementById('vMin');
+    const sensEl = document.getElementById('sens');
+    const densEl = document.getElementById('density');
+    const speedEl = document.getElementById('speed');
+    const hMinVal = document.getElementById('hMinVal');
+    const hMaxVal = document.getElementById('hMaxVal');
+    const sMinVal = document.getElementById('sMinVal');
+    const vMinVal = document.getElementById('vMinVal');
+    const sensVal = document.getElementById('sensVal');
+    const densityVal = document.getElementById('densityVal');
+    const speedVal = document.getElementById('speedVal');
+
+    // 偵測閾值滑桿
+    const areaPpmEl = document.getElementById('areaPpm');
+    const minSideEl = document.getElementById('minSide');
+    const ratioTolEl = document.getElementById('ratioTol');
+    const angleCosEl = document.getElementById('angleCos');
+    const minPeriEl = document.getElementById('minPeri');
+    const thrBlockEl = document.getElementById('thrBlock');
+    const thrOffsetEl = document.getElementById('thrOffset');
+    const foundFramesEl = document.getElementById('foundFrames');
+    const lostFramesEl = document.getElementById('lostFrames');
+    const areaPpmVal = document.getElementById('areaPpmVal');
+    const minSideVal = document.getElementById('minSideVal');
+    const ratioTolVal = document.getElementById('ratioTolVal');
+    const angleCosVal = document.getElementById('angleCosVal');
+    const minPeriVal = document.getElementById('minPeriVal');
+    const thrBlockVal = document.getElementById('thrBlockVal');
+    const thrOffsetVal = document.getElementById('thrOffsetVal');
+    const foundFramesVal = document.getElementById('foundFramesVal');
+    const lostFramesVal = document.getElementById('lostFramesVal');
+
+    // ========= 狀態 =========
+    let running = false;
+    let gameOver = false;
+    let W = 0, H = 0, dpr = 1;
+
+    let score = 0, combo = 0, timeLeft = 60;
+    let timerId = null;
+
+    let centroid = { x: 0, y: 0 };
+    const smoothing = 0.22; // 更平滑
+
+    let useEnvironment = true;
+    let mirrored = false;
+
+    // 偵測節流
+    const detectInterval = 60; // ms
+    let lastDetectTime = 0;
+    let lastMarkerResult = null;
+    let consecutiveFound = 0;
+    let consecutiveLost = 0;
+    let detected = false;
+    let lastHintState = 'idle';
+
+    // 偵測配置（可調，嚴格缺省）
+    const detectCfg = {
+      areaPpm: 6,       // ‰ of scaled frame
+      minSide: 32,      // px
+      ratioTol: 1.12,   // max longest/shortest side
+      angleCos: 0.18,   // |cos(theta)| tolerance to 90°
+      minPeri: 110,     // px
+      blockSize: 17,    // adaptive threshold S (odd)
+      offset: 12,       // adaptive threshold T
+      foundFrames: 3,   // frames to confirm found
+      lostFrames: 6     // frames to confirm lost
+    };
+
+    // ========= 單張貼圖（無旋轉）=========
+    const dragonImg = new Image();
+    dragonImg.src = 'image_2.png';
+    let dragonImgReady = false;
+    dragonImg.onload = () => { dragonImgReady = true; };
+
+    const sprite = {
+      drawWidth: 90,
+      drawHeight: 90,
+      headAnchorX: 0.6,
+      headAnchorY: 0.6,
+      fineOffsetX: 0,
+      fineOffsetY: -0.1
+    };
+
+    // 文字目標
+    const goodList = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
+    const badList  = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
+    const items = [];
+    const MAX_ITEMS = 14;
+
+    // 粒子
+    const particles = [];
+    const MAX_PARTICLES = 1200;
+
+    // ========= 畫布大小 =========
+    let resizeTimer = null;
+    function resize() {
+      const doResize = () => {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const rect = canvas.getBoundingClientRect();
+        W = rect.width; H = rect.height;
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(doResize, 50);
+    }
+    window.addEventListener('resize', resize, { passive: true });
+    window.addEventListener('orientationchange', () => setTimeout(resize, 150), { passive: true });
+    resize();
+
+    // ========= 能力檢查 =========
+    function supported() {
+      const ok = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      if (!ok) {
+        hintEl.textContent = '此裝置或瀏覽器不支援相機。請使用最新版 Chrome / Safari 並確保 HTTPS。';
+        hintEl.className = 'hint bad';
+      }
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        hintEl.textContent = '請使用 HTTPS 網站以開啟相機權限。';
+        hintEl.className = 'hint bad';
+      }
+      return ok;
+    }
+
+    // ========= 相機 =========
+    let currentStream = null;
+    async function stopStream() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+        currentStream = null;
+      }
+    }
+    async function initCamera() {
+      const kinds = [
+        { width: { ideal: 1280 }, height: { ideal: 720 } },
+        { width: { ideal: 960 }, height: { ideal: 540 } },
+        { width: { ideal: 640 }, height: { ideal: 480 } }
+      ];
+      const facing = useEnvironment ? { ideal: 'environment' } : { ideal: 'user' };
+      let lastErr = null;
+      await stopStream();
+      for (const res of kinds) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { ...res, facingMode: facing }
+          });
+          currentStream = stream;
+          video.srcObject = stream;
+          video.playsInline = true;
+          await video.play().catch(()=>{});
+          applyMirror();
+          return true;
+        } catch (err) { lastErr = err; }
+      }
+      console.error('Camera init failed:', lastErr);
+      hintEl.textContent = '相機無法啟動，請檢查權限/瀏覽器設定或改用其他裝置。';
+      hintEl.className = 'hint bad';
+      return false;
+    }
+
+    function applyMirror() {
+      video.style.transform = mirrored ? 'scaleX(-1)' : 'none';
+      toggleMirrorBtn.textContent = `鏡像：${mirrored ? '開' : '關'}`;
+    }
+
+    // ========= Hiro 標記偵測（嚴格網格驗證）=========
+    const workCanvas = document.createElement('canvas');
+    const wctx = workCanvas.getContext('2d', { willReadFrequently: true });
+    const detector = new AR.Detector();
+
+    function markerArea(marker){
+      const cs = marker.corners;
+      let area = 0;
+      for (let i=0;i<cs.length;i++){
+        const c0 = cs[i], c1 = cs[(i+1)%cs.length];
+        area += c0.x*c1.y - c1.x*c0.y;
+      }
+      return Math.abs(area) * 0.5;
+    }
+
+    function trackHiroMarker(now = performance.now()) {
+      if (now - lastDetectTime < detectInterval) return lastMarkerResult;
+      lastDetectTime = now;
+
+      const vw = video.videoWidth|0, vh = video.videoHeight|0;
+      if (vw === 0 || vh === 0) return lastMarkerResult = null;
+
+      const scale = 0.7;
+      const w = Math.min(640, Math.max(48, Math.round(vw * scale)));
+      const h = Math.min(640, Math.max(48, Math.round(vh * scale)));
+      workCanvas.width = w; workCanvas.height = h;
+
+      try {
+        wctx.drawImage(video, 0, 0, w, h);
+      } catch (e) {
+        return lastMarkerResult = null;
+      }
+
+      const imageData = wctx.getImageData(0, 0, w, h);
+
+      // 計算當前最小面積（依縮放後大小）
+      const minAreaAbs = w * h * (detectCfg.areaPpm / 1000);
+
+      const markers = detector.detect(imageData, {
+        blockSize: detectCfg.blockSize,
+        offset: detectCfg.offset,
+        minArea: minAreaAbs,
+        minSide: detectCfg.minSide,
+        ratioTol: detectCfg.ratioTol,
+        angleCos: detectCfg.angleCos,
+        minPeri: detectCfg.minPeri
+      });
+
+      if (!markers || markers.length === 0) return lastMarkerResult = null;
+
+      // 選最大面積且對比高者
+      let best = null, bestScore = 0;
+      for (let i=0;i<markers.length;i++){
+        const a = markerArea(markers[i]);
+        const score = a * (1 + markers[i].contrast * 0.01);
+        if (score > bestScore) { bestScore = score; best = markers[i]; }
+      }
+      if (!best) return lastMarkerResult = null;
+
+      const corners = best.corners;
+      let cx = 0, cy = 0;
+      for (const c of corners){ cx += c.x; cy += c.y; }
+      cx /= corners.length; cy /= corners.length;
+
+      const canvasX = (cx / w) * W;
+      const canvasY = (cy / h) * H;
+      const finalX = mirrored ? (W - canvasX) : canvasX;
+
+      return lastMarkerResult = { x: finalX, y: canvasY, area: bestScore };
+    }
+
+    // ========= 目標物件 =========
+    function spawnItem() {
+      const isGood = Math.random() < 0.6;
+      const text = isGood ? goodList[Math.floor(Math.random()*goodList.length)] : badList[Math.floor(Math.random()*badList.length)];
+      const size = 28 + Math.random()*18;
+      const margin = 28 + size;
+      const x = margin + Math.random()*(W - margin*2);
+      const y = 80 + Math.random()*(H - 160);
+      const speed = parseInt(speedEl.value, 10);
+      const vx = (Math.random()-0.5)*speed;
+      const vy = (Math.random()-0.5)*speed;
+      const ttl = 12 + Math.random()*10;
+      items.push({ x,y,vx,vy,text,size,isGood,ttl });
+    }
+    function ensureItems() {
+      const target = parseInt(densEl.value, 10) * 3;
+      while (items.length < Math.min(MAX_ITEMS, target)) spawnItem();
+    }
+    function updateItems(dt) {
+      for (let i=items.length-1; i>=0; i--){
+        const it=items[i];
+        it.x += it.vx; it.y += it.vy; it.ttl -= dt;
+        if (it.x<20 || it.x>W-20) it.vx*=-1;
+        if (it.y<60 || it.y>H-60) it.vy*=-1;
+        if (it.ttl<=0) items.splice(i,1);
+      }
+      ensureItems();
+    }
+    function drawItems(ctx) {
+      for (const it of items){
+        ctx.save();
+        ctx.font = `700 ${it.size}px system-ui, "Noto Color Emoji", "Apple Color Emoji"`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.shadowColor = it.isGood ? 'rgba(255,215,0,0.9)' : 'rgba(255,90,0,0.7)';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = it.isGood ? '#ffd166' : '#ff6b6b';
+        ctx.fillText(it.text, it.x, it.y);
+        ctx.restore();
+      }
+    }
+
+    // ========= 粒子效果 =========
+    function spawnIncenseParticles(pos, dir, count=6) {
+      for (let i=0; i<count; i++){
+        if (particles.length >= MAX_PARTICLES) break;
+        const angle = Math.atan2(dir.y, dir.x) + (Math.random()*0.8 - 0.4);
+        const speed = 40 + Math.random()*120;
+        const vx = Math.cos(angle)*speed;
+        const vy = Math.sin(angle)*speed - Math.random()*20;
+        particles.push({
+          x: pos.x + (Math.random()*6-3),
+          y: pos.y + (Math.random()*6-3),
+          vx, vy,
+          life: 0.45 + Math.random()*0.35,
+          age: 0,
+          size: 2 + Math.random()*2.5,
+          hue: 20 + Math.random()*20
+        });
+      }
+    }
+    function updateParticles(dt) {
+      for (let i=particles.length-1; i>=0; i--){
+        const p = particles[i];
+        p.age += dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 20 * dt;
+        if (p.age >= p.life) particles.splice(i,1);
+      }
+    }
+    function drawParticles(ctx) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of particles){
+        const t = p.age / p.life;
+        const alpha = 1 - t;
+        const size = p.size * (0.8 + 0.4*(1-t));
+        const col = `hsla(${p.hue}, 90%, ${60 - t*30}%, ${alpha})`;
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(p.x, p.y, size, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // ========= 單張貼圖繪製（無旋轉）=========
+    function drawDragon(ctx, head) {
+      if (!dragonImgReady) return;
+
+      const imgW = sprite.drawWidth;
+      const imgH = sprite.drawHeight;
+
+      ctx.save();
+      ctx.translate(head.x, head.y);
+
+      const headOffsetX = -imgW * sprite.headAnchorX + (sprite.fineOffsetX || 0);
+      const headOffsetY = -imgH * sprite.headAnchorY + (sprite.fineOffsetY ? sprite.fineOffsetY * imgH : 0);
+      ctx.translate(headOffsetX, headOffsetY);
+
+      ctx.drawImage(dragonImg, 0, -imgH * 0.5, imgW, imgH);
+
+      spawnIncenseParticles({ x: 0, y: 0 }, { x: 1, y: 0 }, 8);
+      ctx.restore();
+    }
+
+    // ========= 碰撞與得分 =========
+    function circleHit(ax, ay, bx, by, r) {
+      const dx = ax - bx, dy = ay - by;
+      return (dx*dx + dy*dy) <= r*r;
+    }
+    function handleCollisions(head) {
+      for (let i=items.length-1; i>=0; i--){
+        const it=items[i];
+        const radius = Math.max(24, sprite.drawHeight * 0.35);
+        if (circleHit(head.x, head.y, it.x, it.y, radius)){
+          if (it.isGood){
+            combo++;
+            const bonus = 10 + Math.min(60, combo*2);
+            score += bonus;
+            flash('+ ' + bonus, it.x, it.y, true);
+          } else {
+            combo = 0;
+            score = Math.max(0, score - 15);
+            flash('− 15', it.x, it.y, false);
+          }
+          items.splice(i,1);
+          scoreEl.textContent = score;
+          comboEl.textContent = combo;
+        }
+      }
+    }
+
+    const floatTexts = [];
+    function flash(text, x, y, ok) { floatTexts.push({ text, x, y, ok, t: 0 }); }
+    function drawFloatTexts(dt) {
+      for (let i=floatTexts.length-1; i>=0; i--){
+        const f=floatTexts[i]; f.t += dt;
+        const alpha = Math.max(0, 1 - f.t/1.2);
+        const dy = -f.t*40;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = '800 22px system-ui';
+        ctx.textAlign = 'center'; ctx.textBaseline='middle';
+        ctx.fillStyle = f.ok ? '#22c55e' : '#f97316';
+        ctx.fillText(f.text, f.x, f.y + dy);
+        ctx.restore();
+        if (alpha <= 0.01) floatTexts.splice(i,1);
+      }
+    }
+
+    // ========= 主循環 =========
+    function updateHint(state) {
+      if (state === lastHintState) return;
+      lastHintState = state;
+      if (state === 'found') {
+        hintEl.textContent = '已偵測到 Hiro 標記，請保持平整、置中且光線均勻。';
+        hintEl.className = 'hint ok';
+      } else if (state === 'search') {
+        hintEl.textContent = '未偵測到 Hiro 標記，請置中 20–60cm，並確保光線充足。';
+        hintEl.className = 'hint bad';
+      } else {
+        hintEl.textContent = '按「開始」允許相機權限。請將 Hiro 標記展示在鏡頭前。';
+        hintEl.className = 'hint';
+      }
+    }
+
+    let lastTime = performance.now();
+    function tick(now) {
+      const dt = Math.min(0.033, (now - lastTime) / 1000);
+      lastTime = now;
+
+      ctx.clearRect(0, 0, W, H);
+
+      const raw = trackHiroMarker(now);
+      if (raw) {
+        consecutiveFound++;
+        consecutiveLost = 0;
+        if (!detected && consecutiveFound >= detectCfg.foundFrames) {
+          detected = true;
+          updateHint('found');
+        }
+        if (detected) {
+          centroid.x = centroid.x ? (centroid.x + (raw.x - centroid.x) * smoothing) : raw.x;
+          centroid.y = centroid.y ? (centroid.y + (raw.y - centroid.y) * smoothing) : raw.y;
+        }
+      } else {
+        consecutiveFound = 0;
+        consecutiveLost++;
+        if (detected && consecutiveLost >= detectCfg.lostFrames) {
+          detected = false;
+          updateHint('search');
+        }
+        // 短暫遺失時保留最後位置
+      }
+
+      updateItems(dt);
+      drawItems(ctx);
+
+      const head = { x: centroid.x || W/2, y: centroid.y || H/2 };
+      drawDragon(ctx, head);
+
+      updateParticles(dt);
+      drawParticles(ctx);
+
+      handleCollisions(head);
+      drawFloatTexts(dt);
+
+      if (running && !gameOver) requestAnimationFrame(tick);
+    }
+
+    // ========= 控制 =========
+    function startGameLoop() {
+      if (running) return;
+      running = true; gameOver = false;
+      lastTime = performance.now();
+      ensureItems();
+      clearInterval(timerId);
+      timeLeft = 60;
+      timeEl.textContent = timeLeft;
+      timerId = setInterval(() => {
+        timeLeft--; timeEl.textContent = timeLeft;
+        if (timeLeft <= 0) {
+          clearInterval(timerId);
+          running = false; gameOver = true;
+          hintEl.textContent = `時間到！總分：${score}`;
+          hintEl.className = 'hint';
+          startBtn.disabled = false;
+        }
+      }, 1000);
+      requestAnimationFrame(tick);
+    }
+
+    async function startAll() {
+      if (!supported()) return;
+      startBtn.disabled = true;
+      try {
+        const ok = await initCamera();
+        if (ok) {
+          updateHint('search');
+          startGameLoop();
+        } else {
+          startBtn.disabled = false;
+        }
+      } catch (err) {
+        console.error(err);
+        hintEl.textContent = '相機無法啟動，請確認權限與 HTTPS。';
+        hintEl.className = 'hint bad';
+        startBtn.disabled = false;
+      }
+    }
+
+    startBtn.addEventListener('click', startAll);
+
+    resetBtn.addEventListener('click', async () => {
+      score = 0; combo = 0; scoreEl.textContent = score; comboEl.textContent = combo;
+      items.length = 0; ensureItems();
+      centroid = { x: W/2, y: H/2 };
+      updateHint('idle');
+      running = false; gameOver = false;
+      clearInterval(timerId);
+      timeLeft = 60; timeEl.textContent = timeLeft;
+      startBtn.disabled = false;
+      await stopStream();
+      detected = false;
+      consecutiveFound = consecutiveLost = 0;
+    });
+
+    toggleFacingBtn.addEventListener('click', async () => {
+      useEnvironment = !useEnvironment;
+      await initCamera();
+    });
+    toggleMirrorBtn.addEventListener('click', () => {
+      mirrored = !mirrored;
+      applyMirror();
+    });
+    fullscreenBtn.addEventListener('click', () => {
+      const el = document.documentElement;
+      if (!document.fullscreenElement) {
+        (el.requestFullscreen && el.requestFullscreen()) || (el.webkitRequestFullscreen && el.webkitRequestFullscreen());
+      } else {
+        (document.exitFullscreen && document.exitFullscreen()) || (document.webkitExitFullscreen && document.webkitExitFullscreen());
+      }
+    });
+
+    // ======== 面板開關 ========
+    function openPanel() {
+      panel.classList.add('open');
+      panelBackdrop.classList.add('open');
+      panel.setAttribute('aria-hidden', 'false');
+    }
+    function closePanel() {
+      panel.classList.remove('open');
+      panelBackdrop.classList.remove('open');
+      panel.setAttribute('aria-hidden', 'true');
+    }
+    menuBtn.addEventListener('click', openPanel);
+    closePanelBtn.addEventListener('click', closePanel);
+    panelBackdrop.addEventListener('click', closePanel);
+
+    // ======== 滑桿數值同步 ========
+    function bindVal(input, labelEl, formatter = v => v) {
+      const sync = () => labelEl.textContent = formatter(input.value);
+      input.addEventListener('input', sync);
+      sync();
+    }
+    bindVal(hMinEl, hMinVal);
+    bindVal(hMaxEl, hMaxVal);
+    bindVal(sMinEl, sMinVal);
+    bindVal(vMinEl, vMinVal);
+    bindVal(sensEl, sensVal);
+    bindVal(densEl, densityVal);
+    bindVal(speedEl, speedVal);
+
+    // 偵測閾值綁定
+    function bindCfg(input, labelEl, key, mapFn, fmtFn) {
+      const sync = () => {
+        detectCfg[key] = mapFn(input.value);
+        labelEl.textContent = fmtFn(input.value);
+      };
+      input.addEventListener('input', sync);
+      sync();
+    }
+    bindCfg(areaPpmEl, areaPpmVal, 'areaPpm', v => parseInt(v,10), v => `${v}‰`);
+    bindCfg(minSideEl, minSideVal, 'minSide', v => parseInt(v,10), v => `${v}`);
+    bindCfg(ratioTolEl, ratioTolVal, 'ratioTol', v => parseInt(v,10)/100, v => (parseInt(v,10)/100).toFixed(2)+'×');
+    bindCfg(angleCosEl, angleCosVal, 'angleCos', v => parseInt(v,10)/100, v => (parseInt(v,10)/100).toFixed(2));
+    bindCfg(minPeriEl, minPeriVal, 'minPeri', v => parseInt(v,10), v => `${v}`);
+    bindCfg(thrBlockEl, thrBlockVal, 'blockSize', v => parseInt(v,10)|1, v => `${v}`);
+    bindCfg(thrOffsetEl, thrOffsetVal, 'offset', v => parseInt(v,10), v => `${v}`);
+    bindCfg(foundFramesEl, foundFramesVal, 'foundFrames', v => parseInt(v,10), v => `${v}`);
+    bindCfg(lostFramesEl, lostFramesVal, 'lostFrames', v => parseInt(v,10), v => `${v}`);
+
+    // 初始
+    centroid = { x: W/2, y: H/2 };
+  </script>
 </body>
 </html>
