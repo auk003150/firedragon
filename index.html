@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (背景圖版)</title>
+    <title>WebAR 新春碰撞遊戲 (無全螢幕版)</title>
     <meta charset="utf-8">
     <!-- 增加 viewport-fit=cover 以適應 iPhone 瀏海屏 -->
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
@@ -127,15 +127,12 @@
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             
-            /* --- 背景圖設定開始 --- */
-            /* 這裡使用了 linear-gradient 疊加一層半透明黑色 (0.7)，確保文字清楚 */
+            /* --- 背景圖設定 --- */
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('image_1.png');
-            
-            /* 確保背景圖填滿整個螢幕且不重複 */
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            /* --- 背景圖設定結束 --- */
+            /* ------------------ */
 
             display: flex;
             flex-direction: column;
@@ -159,7 +156,6 @@
             font-weight: bold;
             box-shadow: 0 0 15px #ff5252;
             transition: transform 0.1s;
-            /* 防止手機點擊產生藍色框 */
             -webkit-tap-highlight-color: transparent;
         }
         button:active { transform: scale(0.95); }
@@ -223,49 +219,34 @@
         
         let playerScreenPos = { x: -1000, y: -1000, visible: false };
 
-        // 嘗試進入全螢幕的函式
-        function enterFullScreen() {
-            const doc = document.documentElement;
-            if (doc.requestFullscreen) {
-                doc.requestFullscreen().catch(err => console.log(err));
-            } else if (doc.mozRequestFullScreen) { /* Firefox */
-                doc.mozRequestFullScreen();
-            } else if (doc.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
-                doc.webkitRequestFullscreen();
-            } else if (doc.msRequestFullscreen) { /* IE/Edge */
-                doc.msRequestFullscreen();
-            }
-        }
+        // 已移除 enterFullScreen 函式
 
         function startGame() {
-            // 1. 嘗試觸發全螢幕
-            enterFullScreen();
-
-            // 2. 重置 UI 狀態
+            // 1. 重置 UI 狀態
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
             
-            // 3. 重置遊戲數據
+            // 2. 重置遊戲數據
             score = 0;
             timeLeft = 60;
             scoreEl.innerText = score;
             timerEl.innerText = timeLeft;
             timerEl.style.color = '#1976d2';
 
-            // 4. 清空場上舊物件
+            // 3. 清空場上舊物件
             gameArea.innerHTML = '';
             items = [];
 
             isGameRunning = true;
             
-            // 5. 生成新物件
+            // 4. 生成新物件
             spawnItems(6, 'good'); 
             spawnItems(4, 'bad');  
             
-            // 6. 啟動遊戲迴圈
+            // 5. 啟動遊戲迴圈
             gameLoop();
 
-            // 7. 啟動計時器
+            // 6. 啟動計時器
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 timeLeft--;
