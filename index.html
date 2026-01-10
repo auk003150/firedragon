@@ -24,7 +24,7 @@
         }
         #global-bg {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            /* 如果你有背景圖 image_1.png 請放在同目錄，沒有的話會透明 */
+            /* 背景圖，若無則透明 */
             background: url('image_1.png') no-repeat center center;
             background-size: cover; z-index: 1; pointer-events: none; opacity: 0.9;
         }
@@ -34,16 +34,18 @@
         }
         #score-board, #timer-board {
             position: absolute; top: 20px;
-            background: rgba(255, 255, 255, 0.8); padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.6); padding: 10px 20px;
             border-radius: 15px; font-size: 20px; font-weight: bold;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.3);
         }
-        #score-board { left: 20px; border: 3px solid #d32f2f; color: #d32f2f; }
-        #timer-board { right: 20px; border: 3px solid #1976d2; color: #1976d2; }
+        #score-board { left: 20px; color: #ffeb3b; text-shadow: 0 0 5px #ff5722; }
+        #timer-board { right: 20px; color: #fff; }
 
         /* --- 游標容器 --- */
         #aim-cursor {
-            position: absolute; width: 100px; height: 100px;
+            position: absolute; width: 140px; height: 140px;
             transform: translate(-50%, -50%); display: none;
             justify-content: center; align-items: center;
             z-index: 15;
@@ -51,109 +53,160 @@
 
         /* 
            ========================================
-           🔥 大坑火龍 (Fire Dragon) 樣式 🔥
+           🔥 真．大坑火龍 (Real Fire Dragon) 樣式 🔥
            ========================================
         */
-        .dragon-head {
-            position: relative;
-            width: 60px; height: 70px;
-            background-color: #4e342e; 
-            background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 2px, transparent 2px, transparent 4px);
-            border-radius: 20px;
-            
-            /* 模擬密集的線香紅點 */
-            box-shadow: 
-                0 -15px 0 -5px #ff5722, 
-                15px -10px 0 -5px #ff5722, 
-                -15px -10px 0 -5px #ff5722,
-                0 -25px 4px -4px #ffeb3b,
-                25px -15px 4px -4px #ffeb3b,
-                -25px -15px 4px -4px #ffeb3b,
-                0 0 30px rgba(255, 87, 34, 0.6);
-                
-            animation: fire-flicker 0.1s infinite alternate;
-        }
-
-        .incense-bundle {
-            position: absolute; top: 50%; left: 50%;
-            width: 100%; height: 100%;
-            transform: translate(-50%, -50%); pointer-events: none;
-        }
         
-        .incense-bundle::before, .incense-bundle::after {
-            content: ''; position: absolute;
-            top: 50%; left: 50%;
-            background: transparent;
-            width: 2px; height: 2px;
-            border-radius: 50%;
-            box-shadow: 
-                0 -40px 2px #ff3d00, 
-                20px -35px 2px #ff9100, 
-                -20px -35px 2px #ff9100,
-                35px -20px 2px #ff3d00,
-                -35px -20px 2px #ff3d00,
-                40px 0px 2px #ff9100,
-                -40px 0px 2px #ff9100;
-            opacity: 0.9;
-        }
-        .incense-bundle::after {
-            transform: rotate(22deg);
-            box-shadow: 
-                0 -45px 1px #ffeb3b, 
-                25px -40px 1px #ff5722, 
-                -25px -40px 1px #ff5722;
+        /* 草紮紋理共用 */
+        .straw-texture {
+            background-color: #3e2723; /* 深褐色底 */
+            /* 模擬草繩捆紮的紋理 */
+            background-image: repeating-linear-gradient(
+                90deg,
+                rgba(255,255,255,0.1) 0px,
+                rgba(255,255,255,0.1) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            box-shadow: inset 0 0 10px #000;
         }
 
-        .dragon-horn {
-            position: absolute; top: -10px;
-            width: 8px; height: 20px;
-            background: #5d4037;
-            border-radius: 4px; z-index: -1;
-        }
-        .horn-left { left: 10px; transform: rotate(-15deg); }
-        .horn-right { right: 10px; transform: rotate(15deg); }
-
-        .dragon-eye {
-            position: absolute; top: 20px;
-            width: 14px; height: 14px;
-            background: #00e676;
-            border-radius: 50%;
-            box-shadow: 0 0 10px #00e676;
-            z-index: 5; border: 1px solid #004d40;
-        }
-        .eye-left { left: 8px; }
-        .eye-right { right: 8px; }
-
-        .dragon-mouth {
-            position: absolute; bottom: 10px; left: 50%;
-            transform: translateX(-50%);
-            width: 40px; height: 20px;
-            background: #3e2723;
-            border-radius: 5px 5px 15px 15px;
-            border: 1px solid #281815; overflow: hidden;
-        }
-        .dragon-mouth::after {
-            content: ''; position: absolute; top: 0; left: 5px;
-            width: 0; height: 0;
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            border-top: 8px solid #fff;
-            box-shadow: 10px 0 0 #fff, 20px 0 0 #fff;
+        /* 龍頭主體 */
+        .dragon-head-group {
+            position: relative;
+            width: 100px; height: 100px;
+            /* 讓整個龍頭稍微浮動 */
+            animation: float-head 2s ease-in-out infinite;
         }
 
-        .dragon-whisker {
-            position: absolute; bottom: 5px;
+        /* 1. 頭部核心 (上顎) */
+        .dh-skull {
+            position: absolute; top: 20px; left: 15px;
+            width: 70px; height: 50px;
+            border-radius: 20px 20px 10px 10px;
+            z-index: 5;
+        }
+
+        /* 2. 鼻子 */
+        .dh-snout {
+            position: absolute; top: 40px; left: 10px;
+            width: 80px; height: 35px;
+            border-radius: 25px;
+            z-index: 6;
+        }
+        /* 鼻孔 */
+        .dh-snout::before, .dh-snout::after {
+            content: ''; position: absolute; bottom: 8px;
+            width: 12px; height: 12px;
+            background: #1a0f0d; border-radius: 50%;
+            box-shadow: 0 0 5px #ff3d00; /* 鼻孔透火光 */
+        }
+        .dh-snout::before { left: 15px; }
+        .dh-snout::after { right: 15px; }
+
+        /* 3. 下顎 */
+        .dh-jaw {
+            position: absolute; bottom: 15px; left: 25px;
             width: 50px; height: 30px;
-            border-top: 3px solid #8d6e63;
-            border-radius: 50%; z-index: -1;
+            border-radius: 0 0 20px 20px;
+            z-index: 4;
+            animation: chew 1s ease-in-out infinite alternate;
         }
-        .whisker-left { right: 85%; transform: rotate(20deg); }
-        .whisker-right { left: 85%; transform: rotate(-20deg); }
 
-        @keyframes fire-flicker {
-            0% { opacity: 0.9; transform: scale(1); filter: brightness(1); }
-            100% { opacity: 1; transform: scale(1.02); filter: brightness(1.2); }
+        /* 4. 眼睛 */
+        .dh-eye {
+            position: absolute; top: 15px;
+            width: 20px; height: 20px;
+            background: radial-gradient(circle, #fff 20%, #00e676 60%, #004d40 100%);
+            border-radius: 50%;
+            border: 2px solid #1a0f0d;
+            box-shadow: 0 0 15px #00e676; /* 綠光眼 */
+            z-index: 7;
         }
+        .eye-left { left: 5px; }
+        .eye-right { right: 5px; }
+
+        /* 5. 龍角 (草紮感) */
+        .dh-horn {
+            position: absolute; top: -20px;
+            width: 12px; height: 45px;
+            border-radius: 5px;
+            transform-origin: bottom center;
+            z-index: 3;
+        }
+        .horn-left { left: 10px; transform: rotate(-25deg); }
+        .horn-right { right: 10px; transform: rotate(25deg); }
+
+        /* 6. 龍鬚 (草繩) */
+        .dh-whisker {
+            position: absolute; top: 50px;
+            width: 60px; height: 40px;
+            border-top: 4px solid #8d6e63; /* 草色 */
+            border-radius: 50%;
+            z-index: 2;
+            opacity: 0.8;
+        }
+        .whisker-left { right: 75px; transform: rotate(20deg); }
+        .whisker-right { left: 75px; transform: rotate(-20deg); }
+
+        /* 
+           🔥 香火特效 (The Incense Effect) 🔥 
+           使用 box-shadow 模擬密集的紅點
+        */
+        .incense-glow {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 10;
+        }
+        /* 產生大量隨機紅點 */
+        .incense-particles {
+            position: absolute; width: 2px; height: 2px;
+            background: #ff3d00; border-radius: 50%;
+            top: 50%; left: 50%;
+            box-shadow: 
+                /* 頭頂 */
+                0 -35px 1px #ff9100, 10px -32px 1px #ff3d00, -10px -32px 1px #ff3d00,
+                20px -28px 1px #ff9100, -20px -28px 1px #ff3d00,
+                /* 鼻子周圍 */
+                35px 10px 1px #ff3d00, -35px 10px 1px #ff9100,
+                40px 0px 1px #ff3d00, -40px 0px 1px #ff3d00,
+                30px -10px 1px #ff9100, -30px -10px 1px #ff3d00,
+                /* 下巴 */
+                0 30px 1px #ff3d00, 15px 25px 1px #ff9100, -15px 25px 1px #ff3d00;
+            
+            filter: drop-shadow(0 0 2px #ff3d00);
+            animation: burn-twinkle 0.2s infinite alternate;
+        }
+
+        /* 煙霧效果 */
+        .smoke-effect {
+            position: absolute; top: -30px; left: 50%;
+            width: 10px; height: 10px;
+            background: rgba(200,200,200,0.3);
+            border-radius: 50%;
+            box-shadow: 0 0 20px 10px rgba(200,200,200,0.3);
+            transform: translateX(-50%);
+            animation: smoke-rise 2s infinite linear;
+            z-index: 1;
+        }
+
+        @keyframes burn-twinkle {
+            0% { opacity: 0.7; transform: scale(1) translate(-50%, -50%); }
+            100% { opacity: 1; transform: scale(1.2) translate(-50%, -50%); }
+        }
+        @keyframes smoke-rise {
+            0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); }
+            50% { opacity: 0.6; }
+            100% { opacity: 0; transform: translate(-50%, -60px) scale(2); }
+        }
+        @keyframes float-head {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        @keyframes chew {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(3px); }
+        }
+
 
         /* --- 掉落物體樣式 --- */
         .floating-item {
@@ -177,7 +230,7 @@
         }
         .overlay-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); display: flex; flex-direction: column;
+            background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 30;
             pointer-events: auto; color: white; text-align: center;
         }
@@ -185,7 +238,9 @@
             padding: 15px 40px; font-size: 22px; background: #d32f2f; color: white;
             border: none; border-radius: 50px; cursor: pointer; margin-top: 20px;
             font-weight: bold; box-shadow: 0 0 15px #ff5252;
+            transition: transform 0.1s;
         }
+        button:active { transform: scale(0.95); }
         #mute-btn {
             position: absolute; bottom: 20px; right: 20px; z-index: 40;
             background: rgba(255,255,255,0.5); border: none; padding: 10px;
@@ -197,10 +252,10 @@
 
     <!-- 音效資源 -->
     <audio id="bgm" loop>
-        <source src="https://actions.google.com/sounds/v1/science_fiction/scifi_industrial_loop.ogg" type="audio/ogg">
+        <!-- 使用鼓聲節奏更適合舞火龍 -->
+        <source src="https://actions.google.com/sounds/v1/ambiences/carnival_atmosphere.ogg" type="audio/ogg">
     </audio>
     
-    <!-- ✅ 修改：統一使用 Collect.mp3 作為碰撞音效 -->
     <audio id="sfx-collect">
         <source src="Collect.mp3" type="audio/mp3">
     </audio>
@@ -217,17 +272,36 @@
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="timer-board">時間: <span id="timer">60</span></div>
         
-        <!-- 大坑火龍游標 -->
+        <!-- 
+            🔥 更新後的：大坑火龍頭 (Tai Hang Fire Dragon Cursor) 🔥 
+            結構更複雜，模擬草紮和香火
+        -->
         <div id="aim-cursor">
-            <div class="dragon-head">
-                <div class="incense-bundle"></div>
-                <div class="dragon-horn horn-left"></div>
-                <div class="dragon-horn horn-right"></div>
-                <div class="dragon-eye eye-left"></div>
-                <div class="dragon-eye eye-right"></div>
-                <div class="dragon-mouth"></div>
-                <div class="dragon-whisker whisker-left"></div>
-                <div class="dragon-whisker whisker-right"></div>
+            <div class="dragon-head-group">
+                <!-- 煙霧 -->
+                <div class="smoke-effect"></div>
+                
+                <!-- 龍角 -->
+                <div class="dh-horn horn-left straw-texture"></div>
+                <div class="dh-horn horn-right straw-texture"></div>
+                
+                <!-- 龍鬚 -->
+                <div class="dh-whisker whisker-left"></div>
+                <div class="dh-whisker whisker-right"></div>
+
+                <!-- 頭部結構 -->
+                <div class="dh-skull straw-texture"></div>
+                <div class="dh-jaw straw-texture"></div>
+                <div class="dh-snout straw-texture"></div>
+
+                <!-- 眼睛 -->
+                <div class="dh-eye eye-left"></div>
+                <div class="dh-eye eye-right"></div>
+
+                <!-- 香火層 (紅點光效) -->
+                <div class="incense-glow">
+                    <div class="incense-particles"></div>
+                </div>
             </div>
         </div>
 
@@ -237,15 +311,15 @@
 
     <!-- 開始畫面 -->
     <div id="start-screen" class="overlay-screen">
-        <h1>🔥 舞火龍大碰撞 🔥</h1>
-        <p>請準備好 Hiro Marker!!!!!!</p>
-        <button onclick="startGame()">開始舞動</button>
+        <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 40px;">🔥 大坑舞火龍 🔥</h1>
+        <p style="font-size: 18px; color: #ddd;">請準備好 Hiro Marker<br>控制龍頭收集吉祥字！</p>
+        <button onclick="startGame()">起龍！(Start)</button>
     </div>
 
     <!-- 結束畫面 -->
     <div id="game-over-screen" class="overlay-screen" style="display: none;">
         <h1>時間到！</h1>
-        <p>最終分數: <span id="final-score" style="font-size: 40px; font-weight: bold;">0</span></p>
+        <p>最終分數: <span id="final-score" style="font-size: 40px; font-weight: bold; color: #ffeb3b;">0</span></p>
         <button onclick="startGame()">再舞一次</button>
     </div>
 
@@ -259,19 +333,19 @@
         // --- 音效管理 ---
         const sounds = {
             bgm: document.getElementById('bgm'),
-            collect: document.getElementById('sfx-collect'), // ✅ 統一碰撞音效
+            collect: document.getElementById('sfx-collect'),
             end: document.getElementById('sfx-end')
         };
         let isMuted = false;
 
-        sounds.bgm.volume = 0.4; 
+        sounds.bgm.volume = 0.3; 
         sounds.collect.volume = 0.8;
 
         function playSound(name) {
             if (isMuted) return;
             const audio = sounds[name];
             if (audio) {
-                audio.currentTime = 0; // 確保可以連續快速播放
+                audio.currentTime = 0; 
                 audio.play().catch(e => console.log("Audio play failed:", e));
             }
         }
@@ -289,8 +363,8 @@
         }
 
         // --- 遊戲邏輯變數 ---
-        const goodWords = ['福', '春', '財', '吉', '祥', '旺'];
-        const badWords = ['💣', '💩', '🕷️', '🐍', '🥀'];
+        const goodWords = ['福', '春', '財', '吉', '祥', '旺', '平安', '健康'];
+        const badWords = ['💣', '💩', '🕷️', '🥀', '霉'];
         let score = 0;
         let timeLeft = 60;
         let isGameRunning = false;
@@ -445,9 +519,10 @@
                 item.element.style.top = item.y + 'px';
 
                 if (playerScreenPos.visible) {
+                    // 碰撞檢測距離稍微加大，因為龍頭變大了
                     const dx = playerScreenPos.x - (item.x + item.width/2);
                     const dy = playerScreenPos.y - (item.y + item.height/2);
-                    if ((dx*dx + dy*dy) < (50 + 35)**2) {
+                    if ((dx*dx + dy*dy) < (60 + 35)**2) {
                         handleHit(item);
                     }
                 }
@@ -461,7 +536,6 @@
             score += pts;
             scoreEl.innerText = score;
             
-            // ✅ 修改：無論好壞，只要碰撞就播放 collect 音效
             playSound('collect');
             
             const popup = document.createElement('div');
