@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>Hiro Marker AR Demo + 碰撞與分數（相機僅鏡像）</title>
+  <title>Hiro Marker AR Demo + 碰撞與分數（相機僅鏡像，修正投射）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
@@ -175,6 +175,8 @@
 
     let score = 0;
     let mirrored = false; // 鏡像開關（僅影響相機畫面與 3D）
+    let aframeCanvas = null; // 取得 A-Frame 實際 canvas
+    let canvasRect = null;
 
     function setScore(v){ score=v; scoreEl.textContent = `分數：${score}`; }
 
@@ -188,21 +190,40 @@
 
     mirrorBtn.addEventListener('click', () => setMirrored(!mirrored));
 
-    // 螢幕座標 -> 相機前方固定距離的世界座標
-    // 注意：即使目標未鏡像，當視覺鏡像開啟時，投射時仍須用映射後的 X
+    // 取得 A-Frame canvas 與其 rect
+    function cacheCanvasRect() {
+      aframeCanvas = scene?.canvas || document.querySelector('canvas.a-canvas');
+      if (aframeCanvas) {
+        canvasRect = aframeCanvas.getBoundingClientRect();
+      }
+    }
+
+    // 將螢幕座標（相對視窗左上）轉換成「實際 WebGL 畫布的 NDC」
+    function screenPosToCanvasNDC(sx, sy) {
+      if (!aframeCanvas || !canvasRect) return null;
+      // 先換成在 canvas 內部的像素座標
+      const cx = sx - canvasRect.left;
+      const cy = sy - canvasRect.top;
+
+      // 鏡像時，視覺翻轉的是 canvas，所以要在 canvas 座標系做 X 翻轉
+      const adjCx = mirrored ? (canvasRect.width - cx) : cx;
+
+      // 轉 NDC (-1..1)
+      const ndcX = (adjCx / canvasRect.width) * 2 - 1;
+      const ndcY = -((cy / canvasRect.height) * 2 - 1); // Y 軸向下為正 -> NDC 向上為正
+      return { ndcX, ndcY };
+    }
+
+    // 使用 canvas NDC 投射到相機前方固定距離
     function screenToWorldAtDistance(sx, sy, dist) {
       const threeCam = cameraEl.getObject3D('camera');
       if (!threeCam) return null;
+      const ndc = screenPosToCanvasNDC(sx, sy);
+      if (!ndc) return null;
 
-      const projX = mirrored ? (window.innerWidth - sx) : sx;
-
-      const ndc = new THREE.Vector3(
-        (projX / window.innerWidth) * 2 - 1,
-        -(sy / window.innerHeight) * 2 + 1,
-        0.5
-      );
+      const vecNDC = new THREE.Vector3(ndc.ndcX, ndc.ndcY, 0.5);
       const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(ndc, threeCam);
+      raycaster.setFromCamera(vecNDC, threeCam);
       const origin = raycaster.ray.origin.clone();
       const dir = raycaster.ray.direction.clone().normalize();
       return origin.add(dir.multiplyScalar(dist));
@@ -281,11 +302,11 @@
         if (st.sy < minY) { st.sy = minY; st.vy = Math.abs(st.vy); }
         if (st.sy > maxY) { st.sy = maxY; st.vy = -Math.abs(st.vy); }
 
-        // DOM 位置（不鏡像）
+        // DOM 位置
         span.style.left = `${st.sx}px`;
         span.style.top = `${st.sy}px`;
 
-        // 更新 3D 碰撞點位置（鏡像時改用對映 X）
+        // 更新 3D 碰撞點位置（用 canvas NDC + 鏡像修正）
         const world = screenToWorldAtDistance(st.sx, st.sy, PLANE_DISTANCE);
         if (world) {
           span.__collider.object3D.position.copy(world);
@@ -307,7 +328,8 @@
         if (dist <= COLLIDE_RADIUS) {
           if (now - st.lastHitAt > HIT_COOLDOWN_MS) {
             st.lastHitAt = now;
-            setScore(score + (st.type === 'first' ? SCORE_HIT_FIRST : SCORE_HIT_SECOND));
+            score += (st.type === 'first' ? SCORE_HIT_FIRST : SCORE_HIT_SECOND);
+            setScore(score);
             hitFeedback(span);
           }
         }
@@ -317,11 +339,13 @@
     }
 
     function start() {
+      cacheCanvasRect();           // 抓 canvas 與 rect
       spawnAllTargets();
       lastT = performance.now();
       requestAnimationFrame(loop);
     }
 
+    // 等 scene 載入後再啟動，確保 scene.canvas 可取得
     if (document.readyState === 'complete') {
       if (scene.hasLoaded) start();
       else scene.addEventListener('loaded', start);
@@ -332,7 +356,10 @@
       });
     }
 
-    // 視窗變更：維持目標在可視範圍
+    // 任何可能變動 canvas 尺寸/位置的事件，都更新 rect
+    const recalcCanvasRect = () => {
+      cacheCanvasRect();
+    };
     window.addEventListener('resize', () => {
       const margin = 24;
       for (const span of targets) {
@@ -342,7 +369,16 @@
         span.style.left = `${st.sx}px`;
         span.style.top = `${st.sy}px`;
       }
+      recalcCanvasRect();
     });
+
+    // 有些裝置會在方向改變、鍵盤彈出、視口調整時影響 rect：
+    window.addEventListener('orientationchange', recalcCanvasRect);
+    window.addEventListener('scroll', recalcCanvasRect);
+    window.addEventListener('visibilitychange', recalcCanvasRect);
+
+    // A-Frame 在某些情況下會重建 canvas，因此也監聽 scene 的 render-start
+    scene.addEventListener('renderstart', recalcCanvasRect);
   </script>
 </body>
 </html>
