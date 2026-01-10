@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (擬真香火特效版)</title>
+    <title>WebAR 新春碰撞遊戲 (白眼火龍版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     
@@ -52,7 +52,7 @@
             pointer-events: none; z-index: 15; 
         }
 
-        /* --- 珍珠草材質 (保持不變) --- */
+        /* --- 珍珠草材質 --- */
         .straw-texture {
             background-color: #d4b483; 
             background-image: 
@@ -75,7 +75,25 @@
         .dh-snout::before, .dh-snout::after { content: ''; position: absolute; bottom: 10px; width: 14px; height: 14px; background: #3e2723; border-radius: 50%; box-shadow: inset 0 0 5px #000; }
         .dh-snout::before { left: 15px; } .dh-snout::after { right: 15px; }
         .dh-jaw { position: absolute; bottom: 10px; left: 30px; width: 60px; height: 35px; border-radius: 0 0 25px 25px; z-index: 4; animation: chew 1s ease-in-out infinite alternate; }
-        .dh-eye { position: absolute; top: 20px; width: 24px; height: 24px; background: radial-gradient(circle, #fff 10%, #00e676 50%, #1b5e20 100%); border-radius: 50%; border: 3px solid #3e2723; box-shadow: 0 0 15px #00e676; z-index: 7; }
+        
+        /* 
+           👀 修改處：龍眼樣式 (白色版) 👀 
+        */
+        .dh-eye { 
+            position: absolute; top: 20px; width: 24px; height: 24px; 
+            /* 
+               1. 漸層改為白色系：中心純白 -> 邊緣微灰 (#cfd8dc) 
+            */
+            background: radial-gradient(circle, #fff 40%, #cfd8dc 100%);
+            border-radius: 50%; 
+            border: 3px solid #3e2723; 
+            /* 
+               2. 發光改為白色光暈 
+            */
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.9); 
+            z-index: 7; 
+        }
+        
         .eye-left { left: 5px; } .eye-right { right: 5px; }
         .dh-horn { position: absolute; top: -25px; width: 15px; height: 55px; border-radius: 8px; transform-origin: bottom center; z-index: 3; }
         .horn-left { left: 15px; transform: rotate(-25deg); } .horn-right { right: 15px; transform: rotate(25deg); }
@@ -92,28 +110,15 @@
             z-index: 15;
         }
 
-        /* 
-           🔥 升級版香火特效 (Realistic Incense) 🔥
-        */
+        /* 擬真香火特效 */
         .dragon-body-segment::before {
             content: '';
             position: absolute;
             top: 50%; left: 50%;
-            width: 4px; height: 4px; /* 稍微加大一點，讓中心有空間 */
+            width: 4px; height: 4px; 
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            
-            /* 
-               1. 核心顏色：使用 radial-gradient 模擬高溫中心 
-                  中心是白色/黃色，外圍是紅色
-            */
             background: radial-gradient(circle, #fff 20%, #ffeb3b 40%, #ff3d00 100%);
-            
-            /* 
-               2. Box-Shadow 升級：
-                  - 增加第三個參數 (blur-radius) 讓點看起來有光暈，不是死板的圓點
-                  - 顏色使用 rgba 增加通透感
-            */
             box-shadow: 
                 0px -28px 2px #ff1744, 
                 6px -26px 1px #ff5722,
@@ -128,20 +133,11 @@
                 -24px 5px 2px #ff5722,
                 18px 16px 1px #ff9100,
                 -18px 16px 2px #ff9100,
-                0px 0px 8px rgba(255, 200, 0, 0.8); /* 中心強光 */
-
-            /* 
-               3. 濾鏡：整體增加一層紅色光暈，模擬煙霧中的漫射光 
-            */
+                0px 0px 8px rgba(255, 200, 0, 0.8); 
             filter: drop-shadow(0 0 2px rgba(255, 61, 0, 0.8));
-
-            /* 
-               4. 動畫：使用新的 flicker 動畫 
-            */
             animation: incense-flicker 0.1s infinite alternate;
         }
 
-        /* 煙霧層：加強一點 */
         .dragon-body-segment::after {
             content: ''; position: absolute; top: -15px; left: -15px; right: -15px; bottom: -15px;
             border-radius: 50%;
@@ -168,10 +164,6 @@
             animation: incense-flicker 0.15s infinite alternate;
         }
 
-        /* 
-           🔥 新的動畫關鍵幀：模擬風吹火光的抖動 🔥
-           不再是均勻的縮放，而是亮度和大小的隨機微調
-        */
         @keyframes incense-flicker { 
             0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.95); filter: drop-shadow(0 0 1px rgba(255,61,0,0.5)); } 
             50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 3px rgba(255,200,0,0.8)); } 
@@ -342,7 +334,7 @@
         const gameOverScreen = document.getElementById('game-over-screen');
         const finalScoreEl = document.getElementById('final-score');
 
-        // --- 初始化龍身 (加入隨機閃爍延遲) ---
+        // --- 初始化龍身 ---
         function initDragonBody() {
             dragonBodyContainer.innerHTML = '';
             bodySegments.length = 0;
@@ -354,29 +346,6 @@
                 el.classList.add('straw-texture');
                 const scale = 1 - (i * 0.04);
                 el.style.transform = `translate(-50%, -50%) scale(${scale})`;
-                
-                // 🔥 關鍵修改：為每一節身體的香火添加隨機延遲 🔥
-                // 這樣它們就不會同時閃爍，看起來更自然
-                const randomDelay = Math.random() * 2; 
-                
-                // 我們需要通過 CSS 變數或直接操作 style 來影響偽元素動畫比較困難
-                // 這裡我們直接操作元素的 opacity 或 transform 來輔助，
-                // 但為了影響偽元素動畫，最簡單的方法是給父層加一個隨機的 animation-delay
-                // 不過偽元素的動畫是獨立的。
-                // 解決方案：我們在 CSS 定義了動畫，這裡我們動態插入一個 style 標籤來覆蓋特定的 delay 
-                // 或者更簡單：讓每一節身體的 ::before 繼承父層的 delay (需要 CSS 配合)
-                // 這裡我們採用簡單的 "隨機化 scale 微調" 在 updateDragonBody 裡做，或者...
-                
-                // 實際上，最有效的 CSS 方法是：
-                // 由於 ::before 的動畫是寫死在 CSS 裡的，我們無法直接用 JS 修改偽元素屬性。
-                // 但我們可以給每個 div 加一個隨機的 style="animation-delay: -0.5s" 
-                // 然後在 CSS 裡讓 ::before 繼承這個 delay? 不行，偽元素不繼承 delay。
-                
-                // 替代方案：我們在 CSS 裡寫 animation，但這裡我們用 JS 創建一個 style 區塊
-                // 或者，我們接受它們有輕微同步，但因為位置不同，視覺上還可以。
-                // *更好的方法*：我們在 CSS 裡定義多個動畫時長，隨機分配 class？
-                // 為了保持代碼簡潔，我們讓 CSS 的 animation-duration 非常快 (0.1s)，
-                // 這樣隨機性主要來自於視覺上的錯覺。
                 
                 dragonBodyContainer.appendChild(el);
                 bodySegments.push(el);
