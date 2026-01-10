@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (背景優化版)</title>
+    <title>WebAR 新春碰撞遊戲 (70% 高度版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
@@ -15,35 +15,60 @@
             height: 100dvh; 
             overflow: hidden; 
             font-family: 'Microsoft YaHei', sans-serif; 
-            background-color: black;
+            background-color: #222; /* 剩餘的 30% 區域顯示深灰色 */
         }
         
+        /* --- 核心修改：限制影片高度為 70% --- */
         #arjs-video {
             transform: scaleX(-1) !important;
             max-width: none !important;
             width: 100% !important;
-            height: 100% !important;
+            height: 70% !important; /* 強制高度 70% */
             object-fit: cover !important;
-            z-index: 0 !important; /* 確保影片在最底層 */
+            z-index: 0 !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
         }
 
-        /* --- 新增：全域背景圖層 --- */
+        /* --- 背景圖層：也限制在 70% 範圍內 --- */
         #global-bg {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0; left: 0; width: 100%; 
+            height: 70%; /* 與影片高度一致 */
             background: url('image_1.png') no-repeat center center;
             background-size: cover;
-            z-index: 1; /* 在影片之上，但在 UI 之下 */
-            pointer-events: none; /* 讓點擊穿透 */
-            transition: opacity 1s ease; /* 平滑淡出效果 */
-            opacity: 1; /* 初始狀態：完全顯示 */
+            z-index: 1; 
+            pointer-events: none; 
+            transition: opacity 1s ease; 
+            opacity: 1; 
+            border-bottom: 5px solid #d32f2f; /* 加個邊框區隔下方區域 */
+            box-sizing: border-box;
         }
 
+        /* --- UI 層：限制在 70% 範圍內 --- */
         #ui-layer {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0; left: 0; width: 100%; 
+            height: 70%; /* 遊戲物體只會在影片範圍內活動 */
             pointer-events: none;
             z-index: 10;
+            overflow: hidden; /* 防止物體跑出去 */
+        }
+
+        /* --- 下方資訊區 (新增) --- */
+        /* 利用剩下的 30% 空間放一些資訊或裝飾 */
+        #bottom-panel {
+            position: absolute;
+            bottom: 0; left: 0; width: 100%; height: 30%;
+            background: #fff8e1;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-top: 5px solid #d32f2f;
+            box-sizing: border-box;
         }
 
         #score-board {
@@ -131,11 +156,11 @@
             100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
         }
 
-        /* 遮罩層現在只負責黑色半透明遮罩，不再負責背景圖 */
+        /* 遮罩層覆蓋全螢幕 */
         .overlay-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); /* 黑色半透明，讓下方的 global-bg 透出來 */
+            background: rgba(0,0,0,0.6); 
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -165,15 +190,22 @@
 </head>
 <body>
 
-    <!-- 獨立的背景圖層 -->
+    <!-- 獨立的背景圖層 (高度 70%) -->
     <div id="global-bg"></div>
 
+    <!-- 遊戲 UI 層 (高度 70%) -->
     <div id="ui-layer">
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="timer-board">時間: <span id="timer">60</span></div>
         
         <div id="aim-cursor"></div>
         <div id="game-area"></div>
+    </div>
+
+    <!-- 下方裝飾面板 (高度 30%) -->
+    <div id="bottom-panel">
+        <h2 style="color: #d32f2f; margin: 0;">🧧 新春大碰撞 🧧</h2>
+        <p style="color: #555; margin: 5px 0;">移動鏡頭捕捉紅字，避開雜物！</p>
     </div>
 
     <!-- 開始畫面 -->
@@ -221,39 +253,41 @@
         const startScreen = document.getElementById('start-screen');
         const gameOverScreen = document.getElementById('game-over-screen');
         const finalScoreEl = document.getElementById('final-score');
-        const globalBg = document.getElementById('global-bg'); // 取得背景圖層
+        const globalBg = document.getElementById('global-bg');
         
+        // 取得 UI 層的實際高度，用於計算邊界
+        const uiLayer = document.getElementById('ui-layer');
+        let gameHeight = uiLayer.clientHeight;
+        let gameWidth = uiLayer.clientWidth;
+
         let playerScreenPos = { x: -1000, y: -1000, visible: false };
 
         function startGame() {
-            // 1. UI 狀態切換
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
             
-            // 關鍵修改：將背景圖透明度降低，讓攝影機畫面透出來
             globalBg.style.opacity = '0.3'; 
 
-            // 2. 重置遊戲數據
             score = 0;
             timeLeft = 60;
             scoreEl.innerText = score;
             timerEl.innerText = timeLeft;
             timerEl.style.color = '#1976d2';
 
-            // 3. 清空場上舊物件
             gameArea.innerHTML = '';
             items = [];
 
+            // 重新計算遊戲區域大小 (以防視窗改變)
+            gameHeight = uiLayer.clientHeight;
+            gameWidth = uiLayer.clientWidth;
+
             isGameRunning = true;
             
-            // 4. 生成新物件
             spawnItems(6, 'good'); 
             spawnItems(4, 'bad');  
             
-            // 5. 啟動遊戲迴圈
             gameLoop();
 
-            // 6. 啟動計時器
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 timeLeft--;
@@ -274,7 +308,6 @@
             clearInterval(timerInterval);
             finalScoreEl.innerText = score;
             
-            // 關鍵修改：遊戲結束時，恢復背景圖亮度
             globalBg.style.opacity = '1';
             
             gameOverScreen.style.display = 'flex';
@@ -300,10 +333,11 @@
                 gameArea.appendChild(el);
 
                 const size = 70; 
+                // 確保生成在 70% 高度範圍內
                 const itemObj = {
                     element: el,
-                    x: Math.random() * (window.innerWidth - size),
-                    y: Math.random() * (window.innerHeight - size),
+                    x: Math.random() * (gameWidth - size),
+                    y: Math.random() * (gameHeight - size),
                     vx: (Math.random() - 0.5) * 6, 
                     vy: (Math.random() - 0.5) * 6, 
                     width: size,
@@ -330,8 +364,12 @@
                 const camera = document.querySelector('a-scene').camera;
                 vector.project(camera);
 
+                // 座標轉換：需要根據視窗寬高轉換
                 const screenX = ((-vector.x + 1) / 2) * window.innerWidth;
                 const screenY = ((-vector.y + 1) / 2) * window.innerHeight;
+
+                // 檢查是否在遊戲區域內 (70% 高度)
+                const isInGameArea = screenY <= gameHeight;
 
                 playerScreenPos.x = screenX;
                 playerScreenPos.y = screenY;
@@ -341,9 +379,12 @@
                 aimCursor.style.left = screenX + 'px';
                 aimCursor.style.top = screenY + 'px';
                 
-                if (screenX < 0 || screenX > window.innerWidth || screenY < 0 || screenY > window.innerHeight) {
+                // 如果游標超出遊戲區域，變灰提示
+                if (!isInGameArea || screenX < 0 || screenX > gameWidth) {
                     aimCursor.style.borderColor = '#ccc';
                     aimCursor.style.opacity = '0.5';
+                    // 這裡可以選擇是否要讓超出範圍的游標無效化
+                    // playerScreenPos.visible = false; 
                 } else {
                     aimCursor.style.borderColor = '#FFD700';
                     aimCursor.style.opacity = '1';
@@ -361,13 +402,14 @@
                 item.x += item.vx;
                 item.y += item.vy;
 
-                if (item.x <= 0 || item.x >= window.innerWidth - item.width) {
+                // 邊界檢查改用 gameWidth 和 gameHeight
+                if (item.x <= 0 || item.x >= gameWidth - item.width) {
                     item.vx *= -1;
-                    item.x = Math.max(0, Math.min(item.x, window.innerWidth - item.width));
+                    item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
                 }
-                if (item.y <= 0 || item.y >= window.innerHeight - item.height) {
+                if (item.y <= 0 || item.y >= gameHeight - item.height) {
                     item.vy *= -1;
-                    item.y = Math.max(0, Math.min(item.y, window.innerHeight - item.height));
+                    item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
                 }
 
                 item.element.style.left = item.x + 'px';
@@ -377,6 +419,10 @@
 
         function checkCollisions() {
             if (!playerScreenPos.visible) return;
+            
+            // 如果玩家游標在 70% 高度以外，不進行碰撞檢測
+            if (playerScreenPos.y > gameHeight) return;
+
             const playerReachRadius = 50; 
 
             items.forEach(item => {
@@ -436,8 +482,8 @@
                 let newX, newY;
                 let safetyTries = 0;
                 do {
-                    newX = Math.random() * (window.innerWidth - item.width);
-                    newY = Math.random() * (window.innerHeight - item.height);
+                    newX = Math.random() * (gameWidth - item.width);
+                    newY = Math.random() * (gameHeight - item.height);
                     safetyTries++;
                     const dx = newX - playerScreenPos.x;
                     const dy = newY - playerScreenPos.y;
@@ -460,9 +506,11 @@
         }
 
         window.addEventListener('resize', () => {
+            gameHeight = uiLayer.clientHeight;
+            gameWidth = uiLayer.clientWidth;
             items.forEach(item => {
-                item.x = Math.min(item.x, window.innerWidth - item.width);
-                item.y = Math.min(item.y, window.innerHeight - item.height);
+                item.x = Math.min(item.x, gameWidth - item.width);
+                item.y = Math.min(item.y, gameHeight - item.height);
             });
         });
     </script>
