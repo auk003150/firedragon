@@ -1,250 +1,237 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (全螢幕疊圖版)</title>
+    <title>WebAR 新春碰撞遊戲 (全螢幕修正版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+    
+    <!-- 引入 A-Frame 和 AR.js -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <style>
+        /* --- 基礎設定 --- */
         html, body { 
             margin: 0; 
             padding: 0; 
             width: 100%; 
-            height: 100dvh; 
+            height: 100%; 
             overflow: hidden; 
             font-family: 'Microsoft YaHei', sans-serif; 
             background-color: #000; 
         }
-        
-        /* --- 1. 攝影機設為全螢幕 --- */
+
+        /* --- 關鍵修正：強制攝影機畫面填滿 --- */
         #arjs-video {
-            transform: scaleX(-1) !important;
-            max-width: none !important;
-            width: 100% !important;
-            height: 100% !important; /* 全螢幕高度 */
-            object-fit: cover !important;
-            z-index: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
+            z-index: 0 !important;
+            margin: 0 !important;
+            object-fit: cover !important; /* 關鍵：裁切畫面以填滿螢幕 */
+            transform: scaleX(-1) !important; /* 鏡像翻轉 */
         }
 
-        /* --- 2. 背景圖層：覆蓋全螢幕並設為 30% 透明度 --- */
+        /* --- 背景圖層：覆蓋全螢幕並設為 30% 透明度 --- */
         #global-bg {
             position: absolute;
             top: 0; left: 0; 
             width: 100%; height: 100%;
-            /* 這裡請換成您的背景圖 */
+            /* 請確保 image_1.png 存在，或換成您的圖片路徑 */
             background: url('image_1.png') no-repeat center center;
             background-size: cover;
-            z-index: 1; /* 在影片之上 */
-            pointer-events: none; /* 讓點擊穿透 */
-            opacity: 0.3; /* 關鍵：透明度 30% */
+            z-index: 1; 
+            pointer-events: none; 
+            opacity: 0.3; /* 透明度 30% */
         }
 
-        /* --- 3. UI 層：全螢幕 --- */
+        /* --- UI 層 --- */
         #ui-layer {
             position: absolute;
             top: 0; left: 0; 
             width: 100%; height: 100%;
             pointer-events: none;
-            z-index: 10; /* 在背景圖之上 */
+            z-index: 10;
             overflow: hidden;
         }
 
-        /* 分數與時間面板 */
-        #score-board {
+        /* 分數與時間 */
+        #score-board, #timer-board {
             position: absolute;
-            top: 20px; left: 20px;
+            top: 20px;
             background: rgba(255, 255, 255, 0.8);
             padding: 10px 20px;
             border-radius: 15px;
-            border: 3px solid #d32f2f;
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
-            color: #d32f2f;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
+        #score-board { left: 20px; border: 3px solid #d32f2f; color: #d32f2f; }
+        #timer-board { right: 20px; border: 3px solid #1976d2; color: #1976d2; }
 
-        #timer-board {
-            position: absolute;
-            top: 20px; right: 20px;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 10px 20px;
-            border-radius: 15px;
-            border: 3px solid #1976d2;
-            font-size: 24px;
-            font-weight: bold;
-            color: #1976d2;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
-
-        /* 準心樣式 */
+        /* 準心 */
         #aim-cursor {
             position: absolute;
-            width: 100px; height: 100px;
+            width: 80px; height: 80px;
             border: 3px dashed #FFD700;
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            display: none;
-            box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
-            transition: opacity 0.1s;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            display: none; /* 偵測到 Marker 才顯示 */
+            justify-content: center; align-items: center;
             z-index: 15;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
         }
-        
-        #aim-cursor::after {
-            content: '+';
-            color: #FFD700;
-            font-size: 24px;
-            font-weight: bold;
-        }
+        #aim-cursor::after { content: '+'; color: #FFD700; font-size: 24px; font-weight: bold; }
 
         /* 漂浮物體 */
         .floating-item {
             position: absolute;
-            font-size: 45px;
+            font-size: 40px;
             font-weight: bold;
-            user-select: none;
-            will-change: left, top;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 80px; height: 80px;
+            display: flex; justify-content: center; align-items: center;
+            width: 70px; height: 70px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.9);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             z-index: 5;
+            will-change: transform, left, top;
         }
-
         .good-item { color: #d32f2f; border: 3px solid #d32f2f; }
         .bad-item { color: #333; border: 3px solid #555; }
 
-        .hit-effect {
-            transform: scale(1.4);
-            background: #fffacd !important;
-        }
+        .hit-effect { transform: scale(1.3); background: #fffacd !important; }
 
+        /* 分數跳出動畫 */
         .score-popup {
             position: absolute;
-            font-size: 40px;
-            font-weight: 900;
-            text-shadow: 2px 2px 0px #fff;
+            font-size: 36px; font-weight: 900;
+            text-shadow: 1px 1px 0 #fff;
             animation: floatUp 0.8s ease-out forwards;
             z-index: 20;
         }
-        
         @keyframes floatUp {
-            0% { opacity: 1; transform: translateY(0) scale(1); }
-            100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-60px); }
         }
 
-        /* 遮罩層 (開始/結束畫面) */
+        /* 遮罩層 */
         .overlay-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.75); 
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            background: rgba(0,0,0,0.8); 
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
             z-index: 30;
             pointer-events: auto;
             color: white;
             text-align: center;
-            backdrop-filter: blur(5px);
         }
-
         button {
-            padding: 15px 40px;
-            font-size: 24px;
-            background: #d32f2f;
-            color: white;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            margin-top: 30px;
+            padding: 15px 40px; font-size: 22px;
+            background: #d32f2f; color: white;
+            border: none; border-radius: 50px;
+            cursor: pointer; margin-top: 20px;
             font-weight: bold;
-            box-shadow: 0 0 20px #ff5252;
-            transition: transform 0.1s;
-            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 0 15px #ff5252;
         }
-        button:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
 
-    <!-- 背景圖層 (全螢幕, opacity 0.3) -->
+    <!-- 背景圖層 -->
     <div id="global-bg"></div>
 
-    <!-- 遊戲 UI 層 (全螢幕) -->
+    <!-- UI 層 -->
     <div id="ui-layer">
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="timer-board">時間: <span id="timer">60</span></div>
-        
         <div id="aim-cursor"></div>
         <div id="game-area"></div>
     </div>
 
     <!-- 開始畫面 -->
     <div id="start-screen" class="overlay-screen">
-        <h1 style="font-size: 42px; margin-bottom: 10px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">🧧 WebAR 新春大碰撞 🧧</h1>
-        <p style="font-size: 18px; color: #ddd; margin-bottom: 20px;">請準備好 Hiro Marker</p>
-        
-        <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.2);">
-            <p style="margin: 10px 0;">⏱️ 限時：<span style="color:#4fc3f7; font-weight:bold;">60 秒</span></p>
-            <p style="margin: 10px 0;">🔴 碰到紅字：<span style="color:#ff5252; font-weight:bold;">+15 分</span></p>
-            <p style="margin: 10px 0;">⚫ 碰到雜物：<span style="color:#aaa; font-weight:bold;">-5 分</span></p>
-        </div>
-        
+        <h1>🧧 新春大碰撞 🧧</h1>
+        <p>請準備好 Hiro Marker</p>
         <button onclick="startGame()">開始遊戲</button>
     </div>
 
-    <!-- 遊戲結束畫面 -->
+    <!-- 結束畫面 -->
     <div id="game-over-screen" class="overlay-screen" style="display: none;">
-        <h1 style="font-size: 48px; color: #FFD700; text-shadow: 0 2px 10px rgba(0,0,0,0.8);">時間到！</h1>
-        <p style="font-size: 24px;">最終分數</p>
-        <div style="font-size: 80px; font-weight: bold; color: #fff; margin: 10px 0; text-shadow: 0 4px 15px rgba(211, 47, 47, 0.8);">
-            <span id="final-score">0</span>
-        </div>
+        <h1>時間到！</h1>
+        <p>最終分數: <span id="final-score" style="font-size: 40px; font-weight: bold;">0</span></p>
         <button onclick="startGame()">再玩一次</button>
     </div>
 
     <!-- AR 場景 -->
+    <!-- 注意：vr-mode-ui="enabled: false" 隱藏 VR 按鈕 -->
     <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;' vr-mode-ui="enabled: false">
         <a-entity camera></a-entity>
         <a-marker preset="hiro" id="player-marker"></a-marker>
     </a-scene>
 
     <script>
-        const goodWords = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '龍', '年'];
-        const badWords = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
-        
+        // --- 遊戲邏輯變數 ---
+        const goodWords = ['福', '春', '財', '吉', '祥', '旺'];
+        const badWords = ['💣', '💩', '🕷️', '🐍', '🥀'];
         let score = 0;
         let timeLeft = 60;
         let isGameRunning = false;
         let items = []; 
         let timerInterval = null;
+        let gameWidth = window.innerWidth;
+        let gameHeight = window.innerHeight;
+        let playerScreenPos = { x: -100, y: -100, visible: false };
 
+        // --- DOM 元素 ---
         const gameArea = document.getElementById('game-area');
         const scoreEl = document.getElementById('score');
         const timerEl = document.getElementById('timer');
-        const playerMarker = document.getElementById('player-marker');
         const aimCursor = document.getElementById('aim-cursor');
+        const playerMarker = document.getElementById('player-marker');
         const startScreen = document.getElementById('start-screen');
         const gameOverScreen = document.getElementById('game-over-screen');
         const finalScoreEl = document.getElementById('final-score');
-        
-        // 取得視窗大小作為遊戲邊界
-        let gameHeight = window.innerHeight;
-        let gameWidth = window.innerWidth;
 
-        let playerScreenPos = { x: -1000, y: -1000, visible: false };
+        // --- 修正 AR.js 影片大小的腳本 ---
+        function fixVideoSize() {
+            const video = document.getElementById('arjs-video');
+            if (video) {
+                // 強制設定寬高為視窗大小
+                video.style.width = window.innerWidth + 'px';
+                video.style.height = window.innerHeight + 'px';
+                // 強制 object-fit
+                video.style.objectFit = 'cover';
+                // 移除可能導致偏移的 margin
+                video.style.marginLeft = '0px';
+                video.style.marginTop = '0px';
+            }
+        }
 
+        // 監聽視窗變化並持續修正
+        window.addEventListener('resize', () => {
+            gameWidth = window.innerWidth;
+            gameHeight = window.innerHeight;
+            fixVideoSize();
+        });
+
+        // 定時檢查影片是否存在並修正 (因為 AR.js 載入需要時間)
+        const videoCheckInterval = setInterval(() => {
+            const video = document.getElementById('arjs-video');
+            if (video) {
+                fixVideoSize();
+                // 監聽影片本身的載入事件
+                video.addEventListener('loadedmetadata', fixVideoSize);
+                video.addEventListener('play', fixVideoSize);
+                // 稍微延遲後停止檢查，避免效能浪費，但 AR.js 有時會重設，所以保留 resize 監聽
+                clearInterval(videoCheckInterval);
+            }
+        }, 500);
+
+
+        // --- 遊戲主流程 ---
         function startGame() {
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
@@ -253,20 +240,16 @@
             timeLeft = 60;
             scoreEl.innerText = score;
             timerEl.innerText = timeLeft;
-            timerEl.style.color = '#1976d2';
-
             gameArea.innerHTML = '';
             items = [];
-
-            // 更新遊戲區域大小
-            gameHeight = window.innerHeight;
-            gameWidth = window.innerWidth;
-
             isGameRunning = true;
-            
-            // 增加生成數量，因為畫面變大了
-            spawnItems(8, 'good'); 
-            spawnItems(5, 'bad');  
+
+            // 修正一次影片大小
+            fixVideoSize();
+
+            // 生成物體
+            spawnItems(6, 'good'); 
+            spawnItems(4, 'bad');  
             
             gameLoop();
 
@@ -274,14 +257,7 @@
             timerInterval = setInterval(() => {
                 timeLeft--;
                 timerEl.innerText = timeLeft;
-
-                if (timeLeft <= 10) {
-                    timerEl.style.color = '#d32f2f';
-                }
-
-                if (timeLeft <= 0) {
-                    endGame();
-                }
+                if (timeLeft <= 0) endGame();
             }, 1000);
         }
 
@@ -296,193 +272,114 @@
             for (let i = 0; i < count; i++) {
                 const el = document.createElement('div');
                 el.classList.add('floating-item');
+                el.classList.add(type === 'good' ? 'good-item' : 'bad-item');
+                el.innerText = type === 'good' ? 
+                    goodWords[Math.floor(Math.random() * goodWords.length)] : 
+                    badWords[Math.floor(Math.random() * badWords.length)];
+                el.dataset.points = type === 'good' ? 15 : -5;
                 
-                let text = '';
-                if (type === 'good') {
-                    text = goodWords[Math.floor(Math.random() * goodWords.length)];
-                    el.classList.add('good-item');
-                    el.dataset.points = 15;
-                } else {
-                    text = badWords[Math.floor(Math.random() * badWords.length)];
-                    el.classList.add('bad-item');
-                    el.dataset.points = -5;
-                }
-                
-                el.innerText = text;
                 gameArea.appendChild(el);
 
-                const size = 80; 
-                const itemObj = {
+                const size = 70;
+                items.push({
                     element: el,
                     x: Math.random() * (gameWidth - size),
                     y: Math.random() * (gameHeight - size),
-                    vx: (Math.random() - 0.5) * 5, // 稍微調整速度
-                    vy: (Math.random() - 0.5) * 5, 
-                    width: size,
-                    height: size,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    width: size, height: size,
                     active: true
-                };
-                items.push(itemObj);
+                });
             }
         }
 
         function gameLoop() {
             if (!isGameRunning) return;
-            updatePlayerPosition();
-            updateItems();
-            checkCollisions();
-            requestAnimationFrame(gameLoop);
-        }
-
-        function updatePlayerPosition() {
+            
+            // 1. 更新玩家位置 (Marker)
             if (playerMarker.object3D.visible) {
                 const vector = new THREE.Vector3();
                 playerMarker.object3D.getWorldPosition(vector);
                 
+                // 投影 3D 座標到 2D 螢幕
                 const camera = document.querySelector('a-scene').camera;
                 vector.project(camera);
 
-                // 全螢幕座標轉換
-                const screenX = ((-vector.x + 1) / 2) * window.innerWidth;
-                const screenY = ((-vector.y + 1) / 2) * window.innerHeight;
+                const screenX = ((-vector.x + 1) / 2) * gameWidth;
+                const screenY = ((-vector.y + 1) / 2) * gameHeight;
 
-                playerScreenPos.x = screenX;
-                playerScreenPos.y = screenY;
-                playerScreenPos.visible = true;
+                playerScreenPos = { x: screenX, y: screenY, visible: true };
 
                 aimCursor.style.display = 'flex';
                 aimCursor.style.left = screenX + 'px';
                 aimCursor.style.top = screenY + 'px';
-                
-                // 檢查是否超出螢幕邊界
-                if (screenX < 0 || screenX > gameWidth || screenY < 0 || screenY > gameHeight) {
-                    aimCursor.style.borderColor = '#ccc';
-                    aimCursor.style.opacity = '0.5';
-                } else {
-                    aimCursor.style.borderColor = '#FFD700';
-                    aimCursor.style.opacity = '1';
-                }
-
             } else {
                 playerScreenPos.visible = false;
                 aimCursor.style.display = 'none';
             }
-        }
 
-        function updateItems() {
+            // 2. 更新漂浮物體位置與碰撞
             items.forEach(item => {
                 if (!item.active) return;
+                
+                // 移動
                 item.x += item.vx;
                 item.y += item.vy;
 
-                // 碰到視窗邊緣反彈
-                if (item.x <= 0 || item.x >= gameWidth - item.width) {
-                    item.vx *= -1;
-                    item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
-                }
-                if (item.y <= 0 || item.y >= gameHeight - item.height) {
-                    item.vy *= -1;
-                    item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
-                }
+                // 邊界反彈
+                if (item.x <= 0 || item.x >= gameWidth - item.width) item.vx *= -1;
+                if (item.y <= 0 || item.y >= gameHeight - item.height) item.vy *= -1;
+
+                // 限制在畫面內
+                item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
+                item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
 
                 item.element.style.left = item.x + 'px';
                 item.element.style.top = item.y + 'px';
-            });
-        }
 
-        function checkCollisions() {
-            if (!playerScreenPos.visible) return;
-            
-            const playerReachRadius = 50; 
-
-            items.forEach(item => {
-                if (!item.active) return;
-                const itemRadius = item.width / 2;
-                const itemCenterX = item.x + itemRadius;
-                const itemCenterY = item.y + itemRadius;
-                const dx = playerScreenPos.x - itemCenterX;
-                const dy = playerScreenPos.y - itemCenterY;
-                const distSq = dx*dx + dy*dy;
-                const threshold = playerReachRadius + itemRadius;
-
-                if (distSq < threshold * threshold) {
-                    handleCollision(item);
+                // 碰撞偵測
+                if (playerScreenPos.visible) {
+                    const dx = playerScreenPos.x - (item.x + item.width/2);
+                    const dy = playerScreenPos.y - (item.y + item.height/2);
+                    // 距離小於 (準心半徑 + 物體半徑)
+                    if ((dx*dx + dy*dy) < (40 + 35)**2) {
+                        handleHit(item);
+                    }
                 }
             });
+
+            requestAnimationFrame(gameLoop);
         }
 
-        function handleCollision(item) {
-            const points = parseInt(item.element.dataset.points);
-            score += points;
+        function handleHit(item) {
+            const pts = parseInt(item.element.dataset.points);
+            score += pts;
             scoreEl.innerText = score;
-            item.element.classList.add('hit-effect');
-            showScorePopup(points, item.x, item.y);
-            respawnItem(item);
-        }
-
-        function showScorePopup(points, x, y) {
+            
+            // 顯示分數特效
             const popup = document.createElement('div');
             popup.classList.add('score-popup');
-            popup.innerText = points > 0 ? `+${points}` : points;
-            popup.style.color = points > 0 ? '#2e7d32' : '#d32f2f';
-            popup.style.left = (x + 20) + 'px';
-            popup.style.top = (y - 20) + 'px';
+            popup.innerText = pts > 0 ? `+${pts}` : pts;
+            popup.style.color = pts > 0 ? '#2e7d32' : '#d32f2f';
+            popup.style.left = item.x + 'px';
+            popup.style.top = item.y + 'px';
             gameArea.appendChild(popup);
-            setTimeout(() => { popup.remove(); }, 800);
-        }
+            setTimeout(() => popup.remove(), 800);
 
-        function respawnItem(item) {
+            // 重生物體
             item.active = false;
-            item.element.style.transition = 'opacity 0.2s, transform 0.2s';
             item.element.style.opacity = '0';
-            item.element.style.transform = 'scale(0)';
-
             setTimeout(() => {
                 if (!isGameRunning) return;
-
-                item.element.classList.remove('hit-effect');
-                item.element.style.transition = 'none'; 
-                
-                if (item.element.classList.contains('good-item')) {
-                    item.element.innerText = goodWords[Math.floor(Math.random() * goodWords.length)];
-                } else {
-                    item.element.innerText = badWords[Math.floor(Math.random() * badWords.length)];
-                }
-
-                let newX, newY;
-                let safetyTries = 0;
-                do {
-                    newX = Math.random() * (gameWidth - item.width);
-                    newY = Math.random() * (gameHeight - item.height);
-                    safetyTries++;
-                    const dx = newX - playerScreenPos.x;
-                    const dy = newY - playerScreenPos.y;
-                    if (Math.sqrt(dx*dx + dy*dy) > 200) break;
-                } while (safetyTries < 5);
-
-                item.x = newX;
-                item.y = newY;
-                item.vx = (Math.random() - 0.5) * 5;
-                item.vy = (Math.random() - 0.5) * 5;
                 item.active = true;
-                
-                requestAnimationFrame(() => {
-                    item.element.style.transition = 'opacity 0.3s, transform 0.3s';
-                    item.element.style.opacity = '1';
-                    item.element.style.transform = 'scale(1)';
-                });
-
-            }, 400);
+                item.element.style.opacity = '1';
+                item.x = Math.random() * (gameWidth - item.width);
+                item.y = Math.random() * (gameHeight - item.height);
+                item.element.innerText = pts > 0 ? 
+                    goodWords[Math.floor(Math.random() * goodWords.length)] : 
+                    badWords[Math.floor(Math.random() * badWords.length)];
+            }, 500);
         }
-
-        window.addEventListener('resize', () => {
-            gameHeight = window.innerHeight;
-            gameWidth = window.innerWidth;
-            items.forEach(item => {
-                item.x = Math.min(item.x, gameWidth - item.width);
-                item.y = Math.min(item.y, gameHeight - item.height);
-            });
-        });
     </script>
 </body>
 </html>
