@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲 (高靈敏度版)</title>
+    <title>WebAR 新春碰撞遊戲 (座標修正版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <!-- 引入 A-Frame 和 AR.js -->
@@ -36,7 +36,7 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
 
-        /* 2D 輔助準心 (關鍵修改：讓玩家知道實際判定位置) */
+        /* 2D 輔助準心 */
         #aim-cursor {
             position: absolute;
             width: 100px;
@@ -52,14 +52,14 @@
         /* 漂浮元素的樣式 */
         .floating-item {
             position: absolute;
-            font-size: 45px; /* 字體加大 */
+            font-size: 45px;
             font-weight: bold;
             user-select: none;
             will-change: left, top;
             display: flex;
             justify-content: center;
             align-items: center;
-            width: 70px; /* 尺寸加大 */
+            width: 70px;
             height: 70px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.85);
@@ -126,7 +126,6 @@
     <!-- UI 層 -->
     <div id="ui-layer">
         <div id="score-board">分數: <span id="score">0</span></div>
-        <!-- 這是新增的 2D 準心，幫助玩家對準 -->
         <div id="aim-cursor"></div>
         <div id="game-area"></div>
     </div>
@@ -139,7 +138,7 @@
             <p>🔴 碰到紅字：<span style="color:#ff5252; font-weight:bold;">+15 分</span></p>
             <p>⚫ 碰到雜物：<span style="color:#aaa; font-weight:bold;">-5 分</span></p>
         </div>
-        <p style="font-size: 14px; color: #aaa;">(黃色虛線圈是對準位置)</p>
+        <p style="font-size: 14px; color: #aaa;">(請確認黃色圈圈與紅環重疊)</p>
         <button onclick="startGame()">開始遊戲</button>
     </div>
 
@@ -159,7 +158,6 @@
                       scale="-1 1 1">
                 <a-animation attribute="scale" to="1.1 1.1 1.1" direction="alternate" dur="600" repeat="indefinite"></a-animation>
             </a-entity>
-            <!-- 增加一個中心點提示 -->
             <a-circle color="yellow" radius="0.1" rotation="-90 0 0" position="0 0 0"></a-circle>
         </a-marker>
 
@@ -178,13 +176,12 @@
         const playerMarker = document.getElementById('player-marker');
         const aimCursor = document.getElementById('aim-cursor');
         
-        // 玩家屏幕座標
         let playerScreenPos = { x: -1000, y: -1000, visible: false };
 
         function startGame() {
             document.getElementById('start-screen').style.display = 'none';
             isGameRunning = true;
-            spawnItems(6, 'good'); // 增加數量
+            spawnItems(6, 'good'); 
             spawnItems(4, 'bad');  
             gameLoop();
         }
@@ -208,12 +205,12 @@
                 el.innerText = text;
                 gameArea.appendChild(el);
 
-                const size = 70; // 與 CSS 對應
+                const size = 70; 
                 const itemObj = {
                     element: el,
                     x: Math.random() * (window.innerWidth - size),
                     y: Math.random() * (window.innerHeight - size),
-                    vx: (Math.random() - 0.5) * 6, // 速度稍微加快
+                    vx: (Math.random() - 0.5) * 6, 
                     vy: (Math.random() - 0.5) * 6, 
                     width: size,
                     height: size,
@@ -241,20 +238,23 @@
                 const camera = document.querySelector('a-scene').camera;
                 vector.project(camera);
 
-                // 鏡像計算 (X 軸反轉)
-                const screenX = ((-vector.x + 1) / 2) * window.innerWidth;
+                // --- 修正重點 ---
+                // 之前是: ((-vector.x + 1) / 2) -> 導致左右相反
+                // 現在改為: ((vector.x + 1) / 2) -> 正常映射 (左邊是 -1, 右邊是 +1)
+                const screenX = ((vector.x + 1) / 2) * window.innerWidth;
+                
+                // Y 軸保持不變 (Three.js Y向上為正，HTML Y向下為正，所以要反轉)
                 const screenY = ((-vector.y + 1) / 2) * window.innerHeight;
 
                 playerScreenPos.x = screenX;
                 playerScreenPos.y = screenY;
                 playerScreenPos.visible = true;
 
-                // 更新 2D 準心位置 (視覺反饋)
+                // 更新 2D 準心位置
                 aimCursor.style.display = 'block';
                 aimCursor.style.left = screenX + 'px';
                 aimCursor.style.top = screenY + 'px';
                 
-                // 如果標記太靠近邊緣，改變準心顏色提示
                 if (screenX < 0 || screenX > window.innerWidth || screenY < 0 || screenY > window.innerHeight) {
                     aimCursor.style.borderColor = '#ccc';
                 } else {
@@ -291,9 +291,7 @@
         function checkCollisions() {
             if (!playerScreenPos.visible) return;
 
-            // 調整靈敏度：判定半徑
-            // 物品半徑約 35px，我們給玩家設定一個較大的抓取範圍 (90px)
-            // 這樣總判定距離就是 35 + 90 = 125px
+            // 保持高靈敏度設置
             const playerReachRadius = 90; 
 
             items.forEach(item => {
@@ -306,7 +304,6 @@
                 const dx = playerScreenPos.x - itemCenterX;
                 const dy = playerScreenPos.y - itemCenterY;
                 
-                // 不開根號，直接比較平方，性能稍微好一點點
                 const distSq = dx*dx + dy*dy;
                 const threshold = playerReachRadius + itemRadius;
 
@@ -322,12 +319,8 @@
             score += points;
             scoreEl.innerText = score;
 
-            // 視覺反饋：短暫放大
             item.element.classList.add('hit-effect');
-
             showScorePopup(points, item.x, item.y);
-
-            // 立即重生邏輯
             respawnItem(item);
         }
 
@@ -336,7 +329,6 @@
             popup.classList.add('score-popup');
             popup.innerText = points > 0 ? `+${points}` : points;
             popup.style.color = points > 0 ? '#2e7d32' : '#d32f2f';
-            // 稍微偏移一點，不要擋住視線
             popup.style.left = (x + 20) + 'px';
             popup.style.top = (y - 20) + 'px';
             
@@ -350,15 +342,13 @@
         function respawnItem(item) {
             item.active = false;
             
-            // 快速淡出
             item.element.style.transition = 'opacity 0.2s, transform 0.2s';
             item.element.style.opacity = '0';
             item.element.style.transform = 'scale(0)';
 
             setTimeout(() => {
-                // 重置樣式
                 item.element.classList.remove('hit-effect');
-                item.element.style.transition = 'none'; // 移除過渡以進行瞬間移動
+                item.element.style.transition = 'none'; 
                 
                 if (item.element.classList.contains('good-item')) {
                     item.element.innerText = goodWords[Math.floor(Math.random() * goodWords.length)];
@@ -366,14 +356,12 @@
                     item.element.innerText = badWords[Math.floor(Math.random() * badWords.length)];
                 }
 
-                // 隨機新位置 (遠離玩家當前位置，避免連續誤觸)
                 let newX, newY;
                 let safetyTries = 0;
                 do {
                     newX = Math.random() * (window.innerWidth - item.width);
                     newY = Math.random() * (window.innerHeight - item.height);
                     safetyTries++;
-                    // 簡單檢查是否離玩家太近
                     const dx = newX - playerScreenPos.x;
                     const dy = newY - playerScreenPos.y;
                     if (Math.sqrt(dx*dx + dy*dy) > 200) break;
@@ -387,7 +375,6 @@
 
                 item.active = true;
                 
-                // 淡入
                 requestAnimationFrame(() => {
                     item.element.style.transition = 'opacity 0.3s, transform 0.3s';
                     item.element.style.opacity = '1';
