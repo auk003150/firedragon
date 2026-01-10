@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebAR 新春碰撞遊戲</title>
+    <title>WebAR 新春碰撞遊戲 (高靈敏度版)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <!-- 引入 A-Frame 和 AR.js -->
@@ -18,7 +18,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* 讓點擊穿透到 AR 場景 */
+            pointer-events: none;
             z-index: 10;
         }
 
@@ -26,74 +26,99 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.9);
             padding: 15px 25px;
             border-radius: 15px;
-            border: 2px solid #d32f2f;
-            font-size: 24px;
+            border: 3px solid #d32f2f;
+            font-size: 28px;
             font-weight: bold;
             color: #d32f2f;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        /* 2D 輔助準心 (關鍵修改：讓玩家知道實際判定位置) */
+        #aim-cursor {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border: 3px dashed #FFD700; /* 金色虛線 */
+            border-radius: 50%;
+            transform: translate(-50%, -50%); /* 居中定位 */
+            display: none; /* 初始隱藏 */
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            transition: opacity 0.2s;
         }
 
         /* 漂浮元素的樣式 */
         .floating-item {
             position: absolute;
-            font-size: 40px;
+            font-size: 45px; /* 字體加大 */
             font-weight: bold;
             user-select: none;
-            transition: transform 0.1s linear;
             will-change: left, top;
             display: flex;
             justify-content: center;
             align-items: center;
-            width: 60px;
-            height: 60px;
+            width: 70px; /* 尺寸加大 */
+            height: 70px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.6);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            background: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 5;
         }
 
-        .good-item { color: #d32f2f; border: 2px solid #d32f2f; }
-        .bad-item { color: #555; border: 2px solid #555; }
+        .good-item { color: #d32f2f; border: 3px solid #d32f2f; }
+        .bad-item { color: #333; border: 3px solid #555; }
+
+        /* 碰撞時的閃爍效果 */
+        .hit-effect {
+            transform: scale(1.3);
+            background: #fffacd !important;
+        }
 
         /* 分數特效 */
         .score-popup {
             position: absolute;
-            font-size: 30px;
-            font-weight: bold;
-            animation: floatUp 1s ease-out forwards;
+            font-size: 40px;
+            font-weight: 900;
+            text-shadow: 2px 2px 0px #fff;
+            animation: floatUp 0.8s ease-out forwards;
+            z-index: 20;
         }
         
         @keyframes floatUp {
             0% { opacity: 1; transform: translateY(0) scale(1); }
-            100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+            100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
         }
 
         #start-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 20;
+            z-index: 30;
             pointer-events: auto;
             color: white;
             text-align: center;
         }
 
         button {
-            padding: 15px 30px;
-            font-size: 20px;
+            padding: 20px 40px;
+            font-size: 24px;
             background: #d32f2f;
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 50px;
             cursor: pointer;
-            margin-top: 20px;
+            margin-top: 30px;
+            font-weight: bold;
+            box-shadow: 0 0 15px #ff5252;
+            transition: transform 0.1s;
         }
+        button:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
@@ -101,36 +126,41 @@
     <!-- UI 層 -->
     <div id="ui-layer">
         <div id="score-board">分數: <span id="score">0</span></div>
+        <!-- 這是新增的 2D 準心，幫助玩家對準 -->
+        <div id="aim-cursor"></div>
         <div id="game-area"></div>
     </div>
 
     <!-- 開始畫面 -->
     <div id="start-screen">
-        <h1>WebAR 新春碰撞遊戲</h1>
-        <p>請準備好 Hiro Marker</p>
-        <p>🔴 碰到紅字 +15 分</p>
-        <p>⚫ 碰到雜物 -5 分</p>
+        <h1 style="font-size: 36px; margin-bottom: 10px;">🧧 WebAR 新春大碰撞 🧧</h1>
+        <p style="font-size: 18px; color: #ddd;">請準備好 Hiro Marker</p>
+        <div style="margin: 20px; text-align: left; display: inline-block;">
+            <p>🔴 碰到紅字：<span style="color:#ff5252; font-weight:bold;">+15 分</span></p>
+            <p>⚫ 碰到雜物：<span style="color:#aaa; font-weight:bold;">-5 分</span></p>
+        </div>
+        <p style="font-size: 14px; color: #aaa;">(黃色虛線圈是對準位置)</p>
         <button onclick="startGame()">開始遊戲</button>
     </div>
 
     <!-- A-Frame AR 場景 -->
     <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;'>
         
-        <!-- 攝像機 -->
         <a-entity camera></a-entity>
 
         <!-- Hiro Marker -->
-        <!-- 使用 scale="-1 1 1" 實現鏡像效果 -->
         <a-marker preset="hiro" id="player-marker">
-            <!-- 這是玩家控制的碰撞體 (一個紅色的環) -->
+            <!-- 3D 視覺模型 (紅環) -->
             <a-entity id="collider" 
-                      geometry="primitive: ring; radiusInner: 0.5; radiusOuter: 0.8" 
-                      material="color: red; opacity: 0.7; side: double" 
+                      geometry="primitive: ring; radiusInner: 0.6; radiusOuter: 0.9" 
+                      material="color: red; opacity: 0.6; side: double" 
                       rotation="-90 0 0"
                       position="0 0 0"
-                      scale="-1 1 1"> <!-- 這裡也加上鏡像以確保視覺一致 -->
-                <a-animation attribute="scale" to="1.2 1.2 1.2" direction="alternate" dur="500" repeat="indefinite"></a-animation>
+                      scale="-1 1 1">
+                <a-animation attribute="scale" to="1.1 1.1 1.1" direction="alternate" dur="600" repeat="indefinite"></a-animation>
             </a-entity>
+            <!-- 增加一個中心點提示 -->
+            <a-circle color="yellow" radius="0.1" rotation="-90 0 0" position="0 0 0"></a-circle>
         </a-marker>
 
     </a-scene>
@@ -142,24 +172,23 @@
         
         let score = 0;
         let isGameRunning = false;
-        let items = []; // 存儲屏幕上的元素對象
+        let items = []; 
         const gameArea = document.getElementById('game-area');
         const scoreEl = document.getElementById('score');
         const playerMarker = document.getElementById('player-marker');
+        const aimCursor = document.getElementById('aim-cursor');
         
-        // 玩家屏幕座標 (由 AR Marker 轉換而來)
+        // 玩家屏幕座標
         let playerScreenPos = { x: -1000, y: -1000, visible: false };
 
-        // 啟動遊戲
         function startGame() {
             document.getElementById('start-screen').style.display = 'none';
             isGameRunning = true;
-            spawnItems(5, 'good'); // 生成5個好詞
-            spawnItems(5, 'bad');  // 生成5個壞詞
+            spawnItems(6, 'good'); // 增加數量
+            spawnItems(4, 'bad');  
             gameLoop();
         }
 
-        // 生成元素
         function spawnItems(count, type) {
             for (let i = 0; i < count; i++) {
                 const el = document.createElement('div');
@@ -179,22 +208,21 @@
                 el.innerText = text;
                 gameArea.appendChild(el);
 
-                // 初始化位置和速度
+                const size = 70; // 與 CSS 對應
                 const itemObj = {
                     element: el,
-                    x: Math.random() * (window.innerWidth - 60),
-                    y: Math.random() * (window.innerHeight - 60),
-                    vx: (Math.random() - 0.5) * 4, // 水平速度
-                    vy: (Math.random() - 0.5) * 4, // 垂直速度
-                    width: 60,
-                    height: 60,
+                    x: Math.random() * (window.innerWidth - size),
+                    y: Math.random() * (window.innerHeight - size),
+                    vx: (Math.random() - 0.5) * 6, // 速度稍微加快
+                    vy: (Math.random() - 0.5) * 6, 
+                    width: size,
+                    height: size,
                     active: true
                 };
                 items.push(itemObj);
             }
         }
 
-        // 遊戲主循環
         function gameLoop() {
             if (!isGameRunning) return;
 
@@ -205,43 +233,40 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // 更新玩家(Marker)在屏幕上的 2D 座標
         function updatePlayerPosition() {
             if (playerMarker.object3D.visible) {
                 const vector = new THREE.Vector3();
                 playerMarker.object3D.getWorldPosition(vector);
                 
-                // 鏡像處理：因為 AR 場景通常是翻轉的，我們需要手動計算反向的 X 軸
-                // 這裡我們直接獲取標準投影，然後對 X 進行反轉處理以適配 WebAR 的鏡像體驗
-                vector.project(document.querySelector('a-scene').camera);
+                const camera = document.querySelector('a-scene').camera;
+                vector.project(camera);
 
-                // 將標準化設備坐標 (NDC) 轉換為屏幕坐標
-                // 注意：這裡的 X 軸計算使用了 (1 - ...) 或者反轉邏輯來實現鏡像
-                // 通常 WebAR 前置攝像頭是鏡像的，所以物體向右移，屏幕上應該向左。
-                // 但用戶要求「像在鏡子前一樣移動」，意味著我向右，屏幕裡的物體也向右。
-                // AR.js 默認行為有時會混亂，這裡我們通過調整計算公式來強制對齊。
-                
-                // 標準計算: x = (vector.x + 1) / 2 * width
-                // 鏡像計算: x = (1 - (vector.x + 1) / 2) * width  => 相當於 x = (-vector.x + 1) / 2 * width
-                
-                // 由於我們在 HTML 中對 marker 內容加了 scale="-1 1 1"，視覺上模型已經翻轉。
-                // 這裡我們計算屏幕碰撞點時，直接使用標準映射，但因為 CSS 絕對定位是 left/top，
-                // 我們需要根據實際體驗調整。
-                
-                // 經過測試，為了讓用戶感覺像照鏡子（手往右，屏幕上的圈圈也往右），
-                // 我們需要反轉 X 軸的 NDC 座標。
+                // 鏡像計算 (X 軸反轉)
                 const screenX = ((-vector.x + 1) / 2) * window.innerWidth;
                 const screenY = ((-vector.y + 1) / 2) * window.innerHeight;
 
                 playerScreenPos.x = screenX;
                 playerScreenPos.y = screenY;
                 playerScreenPos.visible = true;
+
+                // 更新 2D 準心位置 (視覺反饋)
+                aimCursor.style.display = 'block';
+                aimCursor.style.left = screenX + 'px';
+                aimCursor.style.top = screenY + 'px';
+                
+                // 如果標記太靠近邊緣，改變準心顏色提示
+                if (screenX < 0 || screenX > window.innerWidth || screenY < 0 || screenY > window.innerHeight) {
+                    aimCursor.style.borderColor = '#ccc';
+                } else {
+                    aimCursor.style.borderColor = '#FFD700';
+                }
+
             } else {
                 playerScreenPos.visible = false;
+                aimCursor.style.display = 'none';
             }
         }
 
-        // 更新漂浮元素位置
         function updateItems() {
             items.forEach(item => {
                 if (!item.active) return;
@@ -249,7 +274,6 @@
                 item.x += item.vx;
                 item.y += item.vy;
 
-                // 邊界反彈
                 if (item.x <= 0 || item.x >= window.innerWidth - item.width) {
                     item.vx *= -1;
                     item.x = Math.max(0, Math.min(item.x, window.innerWidth - item.width));
@@ -264,44 +288,46 @@
             });
         }
 
-        // 碰撞檢測
         function checkCollisions() {
             if (!playerScreenPos.visible) return;
 
-            // 定義玩家碰撞半徑 (像素)
-            const playerRadius = 50; 
+            // 調整靈敏度：判定半徑
+            // 物品半徑約 35px，我們給玩家設定一個較大的抓取範圍 (90px)
+            // 這樣總判定距離就是 35 + 90 = 125px
+            const playerReachRadius = 90; 
 
             items.forEach(item => {
                 if (!item.active) return;
 
-                // 簡單的圓形碰撞檢測
-                // 物品中心
-                const itemCenterX = item.x + item.width / 2;
-                const itemCenterY = item.y + item.height / 2;
+                const itemRadius = item.width / 2;
+                const itemCenterX = item.x + itemRadius;
+                const itemCenterY = item.y + itemRadius;
 
                 const dx = playerScreenPos.x - itemCenterX;
                 const dy = playerScreenPos.y - itemCenterY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // 不開根號，直接比較平方，性能稍微好一點點
+                const distSq = dx*dx + dy*dy;
+                const threshold = playerReachRadius + itemRadius;
 
-                // 判定碰撞
-                if (distance < (playerRadius + item.width / 2)) {
+                if (distSq < threshold * threshold) {
                     handleCollision(item);
                 }
             });
         }
 
-        // 處理碰撞邏輯
         function handleCollision(item) {
             const points = parseInt(item.element.dataset.points);
             
-            // 更新分數
             score += points;
             scoreEl.innerText = score;
 
-            // 顯示特效文字
+            // 視覺反饋：短暫放大
+            item.element.classList.add('hit-effect');
+
             showScorePopup(points, item.x, item.y);
 
-            // 重置該物品位置 (使其重生)
+            // 立即重生邏輯
             respawnItem(item);
         }
 
@@ -309,48 +335,69 @@
             const popup = document.createElement('div');
             popup.classList.add('score-popup');
             popup.innerText = points > 0 ? `+${points}` : points;
-            popup.style.color = points > 0 ? '#2e7d32' : '#c62828'; // 綠色加分，紅色減分
-            popup.style.left = x + 'px';
-            popup.style.top = y + 'px';
+            popup.style.color = points > 0 ? '#2e7d32' : '#d32f2f';
+            // 稍微偏移一點，不要擋住視線
+            popup.style.left = (x + 20) + 'px';
+            popup.style.top = (y - 20) + 'px';
             
             gameArea.appendChild(popup);
 
-            // 動畫結束後移除
             setTimeout(() => {
                 popup.remove();
-            }, 1000);
+            }, 800);
         }
 
         function respawnItem(item) {
-            // 暫時隱藏
             item.active = false;
+            
+            // 快速淡出
+            item.element.style.transition = 'opacity 0.2s, transform 0.2s';
             item.element.style.opacity = '0';
+            item.element.style.transform = 'scale(0)';
 
-            // 隨機延遲後重生
             setTimeout(() => {
-                // 重新隨機選擇文字
+                // 重置樣式
+                item.element.classList.remove('hit-effect');
+                item.element.style.transition = 'none'; // 移除過渡以進行瞬間移動
+                
                 if (item.element.classList.contains('good-item')) {
                     item.element.innerText = goodWords[Math.floor(Math.random() * goodWords.length)];
                 } else {
                     item.element.innerText = badWords[Math.floor(Math.random() * badWords.length)];
                 }
 
-                // 隨機新位置 (避免直接生在玩家臉上)
-                item.x = Math.random() * (window.innerWidth - 60);
-                item.y = Math.random() * (window.innerHeight - 60);
+                // 隨機新位置 (遠離玩家當前位置，避免連續誤觸)
+                let newX, newY;
+                let safetyTries = 0;
+                do {
+                    newX = Math.random() * (window.innerWidth - item.width);
+                    newY = Math.random() * (window.innerHeight - item.height);
+                    safetyTries++;
+                    // 簡單檢查是否離玩家太近
+                    const dx = newX - playerScreenPos.x;
+                    const dy = newY - playerScreenPos.y;
+                    if (Math.sqrt(dx*dx + dy*dy) > 200) break;
+                } while (safetyTries < 5);
+
+                item.x = newX;
+                item.y = newY;
                 
-                // 隨機新速度
-                item.vx = (Math.random() - 0.5) * 5;
-                item.vy = (Math.random() - 0.5) * 5;
+                item.vx = (Math.random() - 0.5) * 6;
+                item.vy = (Math.random() - 0.5) * 6;
 
                 item.active = true;
-                item.element.style.opacity = '1';
-            }, 500);
+                
+                // 淡入
+                requestAnimationFrame(() => {
+                    item.element.style.transition = 'opacity 0.3s, transform 0.3s';
+                    item.element.style.opacity = '1';
+                    item.element.style.transform = 'scale(1)';
+                });
+
+            }, 400);
         }
 
-        // 窗口大小改變時調整
         window.addEventListener('resize', () => {
-            // 確保物品不跑出去
             items.forEach(item => {
                 item.x = Math.min(item.x, window.innerWidth - item.width);
                 item.y = Math.min(item.y, window.innerHeight - item.height);
