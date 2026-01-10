@@ -3,82 +3,179 @@
 <head>
   <meta charset="UTF-8" />
   <title>Hiro Marker AR Demo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- A-Frame -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  
+  <!-- A-Frame 1.4.2 -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <!-- AR.js for A-Frame -->
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+
   <style>
-    html, body { margin: 0; padding: 0; overflow: hidden; }
+    html, body { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; }
     body { font-family: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+    
+    /* 頂部遮罩與狀態列 */
     .overlay {
       position: fixed;
       top: 0; left: 0; right: 0;
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 16px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0));
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.8), rgba(0,0,0,0));
       color: #fff; z-index: 10; pointer-events: none;
       font-size: 14px;
     }
+
+    /* 底部提示區 */
     .hint {
       position: fixed;
       bottom: 0; left: 0; right: 0;
-      padding: 10px 14px;
-      background: linear-gradient(0deg, rgba(0,0,0,0.7), rgba(0,0,0,0));
+      padding: 20px;
+      padding-bottom: 30px; /* 避開某些手機的底部手勢區 */
+      background: linear-gradient(0deg, rgba(0,0,0,0.8), rgba(0,0,0,0));
       color: #fff; z-index: 10; text-align: center;
-      font-size: 13px; pointer-events: none;
+      font-size: 14px; pointer-events: none;
+      line-height: 1.5;
     }
+
+    /* 狀態標籤 */
     .badge {
-      background: rgba(255,255,255,0.12);
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(4px);
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.3);
       pointer-events: auto;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      display: flex; align-items: center; gap: 6px;
     }
+
+    /* 偵測到標記時的樣式 */
+    .badge.active {
+      background: rgba(46, 204, 113, 0.8);
+      border-color: rgba(46, 204, 113, 1);
+      box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+    }
+
+    /* 狀態圓點 */
+    .status-dot {
+      width: 8px; height: 8px;
+      background-color: #ff4757;
+      border-radius: 50%;
+      transition: background-color 0.3s;
+    }
+    .badge.active .status-dot {
+      background-color: #fff;
+    }
+
     .link {
-      color: #9ad6ff; text-decoration: underline; pointer-events: auto;
+      color: #74b9ff; text-decoration: none; 
+      border-bottom: 1px dashed #74b9ff;
+      pointer-events: auto;
+      font-weight: bold;
     }
+
     @media (max-width: 640px) {
-      .overlay { font-size: 13px; padding: 10px 12px; }
-      .hint { font-size: 12px; padding: 8px 12px; }
+      .overlay { font-size: 13px; padding: 12px; }
+      .hint { font-size: 13px; padding: 15px; }
     }
   </style>
 </head>
 <body>
+
+  <!-- UI 介面 -->
   <div class="overlay">
-    <div class="badge">Hiro Marker AR</div>
-    <div>
-      若未顯示，請確認已允許「攝影機」權限
+    <div class="badge" id="status-badge">
+      <div class="status-dot"></div>
+      <span id="status-text">搜尋標記中...</span>
     </div>
   </div>
+
   <div class="hint">
-    將 Hiro 標記置於鏡頭前方，3D 物件會出現在標記上。<br/>
-    沒有標記？可列印：<a class="link" href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/aframe/examples/marker-training/examples/pattern-files/pattern-hiro.png" target="_blank" rel="noopener">下載 Hiro 圖</a>
+    請將鏡頭對準 Hiro 標記<br/>
+    沒有標記？<a class="link" href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/aframe/examples/marker-training/examples/pattern-files/pattern-hiro.png" target="_blank" rel="noopener">點此下載並列印</a>
   </div>
 
+  <!-- AR 場景 -->
+  <!-- 
+       vr-mode-ui="enabled: false" : 隱藏 VR 眼鏡按鈕
+       renderer : 優化渲染效果，減少破圖與鋸齒
+       arjs : 設定使用 Webcam，關閉除錯介面
+  -->
   <a-scene
     vr-mode-ui="enabled: false"
     embedded
-    renderer="logarithmicDepthBuffer: true; antialias: true;"
-    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; maxDetectionRate: 30;"
+    renderer="logarithmicDepthBuffer: true; antialias: true; colorManagement: true;"
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; maxDetectionRate: 60;"
   >
-    <!-- 光源 -->
-    <a-entity light="type: ambient; color: #cccccc"></a-entity>
-    <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="1 1 0.5"></a-entity>
+    
+    <!-- 燈光設定 -->
+    <a-entity light="type: ambient; color: #BBB"></a-entity>
+    <a-entity light="type: directional; color: #FFF; intensity: 1.2" position="-0.5 1 1"></a-entity>
 
     <!-- Hiro 標記 -->
-    <a-marker preset="hiro">
-      <!-- 3D 物件：一個旋轉的立方體 -->
-      <a-box position="0 0.5 0" depth="1" height="1" width="1"
-             color="#4FC3F7"
-             animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
-      </a-box>
-      <!-- 一個小圓柱當底座 -->
-      <a-cylinder position="0 0 0" radius="0.35" height="0.1" color="#FFC107"></a-cylinder>
+    <!-- 加入 emitevents="true" 以便 JS 監聽事件 -->
+    <a-marker preset="hiro" id="hiro-marker" emitevents="true" smooth="true">
+      
+      <!-- 3D 群組容器 -->
+      <a-entity position="0 0 0" scale="1 1 1">
+        
+        <!-- 核心立方體 (半透明) -->
+        <a-box 
+          position="0 0.5 0" 
+          depth="1" height="1" width="1"
+          material="color: #00a8ff; opacity: 0.7; transparent: true; metalness: 0.5; roughness: 0.2"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear">
+        </a-box>
+
+        <!-- 內部線框 (增加科技感) -->
+        <a-box 
+          position="0 0.5 0" 
+          depth="1.05" height="1.05" width="1.05"
+          material="wireframe: true; color: #fff; opacity: 0.5"
+          animation="property: rotation; to: 0 -360 0; loop: true; dur: 10000; easing: linear">
+        </a-box>
+
+        <!-- 底座圓環 -->
+        <a-ring 
+          position="0 0.05 0" 
+          rotation="-90 0 0" 
+          radius-inner="0.6" 
+          radius-outer="0.7" 
+          color="#fbc531"
+          animation="property: scale; dir: alternate; to: 1.2 1.2 1.2; loop: true; dur: 1000; easing: easeInOutSine">
+        </a-ring>
+
+      </a-entity>
+
     </a-marker>
 
     <!-- 相機 -->
     <a-entity camera></a-entity>
   </a-scene>
+
+  <!-- 互動邏輯腳本 -->
+  <script>
+    // 等待頁面載入完成
+    window.addEventListener('load', () => {
+      const marker = document.querySelector('#hiro-marker');
+      const badge = document.querySelector('#status-badge');
+      const statusText = document.querySelector('#status-text');
+
+      // 當偵測到標記時
+      marker.addEventListener('markerFound', () => {
+        badge.classList.add('active');
+        statusText.textContent = '已鎖定目標';
+        console.log("Marker Found");
+      });
+
+      // 當標記遺失時
+      marker.addEventListener('markerLost', () => {
+        badge.classList.remove('active');
+        statusText.textContent = '搜尋標記中...';
+        console.log("Marker Lost");
+      });
+    });
+  </script>
 </body>
 </html>
