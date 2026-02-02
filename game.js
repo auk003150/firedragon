@@ -8,6 +8,13 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+// Audio Files
+const crunchSound = new Audio('Crunch.mp3'); // For emoji bubbles
+const collectSound = new Audio('Collect.mp3'); // For one-word bubbles
+const bgm = new Audio('bgm.mp3'); // Background music
+const endMusic = new Audio('end.mp3'); // Game end music
+bgm.loop = true; // Set background music to loop
+
 let score = 0, gameTimer = 60, gameRunning = true, wristPos = {x: canvas.width/2, y: canvas.height/2};
 let bubbles = [];
 let lastSpawn = 0;
@@ -17,7 +24,7 @@ let rightwrist = null;
 
 function spawnBubble() {
   let isEmoji = Math.random() < 0.6; // 60% emoji, 40% word
-  let text = isEmoji ? EMOJIS[Math.floor(Math.random()*EMOJIS.length)] : WORDS[Math.floor(Math.random()*WORDS.length)];
+  let text = isEmoji ? EMOJIS[Math.floor(Math.random() * EMOJIS.length)] : WORDS[Math.floor(Math.random() * WORDS.length)];
   let x = Math.random() * (canvas.width - 80) + 40, y = -40;
   let speed = Math.random() * 2 + 2;
   let type = isEmoji ? 'emoji' : 'word';
@@ -64,8 +71,13 @@ function collision(bubble, dragonPos) {
 function updateScoreAndHit() {
   for (let i = bubbles.length - 1; i >= 0; i--) {
     if (collision(bubbles[i], dragonPos)) {
-      if (bubbles[i].type === 'emoji') score -= 5; // Emoji: negative
-      else score += 10; // Word: positive
+      if (bubbles[i].type === 'emoji') {
+        score -= 5; // Emoji: negative
+        crunchSound.play(); // Play crunch sound
+      } else {
+        score += 10; // Word: positive
+        collectSound.play(); // Play collect sound
+      }
       bubbles.splice(i, 1);
       document.getElementById('score').textContent = Math.max(0, score);
     }
@@ -106,7 +118,9 @@ let timerInterval = setInterval(() => {
 }, 1000);
 
 function endGame() {
-  gameRunning = false;
+  gameRunning = false; // Stop game loop
+  bgm.pause(); // Stop background music
+  endMusic.play(); // Play end music
   document.getElementById('gameOver').classList.remove('hidden');
   document.getElementById('finalScore').textContent = score;
   canvas.style.filter = 'grayscale(0.6) blur(2px)';
@@ -133,7 +147,7 @@ function startHandTracking() {
       // Landmarks[0]-> Wrist is index 0, index finger tip is 8
       let wristMarker = results.multiHandLandmarks[0][0];
       if (wristMarker) {
-        let x = wristMarker.x;
+        let x = canvas.width
         let y = wristMarker.y * canvas.height;
         dragonPos.x = x;
         dragonPos.y = y;
@@ -153,6 +167,7 @@ function startHandTracking() {
 
 function startGame() {
   DRAGON.onload = function() {
+    bgm.play(); // Start background music
     startHandTracking();
     requestAnimationFrame(gameLoop);
   }
