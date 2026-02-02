@@ -86,7 +86,8 @@ function drawDragon(ctx, x, y, scale) {
 }
 
 function collision(bubble, x, y) {
-  let dx = bubble.x - x, dy = bubble.y - y;
+  let dx = bubble.x - x;
+  let dy = bubble.y - y;
   return Math.sqrt(dx * dx + dy * dy) < bubble.radius + 40; // Collision logic based on sizes
 }
 
@@ -95,10 +96,10 @@ function updateScoreAndHit() {
     if (collision(b, dragonPos.x, dragonPos.y)) {
       if (b.type === 'emoji') {
         score = Math.max(0, score - 5);
-        crunchSound.play(); // Play crunch sound effect
+        crunchSound.play();
       } else {
         score += 10;
-        collectSound.play(); // Play collect sound effect
+        collectSound.play();
       }
       bubbles.splice(idx, 1);
       document.getElementById('score').textContent = score;
@@ -108,6 +109,41 @@ function updateScoreAndHit() {
 
 function drawBackground() {
   ctx.drawImage(BACKGROUND, 0, 0, canvas.width, canvas.height);
+}
+
+// MediaPipe Wrist Tracking Logic
+const videoElement = document.getElementById('webcam');
+let camera;
+
+async function startHandTracking() {
+  const hands = new Hands({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+  });
+  hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.75,
+    minTrackingConfidence: 0.75
+  });
+
+  hands.onResults(results => {
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+      let wristMarker = results.multiHandLandmarks[0][0]; // Index 0 is wrist
+      if (wristMarker) {
+        dragonPos.x = canvas.width - wristMarker.x * canvas.width; // Flip x coordinate
+        dragonPos.y = wristMarker.y * canvas.height;
+      }
+    }
+  });
+
+  camera = new Camera(videoElement, {
+    onFrame: async () => {
+      await hands.send({ image: videoElement });
+    },
+    width: canvas.width,
+    height: canvas.height
+  });
+  camera.start();
 }
 
 function gameLoop(ts) {
@@ -148,6 +184,7 @@ let timerInterval = setInterval(() => {
 
 function startGame() {
   bgm.play();
+  startHandTracking(); // Reintroduce hand tracking
   gameLoop();
 }
 document.getElementById('webcam').addEventListener('loadeddata', startGame);
