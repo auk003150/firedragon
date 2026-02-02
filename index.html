@@ -1,90 +1,20 @@
-<script>
-    // --- MediaPipe Hand Detection ---
-    const videoElement = document.getElementById('video-input');
-    const statusText = document.getElementById('status-text');
-    let handDetector = null;
-    let handsDetected = false;
-
-    async function initCameraAndHandDetection() {
-        try {
-            // Ask for video camera permission from the user
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            videoElement.srcObject = stream;
-
-            // Initialize the hand detector after the camera is set up
-            await initHandTracking();
-
-        } catch (err) {
-            console.error("Error accessing the camera: ", err);
-            statusText.style.display = 'block';
-            statusText.innerText = "Error: Unable to access camera. Please check permissions!";
-        }
-    }
-
-    async function initHandTracking() {
-        const hands = new Hands({
-            locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1633559619/${file}`;
-            }
-        });
-
-        hands.setOptions({
-            maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.5
-        });
-
-        hands.onResults(onHandsResults);
-        handDetector = hands;
-
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await hands.send({ image: videoElement });
-            },
-            width: 1280,
-            height: 720
-        });
-        camera.start();
-    }
-
-    let rightHandPos = { x: -100, y: -100, visible: false };
-    const landmarkIndices = {
-        MIDDLE_FINGER_TIP: 12,  // Middle finger tip landmark
-        WRIST: 0,
-    };
-
-    function onHandsResults(results) {
-        if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
-            rightHandPos.visible = false;
-            handsDetected = false;
-            if (statusText) statusText.style.display = 'block';
-            statusText.innerText = "Please raise your right hand!";
-            return;
-        }
-
-        handsDetected = true;
-        if (statusText) statusText.style.display = 'none';
-
-        // Use the first detected hand landmarks for tracking
-        const landmarks = results.multiHandLandmarks[0];
-        const handedness = results.multiHandedness && results.multiHandedness[0];
-
-        // Only track the right hand
-        if (handedness && handedness.label === 'Left') {
-            rightHandPos.visible = false;
-            return;
-        }
-
-        // Update right hand position using the middle finger tip landmark
-        const fingerTip = landmarks[landmarkIndices.MIDDLE_FINGER_TIP];
-        rightHandPos.x = fingerTip.x * window.innerWidth;
-        rightHandPos.y = fingerTip.y * window.innerHeight;
-        rightHandPos.visible = true;
-    }
-
-    // Call this when the page loads
-    window.addEventListener('load', () => {
-        initCameraAndHandDetection();
-    });
-</script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WebAR Dragon Wrist Game</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="scoreboard">
+    <div>Score: <span id="score">0</span></div>
+    <div>Time: <span id="timer">60</span>s</div>
+  </div>
+  <video id="webcam" autoplay playsinline style="display:none"></video>
+  <canvas id="gameCanvas"></canvas>
+  <div id="gameOver" class="hidden">Game Over!<br>Final Score: <span id="finalScore"></span><br><button onclick="window.location.reload()">Play Again</button></div>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
