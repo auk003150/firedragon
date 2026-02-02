@@ -6,150 +6,6 @@
   <title>Wrist Dragon Bubble Game</title>
 
   <style>
-    :root {
-      --hud-bg: rgba(0,0,0,0.55);
-      --hud-fg: #fff;
-      --accent: #ffd166;
-    }
-    html, body {
-      height: 100%;
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color: var(--hud-fg);
-      background: #111;
-      overflow: hidden;
-    }
-    #stage {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      background: url("image_1.png") center/cover no-repeat fixed;
-    }
-    #cameraWrap {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-    }
-    #video {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1);
-      opacity: 0.18;
-      filter: saturate(1.1) contrast(1.05);
-    }
-    #gameCanvas {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-    }
-    #hud {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      right: 12px;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      justify-content: space-between;
-      pointer-events: none;
-    }
-    .panel {
-      background: var(--hud-bg);
-      border: 1px solid rgba(255,255,255,0.14);
-      backdrop-filter: blur(4px);
-      padding: 10px 12px;
-      border-radius: 12px;
-      display: flex;
-      gap: 14px;
-      align-items: center;
-      pointer-events: none;
-    }
-    .stat { display: grid; gap: 2px; line-height: 1.1; }
-    .label { font-size: 12px; opacity: 0.85; }
-    .value { font-size: 18px; font-weight: 700; color: var(--accent); }
-
-    #overlay {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      background: radial-gradient(circle at center, rgba(0,0,0,0.35), rgba(0,0,0,0.78));
-    }
-    #card {
-      width: min(560px, calc(100vw - 36px));
-      background: rgba(0,0,0,0.65);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 18px;
-      padding: 18px 18px 14px;
-      box-shadow: 0 18px 60px rgba(0,0,0,0.4);
-    }
-    #card h1 { margin: 0 0 8px; font-size: 20px; letter-spacing: 0.2px; }
-    #card p { margin: 6px 0; opacity: 0.9; font-size: 14px; line-height: 1.35; }
-    #controls { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
-    button {
-      pointer-events: auto;
-      cursor: pointer;
-      border: 0;
-      border-radius: 12px;
-      padding: 10px 14px;
-      font-weight: 700;
-      background: var(--accent);
-      color: #111;
-    }
-    button.secondary {
-      background: rgba(255,255,255,0.14);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.18);
-    }
-    button:disabled { opacity: 0.7; cursor: not-allowed; }
-    #hint { margin-top: 10px; font-size: 12px; opacity: 0.8; }
-  </style>
-</head>
-
-<body>
-  <div id="stage">
-    <div id="cameraWrap">
-      <video id="video" playsinline autoplay muted></video>
-      <canvas id="gameCanvas"></canvas>
-    </div>
-
-    <div id="hud">
-      <div class="panel">
-        <div class="stat">
-          <div class="label">Score</div>
-          <div id="score" class="value">0</div>
-        </div>
-        <div class="stat">
-          <div class="label">Time</div>
-          <div id="time" class="value">60</div>
-        </div>
-      </div>
-
-      <div class="panelYou’re hitting two separate issues:
-
-1) `Unexpected token 'export'` happens when the page is not being served as a proper module-capable HTTP site (common when opening `index.html` via `file://` or when the server sends the wrong MIME type for `.mjs`). MediaPipe’s docs show `vision_bundle.mjs` should be loaded as an ES module from a web server/CDN. [page:0]  
-2) `hand_landmarker.task 404` means the model file is not at the path you used; MediaPipe expects you to download it and point `modelAssetPath` to the correct location. [page:0]
-
-Below is an updated full code that avoids the `.mjs` script tag entirely by importing Tasks Vision as an ES module (`type="module"`) and uses a **configurable model path**. It also shows a clear warning to run via a local server.
-
----
-
-## Updated index.html (replace your whole file)
-
-Make sure your server can serve `.task` files and that `hand_landmarker.task` is actually in the same folder as this HTML (or change `MODEL_PATH`). MediaPipe’s web guide explicitly requires downloading a compatible model and referencing its path. [page:0]
-
-```html
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wrist Dragon Bubble Game</title>
-
-  <style>
     :root { --hud-bg: rgba(0,0,0,0.55); --hud-fg:#fff; --accent:#ffd166; }
     html, body { height:100%; margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:var(--hud-fg); background:#111; overflow:hidden; }
     #stage { position:relative; width:100vw; height:100vh; background:url("image_1.png") center/cover no-repeat fixed; }
@@ -161,6 +17,7 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
     .stat { display:grid; gap:2px; line-height:1.1; }
     .label { font-size:12px; opacity:0.85; }
     .value { font-size:18px; font-weight:700; color:var(--accent); }
+
     #overlay { position:absolute; inset:0; display:grid; place-items:center; background:radial-gradient(circle at center, rgba(0,0,0,0.35), rgba(0,0,0,0.78)); }
     #card { width:min(600px, calc(100vw - 36px)); background:rgba(0,0,0,0.65); border:1px solid rgba(255,255,255,0.18); border-radius:18px; padding:18px 18px 14px; box-shadow:0 18px 60px rgba(0,0,0,0.4); }
     #card h1 { margin:0 0 8px; font-size:20px; letter-spacing:0.2px; }
@@ -168,9 +25,9 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
     #controls { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
     button { pointer-events:auto; cursor:pointer; border:0; border-radius:12px; padding:10px 14px; font-weight:700; background:var(--accent); color:#111; }
     button.secondary { background:rgba(255,255,255,0.14); color:#fff; border:1px solid rgba(255,255,255,0.18); }
+    button:disabled { opacity:0.7; cursor:not-allowed; }
     #hint { margin-top:10px; font-size:12px; opacity:0.85; }
     #err { margin-top:10px; font-size:12px; color:#ffb4b4; white-space:pre-wrap; display:none; }
-    code { background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:8px; }
   </style>
 </head>
 
@@ -210,26 +67,23 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
         <h1>Tai Hang Fire Dragon — Wrist Game</h1>
         <p>Raise your <b>right</b> hand and move your wrist to control the dragon.</p>
         <p>Hit word bubbles (+10). Avoid emoji bubbles (−5).</p>
-        <p>If you see “export” errors, don’t open via <code>file://</code>; run a local server.</p>
         <div id="controls">
           <button id="startBtn">Start (unlock audio + camera)</button>
           <button id="mirrorBtn" class="secondary">Mirror camera: ON</button>
           <button id="restartBtn" class="secondary" style="display:none;">Play again</button>
         </div>
-        <div id="hint">Model file required: <code>hand_landmarker.task</code> in the same folder (or change MODEL_PATH). </div>
+        <div id="hint">Using the official hosted hand landmarker model URL to avoid GitHub Pages 404s. [web:23]</div>
         <div id="err"></div>
       </div>
     </div>
   </div>
 
   <script type="module">
-    // Import Tasks Vision as a module (avoid separate .mjs script tag issues) 
     import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
-    // -----------------------------
-    // IMPORTANT: configure model path
-    // -----------------------------
-    const MODEL_PATH = "./hand_landmarker.task"; // put the file here, or change this path. 
+    // Official model URL example from @mediapipe/tasks-vision docs [web:23]
+    const MODEL_URL =
+      "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
     const EMOJIS = ['⚽', '🍔', '🎧', '🧊', '🧧', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
     const WORDS  = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '馬', '年'];
@@ -272,7 +126,6 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
       const p = audio.play();
       if (p && typeof p.catch === "function") p.catch(() => {});
     }
-
     function showErr(msg) {
       errEl.style.display = "block";
       errEl.textContent = msg;
@@ -282,20 +135,11 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
     let lastVideoTime = -1;
 
     async function initHandLandmarker() {
-      // WASM assets path per MediaPipe guide 
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-      ); // 
-
-      // Model must exist at MODEL_PATH 
-      handLandmarker = await HandLandmarker.createFromOptions(vision, {
-        baseOptions: { modelAssetPath: MODEL_PATH },
-        runningMode: "VIDEO",
-        numHands: 2,
-        minHandDetectionConfidence: 0.5,
-        minHandPresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      }); // 
+      );
+      // Use hosted model URL (no local .task needed) [web:23]
+      handLandmarker = await HandLandmarker.createFromModelPath(vision, MODEL_URL);
     }
 
     async function initCamera() {
@@ -316,8 +160,7 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
     let spawnTimer = 0;
     let gameTimerInterval = null;
 
-    let dragonX = 0.5;
-    let dragonY = 0.65;
+    let dragonX = 0.5, dragonY = 0.65;
     let dragonPx = { x: 0, y: 0 };
     let dragonVel = { x: 0, y: 0 };
     let hasWrist = false;
@@ -335,8 +178,8 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
     function spawnBubble() {
       const isEmoji = Math.random() < 0.55;
       const text = isEmoji ? pick(EMOJIS) : pick(WORDS);
-
       const w = window.innerWidth, h = window.innerHeight;
+
       bubbles.push({
         id: crypto.randomUUID(),
         kind: isEmoji ? "emoji" : "word",
@@ -475,11 +318,9 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
 
       const fill = (b.kind === "emoji") ? "rgba(255, 90, 90, 0.22)" : "rgba(80, 255, 170, 0.18)";
       const stroke = (b.kind === "emoji") ? "rgba(255, 90, 90, 0.7)" : "rgba(80, 255, 170, 0.75)";
-
       ctx.fillStyle = fill;
       ctx.strokeStyle = stroke;
       ctx.lineWidth = 2;
-
       ctx.beginPath(); ctx.arc(0, 0, b.r, 0, Math.PI * 2);
       ctx.fill(); ctx.stroke();
 
@@ -499,17 +340,15 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
       let idx = 0;
       if (result.handednesses && result.handednesses.length) {
         const rightIndex = result.handednesses.findIndex(h =>
-          h && h && String(h.categoryName).toLowerCase() === "right"
+          h && h[0] && String(h[0].categoryName).toLowerCase() === "right"
         );
         if (rightIndex >= 0) idx = rightIndex;
       }
 
       const lm = result.landmarks[idx];
-      if (!lm || !lm) return; // wrist is landmark 0 
+      if (!lm || !lm[0]) return; // landmark 0 = wrist
 
-      let x = lm.x;
-      let y = lm.y;
-
+      let x = lm[0].x, y = lm[0].y;
       if (mirror) x = 1 - x;
 
       dragonX = dragonX + (x - dragonX) * SMOOTHING;
@@ -522,13 +361,14 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
 
       if (video.readyState >= 2 && handLandmarker) {
         if (video.currentTime !== lastVideoTime) {
-          const res = handLandmarker.detectForVideo(video, performance.now()); // 
+          const res = handLandmarker.detectForVideo(video, performance.now());
           updateWristFromLandmarks(res);
           lastVideoTime = video.currentTime;
         }
       }
 
       const w = window.innerWidth, h = window.innerHeight;
+
       const targetPx = { x: dragonX * w, y: dragonY * h };
       dragonVel.x = targetPx.x - dragonPx.x;
       dragonVel.y = targetPx.y - dragonPx.y;
@@ -544,7 +384,6 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
       handleCollisions();
 
       ctx.clearRect(0, 0, w, h);
-
       if (!hasWrist) {
         ctx.save();
         ctx.fillStyle = "rgba(255,255,255,0.75)";
@@ -589,14 +428,9 @@ Make sure your server can serve `.task` files and that `hand_landmarker.task` is
       startBtn.disabled = true;
       startBtn.textContent = "Starting…";
       try {
-        resize();
-
-        if (location.protocol === "file:") {
-          throw new Error("Open this page via a local server (not file://). Example: `python -m http.server`.");
-        }
-
         await initCamera();
-        await initHandLandmarker(); // model must be at MODEL_PATH 
+        resize();
+        await initHandLandmarker(); // hosted model [web:23]
         await startGame();
       } catch (e) {
         overlay.style.display = "grid";
