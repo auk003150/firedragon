@@ -1,7 +1,11 @@
 const EMOJIS = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
 const WORDS = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '馬', '年'];
 const DRAGON = new Image();
-DRAGON.src = 'https://i.imgur.com/YPvNu1s.png'; // Replace with dragon PNG with transparency
+DRAGON.src = 'https://i.imgur.com/YPvNu1s.png'; // Replace with your dragon PNG with transparency
+
+// Background Image
+const BACKGROUND = new Image();
+BACKGROUND.src = 'image_1.png'; // Replace with the path to your background image
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -62,6 +66,10 @@ function drawDragon() {
   ctx.restore();
 }
 
+function drawBackground() {
+  ctx.drawImage(BACKGROUND, 0, 0, canvas.width, canvas.height);
+}
+
 function collision(bubble, dragonPos) {
   let dx = bubble.x - dragonPos.x, dy = bubble.y - dragonPos.y;
   let dist = Math.sqrt(dx * dx + dy * dy);
@@ -86,7 +94,12 @@ function updateScoreAndHit() {
 
 function gameLoop(ts) {
   if (!gameRunning) return;
+
+  // Clear Canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw the background
+  drawBackground();
 
   // Draw bubbles
   drawBubbles();
@@ -147,7 +160,7 @@ function startHandTracking() {
       // Landmarks[0]-> Wrist is index 0, index finger tip is 8
       let wristMarker = results.multiHandLandmarks[0][0];
       if (wristMarker) {
-        let x = canvas.width - (wristMarker.x * canvas.width); // Fix mirroring issue
+        let x = wristMarker.x * canvas.width);
         let y = wristMarker.y * canvas.height;
         dragonPos.x = x;
         dragonPos.y = y;
@@ -167,9 +180,11 @@ function startHandTracking() {
 
 function startGame() {
   DRAGON.onload = function() {
-    bgm.play(); // Start background music
-    startHandTracking();
-    requestAnimationFrame(gameLoop);
+    BACKGROUND.onload = function() {
+      bgm.play(); // Start background music
+      startHandTracking();
+      requestAnimationFrame(gameLoop);
+    }
   }
 }
 
