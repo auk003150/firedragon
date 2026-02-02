@@ -4,16 +4,16 @@
     <title>新春大坑舞火龍遊戲</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    
+
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    
+
     <style>
-        /* --- 基礎設定 (保持不變) --- */
-        html, body { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; 
-            background-color: #000; 
+        /* --- 基礎設定 (保留) --- */
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #000;
         }
         #arjs-video {
             width: 100vw !important; height: 100vh !important;
@@ -45,17 +45,17 @@
             position: absolute; width: 160px; height: 160px;
             transform: translate(-50%, -50%); display: none;
             justify-content: center; align-items: center;
-            z-index: 20; 
+            z-index: 20;
         }
         #dragon-body-container {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 15; 
+            pointer-events: none; z-index: 15;
         }
 
-        /* --- 珍珠草材質 --- */
+        /* --- 珍珠草材質 (保留) --- */
         .straw-texture {
-            background-color: #d4b483; 
-            background-image: 
+            background-color: #d4b483;
+            background-image:
                 radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%),
                 linear-gradient(to bottom, rgba(0,0,0,0.1), transparent 20%, transparent 80%, rgba(0,0,0,0.4)),
                 repeating-linear-gradient(85deg, transparent 0px, transparent 2px, rgba(93, 64, 55, 0.3) 3px, transparent 4px),
@@ -65,155 +65,206 @@
             box-shadow: inset 0 0 10px rgba(62, 39, 35, 0.5);
         }
 
-        /* --- 龍頭樣式 --- */
-        .dragon-head-group {
-            position: relative; width: 120px; height: 120px;
-            animation: float-head 2s ease-in-out infinite;
-        }
+        /* --- 龍頭樣式 (保留你的版本) --- */
+        .dragon-head-group { position: relative; width: 120px; height: 120px; animation: float-head 2s ease-in-out infinite; }
         .dh-skull { position: absolute; top: 25px; left: 20px; width: 80px; height: 60px; border-radius: 25px 25px 15px 15px; z-index: 5; }
         .dh-snout { position: absolute; top: 50px; left: 10px; width: 90px; height: 40px; border-radius: 30px; z-index: 6; }
         .dh-snout::before, .dh-snout::after { content: ''; position: absolute; bottom: 10px; width: 14px; height: 14px; background: #3e2723; border-radius: 50%; box-shadow: inset 0 0 5px #000; }
         .dh-snout::before { left: 15px; } .dh-snout::after { right: 15px; }
         .dh-jaw { position: absolute; bottom: 10px; left: 30px; width: 60px; height: 35px; border-radius: 0 0 25px 25px; z-index: 4; animation: chew 1s ease-in-out infinite alternate; }
-        
-        /* 
-           👀 修改處：龍眼樣式 (白色版) 👀 
-        */
-        .dh-eye { 
-            position: absolute; top: 20px; width: 24px; height: 24px; 
-            /* 
-               1. 漸層改為白色系：中心純白 -> 邊緣微灰 (#cfd8dc) 
-            */
+        .dh-eye {
+            position: absolute; top: 20px; width: 24px; height: 24px;
             background: radial-gradient(circle, #fff 40%, #cfd8dc 100%);
-            border-radius: 50%; 
-            border: 3px solid #3e2723; 
-            /* 
-               2. 發光改為白色光暈 
-            */
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.9); 
-            z-index: 7; 
+            border-radius: 50%;
+            border: 3px solid #3e2723;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.9);
+            z-index: 7;
         }
-        
         .eye-left { left: 5px; } .eye-right { right: 5px; }
         .dh-horn { position: absolute; top: -25px; width: 15px; height: 55px; border-radius: 8px; transform-origin: bottom center; z-index: 3; }
         .horn-left { left: 15px; transform: rotate(-25deg); } .horn-right { right: 15px; transform: rotate(25deg); }
         .dh-whisker { position: absolute; top: 60px; width: 70px; height: 50px; border-top: 5px solid #a1887f; border-radius: 50%; z-index: 2; opacity: 0.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
         .whisker-left { right: 85px; transform: rotate(20deg); } .whisker-right { left: 85px; transform: rotate(-20deg); }
 
-        /* --- 龍身樣式 --- */
-        .dragon-body-segment {
-            position: absolute;
-            width: 65px; height: 65px;
-            border-radius: 45% 55% 50% 50%; 
-            transform: translate(-50%, -50%);
-            display: none; 
-            z-index: 15;
+        /* --- 香火特效 (沿用) --- */
+        @keyframes incense-flicker {
+            0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.95); filter: drop-shadow(0 0 1px rgba(255,61,0,0.5)); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 3px rgba(255,200,0,0.8)); }
+            100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.0); filter: drop-shadow(0 0 2px rgba(255,61,0,0.6)); }
         }
-
-        /* 擬真香火特效 */
-        .dragon-body-segment::before {
-            content: '';
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 4px; height: 4px; 
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            background: radial-gradient(circle, #fff 20%, #ffeb3b 40%, #ff3d00 100%);
-            box-shadow: 
-                0px -28px 2px #ff1744, 
-                6px -26px 1px #ff5722,
-                -6px -26px 2px #ff5722,
-                12px -22px 1px #ff9100,
-                -12px -22px 2px #ff9100,
-                18px -15px 1px #ff3d00,
-                -18px -15px 2px #ff3d00,
-                22px -6px 1px #ff1744,
-                -22px -6px 2px #ff1744,
-                24px 5px 1px #ff5722,
-                -24px 5px 2px #ff5722,
-                18px 16px 1px #ff9100,
-                -18px 16px 2px #ff9100,
-                0px 0px 8px rgba(255, 200, 0, 0.8); 
-            filter: drop-shadow(0 0 2px rgba(255, 61, 0, 0.8));
-            animation: incense-flicker 0.1s infinite alternate;
-        }
-
-        .dragon-body-segment::after {
-            content: ''; position: absolute; top: -15px; left: -15px; right: -15px; bottom: -15px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(255, 87, 34, 0.15) 30%, transparent 70%);
-            z-index: -1;
-            filter: blur(8px);
-            animation: smoke-pulse 2s infinite ease-in-out;
-        }
-
-        /* --- 龍尾樣式 --- */
-        .dragon-tail {
-            position: absolute; width: 50px; height: 90px;
-            clip-path: polygon(40% 0%, 60% 0%, 100% 30%, 85% 100%, 15% 100%, 0% 30%);
-            transform: translate(-50%, -50%); display: none;
-        }
-        .dragon-tail::before {
-            content: ''; position: absolute; top: 20px; left: 50%; width: 3px; height: 3px;
-            background: radial-gradient(circle, #fff 10%, #ff3d00 100%);
-            box-shadow: 
-                0 10px 1px #ff9100, 0 20px 2px #ff3d00, 0 30px 1px #ff1744,
-                -10px 15px 2px #ff9100, 10px 15px 1px #ff3d00,
-                -15px 25px 2px #ff5722, 15px 25px 1px #ff5722;
-            filter: drop-shadow(0 0 2px #ff3d00);
-            animation: incense-flicker 0.15s infinite alternate;
-        }
-
-        @keyframes incense-flicker { 
-            0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.95); filter: drop-shadow(0 0 1px rgba(255,61,0,0.5)); } 
-            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 3px rgba(255,200,0,0.8)); } 
-            100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.0); filter: drop-shadow(0 0 2px rgba(255,61,0,0.6)); } 
-        }
-
-        @keyframes smoke-pulse {
-            0%, 100% { opacity: 0.3; transform: scale(1); }
-            50% { opacity: 0.6; transform: scale(1.1); }
-        }
-
-        /* 裝飾用的香火特效 (龍頭) */
-        .incense-glow { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-        .incense-particles { 
-            position: absolute; width: 4px; height: 4px; 
-            background: radial-gradient(circle, #fff 20%, #ff3d00 100%);
-            border-radius: 50%; top: 40%; left: 50%; 
-            box-shadow: 
-                0 -35px 2px #ff9100, 10px -32px 1px #ff3d00, -10px -32px 2px #ff3d00, 
-                20px -28px 1px #ff9100, -20px -28px 2px #ff3d00, 30px -20px 1px #ff3d00, -30px -20px 2px #ff9100; 
-            filter: drop-shadow(0 0 4px #ff3d00); 
-            animation: incense-flicker 0.12s infinite alternate; 
-        }
-        
-        .smoke-effect { 
-            position: absolute; top: -40px; left: 50%; width: 15px; height: 15px; 
-            background: rgba(220,220,220,0.4); border-radius: 50%; 
-            box-shadow: 0 0 25px 15px rgba(220,220,220,0.4); 
-            transform: translateX(-50%); 
-            animation: smoke-rise 2.5s infinite linear; 
-            z-index: 1; 
-        }
-        @keyframes smoke-rise { 
-            0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); } 
-            50% { opacity: 0.5; } 
-            100% { opacity: 0; transform: translate(-50%, -80px) scale(2.5); } 
+        @keyframes smoke-rise {
+            0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); }
+            50% { opacity: 0.5; }
+            100% { opacity: 0; transform: translate(-50%, -80px) scale(2.5); }
         }
         @keyframes float-head { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
         @keyframes chew { 0% { transform: translateY(0); } 100% { transform: translateY(5px); } }
 
-        /* --- 掉落物體樣式 --- */
-        .floating-item { position: absolute; font-size: 40px; font-weight: bold; display: flex; justify-content: center; align-items: center; width: 70px; height: 70px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 5; will-change: transform, left, top; }
+        .incense-glow { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .incense-particles {
+            position: absolute; width: 4px; height: 4px;
+            background: radial-gradient(circle, #fff 20%, #ff3d00 100%);
+            border-radius: 50%; top: 40%; left: 50%;
+            box-shadow:
+                0 -35px 2px #ff9100, 10px -32px 1px #ff3d00, -10px -32px 2px #ff3d00,
+                20px -28px 1px #ff9100, -20px -28px 2px #ff3d00, 30px -20px 1px #ff3d00, -30px -20px 2px #ff9100;
+            filter: drop-shadow(0 0 4px #ff3d00);
+            animation: incense-flicker 0.12s infinite alternate;
+        }
+        .smoke-effect {
+            position: absolute; top: -40px; left: 50%; width: 15px; height: 15px;
+            background: rgba(220,220,220,0.4); border-radius: 50%;
+            box-shadow: 0 0 25px 15px rgba(220,220,220,0.4);
+            transform: translateX(-50%);
+            animation: smoke-rise 2.5s infinite linear;
+            z-index: 1;
+        }
+
+        /* =========================
+           新版：火龍龍身（脊骨 + 放射香枝）
+           ========================= */
+        .dragon-body-segment {
+            position: absolute;
+            width: 70px; height: 70px;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 15;
+            will-change: transform, left, top;
+        }
+
+        /* 這個圓芯用來當「脊骨裹草」的視覺中心 */
+        .segment-core {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 22px; height: 22px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background:
+                radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0) 55%),
+                radial-gradient(circle, #d4b483 0%, #b08b55 70%, #6d4c41 100%);
+            box-shadow:
+                inset 0 0 10px rgba(62,39,35,0.55),
+                0 0 10px rgba(255,120,0,0.12);
+            border: 1px solid rgba(141,110,99,0.7);
+        }
+
+        /* 一根香枝：細長、略有漸層，末端有火點 */
+        .incense-stick {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 3px;
+            height: var(--len, 40px);
+            transform-origin: 50% 100%;
+            transform: translate(-50%, -100%) rotate(var(--rot, 0deg));
+            border-radius: 2px;
+            background: linear-gradient(to top, #7a4b2a 0%, #c58a55 50%, #f2d0a6 100%);
+            filter: drop-shadow(0 0 1px rgba(0,0,0,0.5));
+            opacity: 0.95;
+        }
+
+        .incense-stick::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: -8px;
+            width: 6px; height: 6px;
+            transform: translateX(-50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, #fff 10%, #ffeb3b 35%, #ff3d00 100%);
+            box-shadow:
+                0 0 10px rgba(255, 180, 0, 0.9),
+                0 0 18px rgba(255, 61, 0, 0.65);
+            animation: incense-flicker var(--flicker, 0.12s) infinite alternate;
+        }
+
+        /* 外圍熱暈（整節一起） */
+        .segment-glow {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 120px; height: 120px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 87, 34, 0.16) 0%, rgba(255, 87, 34, 0.08) 35%, transparent 70%);
+            filter: blur(8px);
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        /* 尾巴：更「穗狀」的香枝束 */
+        .dragon-tail {
+            position: absolute;
+            width: 90px; height: 90px;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 14;
+            will-change: transform, left, top;
+        }
+        .tail-core {
+            position: absolute;
+            left: 50%; top: 55%;
+            width: 20px; height: 20px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, #caa26f 0%, #8d6e63 70%, #3e2723 100%);
+            box-shadow: inset 0 0 10px rgba(62,39,35,0.6);
+        }
+        .tail-stick {
+            position: absolute;
+            left: 50%; top: 55%;
+            width: 3px;
+            height: var(--len, 55px);
+            transform-origin: 50% 100%;
+            transform: translate(-50%, -100%) rotate(var(--rot, 0deg));
+            border-radius: 2px;
+            background: linear-gradient(to top, #6d3d1f 0%, #c07a3e 60%, #f6d7b8 100%);
+            opacity: 0.95;
+        }
+        .tail-stick::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: -9px;
+            width: 7px; height: 7px;
+            transform: translateX(-50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, #fff 10%, #ffeb3b 35%, #ff3d00 100%);
+            box-shadow:
+                0 0 12px rgba(255, 200, 0, 0.95),
+                0 0 20px rgba(255, 61, 0, 0.65);
+            animation: incense-flicker 0.14s infinite alternate;
+        }
+
+        /* --- 掉落物體樣式 (保留) --- */
+        .floating-item {
+            position: absolute; font-size: 40px; font-weight: bold;
+            display: flex; justify-content: center; align-items: center;
+            width: 70px; height: 70px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 5; will-change: transform, left, top;
+        }
         .good-item { color: #d32f2f; border: 3px solid #d32f2f; }
         .bad-item { color: #333; border: 3px solid #555; }
         .score-popup { position: absolute; font-size: 36px; font-weight: 900; text-shadow: 1px 1px 0 #fff; animation: floatUp 0.8s ease-out forwards; z-index: 20; }
         @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-60px); } }
-        .overlay-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 30; pointer-events: auto; color: white; text-align: center; }
-        button { padding: 15px 40px; font-size: 22px; background: #d32f2f; color: white; border: none; border-radius: 50px; cursor: pointer; margin-top: 20px; font-weight: bold; box-shadow: 0 0 15px #ff5252; transition: transform 0.1s; }
+
+        .overlay-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 30; pointer-events: auto; color: white; text-align: center;
+        }
+        button {
+            padding: 15px 40px; font-size: 22px; background: #d32f2f; color: white;
+            border: none; border-radius: 50px; cursor: pointer; margin-top: 20px;
+            font-weight: bold; box-shadow: 0 0 15px #ff5252; transition: transform 0.1s;
+        }
         button:active { transform: scale(0.95); }
-        #mute-btn { position: absolute; bottom: 20px; right: 20px; z-index: 40; background: rgba(255,255,255,0.5); border: none; padding: 10px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; }
+        #mute-btn {
+            position: absolute; bottom: 20px; right: 20px; z-index: 40;
+            background: rgba(255,255,255,0.5); border: none; padding: 10px;
+            border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto;
+        }
     </style>
 </head>
 <body>
@@ -236,7 +287,7 @@
     <div id="ui-layer">
         <div id="score-board">分數: <span id="score">0</span></div>
         <div id="timer-board">時間: <span id="timer">60</span></div>
-        
+
         <div id="dragon-body-container"></div>
 
         <div id="aim-cursor">
@@ -283,28 +334,28 @@
         const sounds = {
             bgm: document.getElementById('bgm'),
             collect: document.getElementById('sfx-collect'),
-            crunch: document.getElementById('sfx-crunch'), 
+            crunch: document.getElementById('sfx-crunch'),
             end: document.getElementById('sfx-end')
         };
         let isMuted = false;
-        sounds.bgm.volume = 0.3; 
+        sounds.bgm.volume = 0.3;
         sounds.collect.volume = 0.8;
-        sounds.crunch.volume = 0.8; 
+        sounds.crunch.volume = 0.8;
 
         function playSound(name) {
             if (isMuted) return;
             const audio = sounds[name];
-            if (audio) { 
-                audio.currentTime = 0; 
-                audio.play().catch(e => console.log("Audio play failed:", e)); 
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play().catch(e => console.log("Audio play failed:", e));
             }
         }
 
         function toggleMute() {
             isMuted = !isMuted;
             const btn = document.getElementById('mute-btn');
-            if (isMuted) { sounds.bgm.pause(); btn.innerText = '🔇'; } 
-            else { if(isGameRunning) sounds.bgm.play(); btn.innerText = '🔊'; }
+            if (isMuted) { sounds.bgm.pause(); btn.innerText = '🔇'; }
+            else { if (isGameRunning) sounds.bgm.play().catch(()=>{}); btn.innerText = '🔊'; }
         }
 
         // --- 遊戲變數 ---
@@ -313,16 +364,21 @@
         let score = 0;
         let timeLeft = 60;
         let isGameRunning = false;
-        let items = []; 
+        let items = [];
         let timerInterval = null;
         let gameWidth = window.innerWidth;
         let gameHeight = window.innerHeight;
         let playerScreenPos = { x: -100, y: -100, visible: false };
 
-        const bodySegmentCount = 8;
+        // --- 龍身參數（可調）---
+        const bodySegmentCount = 14;      // 原本 8，增加讓更像長龍
+        const bodySpacing = 26;           // 間距更密，讓「香枝海」更連續
+        const sticksPerSegment = 28;      // 每節放射香枝數
+        const stickLenMin = 26;
+        const stickLenMax = 46;
+
         const bodySegments = [];
         const bodyPositions = [];
-        const bodySpacing = 45;
 
         const gameArea = document.getElementById('game-area');
         const scoreEl = document.getElementById('score');
@@ -334,6 +390,51 @@
         const gameOverScreen = document.getElementById('game-over-screen');
         const finalScoreEl = document.getElementById('final-score');
 
+        // --- 建立一節「放射香枝」身體 ---
+        function buildIncenseSegment(isTail=false) {
+            const seg = document.createElement('div');
+            seg.classList.add(isTail ? 'dragon-tail' : 'dragon-body-segment');
+
+            if (!isTail) {
+                const glow = document.createElement('div');
+                glow.className = 'segment-glow';
+                seg.appendChild(glow);
+
+                const core = document.createElement('div');
+                core.className = 'segment-core';
+                seg.appendChild(core);
+
+                for (let i = 0; i < sticksPerSegment; i++) {
+                    const stick = document.createElement('div');
+                    stick.className = 'incense-stick';
+                    const rot = (360 / sticksPerSegment) * i + (Math.random() * 10 - 5);
+                    const len = stickLenMin + Math.random() * (stickLenMax - stickLenMin);
+                    const flicker = (0.09 + Math.random() * 0.08).toFixed(2) + 's';
+                    stick.style.setProperty('--rot', rot + 'deg');
+                    stick.style.setProperty('--len', len + 'px');
+                    stick.style.setProperty('--flicker', flicker);
+                    seg.appendChild(stick);
+                }
+            } else {
+                const core = document.createElement('div');
+                core.className = 'tail-core';
+                seg.appendChild(core);
+
+                const tailSticks = 36;
+                for (let i = 0; i < tailSticks; i++) {
+                    const stick = document.createElement('div');
+                    stick.className = 'tail-stick';
+                    const rot = (360 / tailSticks) * i + (Math.random() * 12 - 6);
+                    const len = 40 + Math.random() * 28;
+                    stick.style.setProperty('--rot', rot + 'deg');
+                    stick.style.setProperty('--len', len + 'px');
+                    seg.appendChild(stick);
+                }
+            }
+
+            return seg;
+        }
+
         // --- 初始化龍身 ---
         function initDragonBody() {
             dragonBodyContainer.innerHTML = '';
@@ -341,23 +442,22 @@
             bodyPositions.length = 0;
 
             for (let i = 0; i < bodySegmentCount; i++) {
-                const el = document.createElement('div');
-                el.classList.add('dragon-body-segment');
-                el.classList.add('straw-texture');
-                const scale = 1 - (i * 0.04);
-                el.style.transform = `translate(-50%, -50%) scale(${scale})`;
-                
+                const el = buildIncenseSegment(false);
+
+                // 從頭到尾稍微變小（像遠端段落更細）
+                const scale = 1 - (i * 0.022);
+                el.dataset.baseScale = scale.toFixed(3);
+
                 dragonBodyContainer.appendChild(el);
                 bodySegments.push(el);
-                bodyPositions.push({ x: -100, y: -100 });
+                bodyPositions.push({ x: -100, y: -100, a: 0 });
             }
 
-            const tail = document.createElement('div');
-            tail.classList.add('dragon-tail');
-            tail.classList.add('straw-texture');
+            const tail = buildIncenseSegment(true);
+            tail.dataset.baseScale = '0.72';
             dragonBodyContainer.appendChild(tail);
             bodySegments.push(tail);
-            bodyPositions.push({ x: -100, y: -100 });
+            bodyPositions.push({ x: -100, y: -100, a: 0 });
         }
 
         function fixVideoSize() {
@@ -392,7 +492,7 @@
 
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
-            
+
             score = 0;
             timeLeft = 60;
             scoreEl.innerText = score;
@@ -403,9 +503,9 @@
 
             initDragonBody();
             fixVideoSize();
-            spawnItems(6, 'good'); 
-            spawnItems(4, 'bad');  
-            
+            spawnItems(6, 'good');
+            spawnItems(4, 'bad');
+
             gameLoop();
 
             if (timerInterval) clearInterval(timerInterval);
@@ -430,12 +530,14 @@
                 const el = document.createElement('div');
                 el.classList.add('floating-item');
                 el.classList.add(type === 'good' ? 'good-item' : 'bad-item');
-                el.innerText = type === 'good' ? 
-                    goodWords[Math.floor(Math.random() * goodWords.length)] : 
+                el.innerText = type === 'good' ?
+                    goodWords[Math.floor(Math.random() * goodWords.length)] :
                     badWords[Math.floor(Math.random() * badWords.length)];
                 el.dataset.points = type === 'good' ? 15 : -5;
+
                 gameArea.appendChild(el);
                 const size = 70;
+
                 items.push({
                     element: el,
                     x: Math.random() * (gameWidth - size),
@@ -448,6 +550,7 @@
             }
         }
 
+        // 讓每一節跟著前一節，但同時保存角度，方便旋轉
         function updateDragonBody(headX, headY) {
             let targetX = headX;
             let targetY = headY;
@@ -459,24 +562,31 @@
                 const dx = targetX - currentPos.x;
                 const dy = targetY - currentPos.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
-                const angle = Math.atan2(dy, dx);
+                const angle = Math.atan2(dy, dx); // 朝向前一節（或龍頭）
 
                 if (dist > bodySpacing) {
                     const moveDist = dist - bodySpacing;
-                    currentPos.x += Math.cos(angle) * moveDist * 0.5;
-                    currentPos.y += Math.sin(angle) * moveDist * 0.5;
+                    currentPos.x += Math.cos(angle) * moveDist * 0.55;
+                    currentPos.y += Math.sin(angle) * moveDist * 0.55;
                 }
+
+                // 角度做一點平滑，避免抖動
+                const prevA = currentPos.a || angle;
+                let da = angle - prevA;
+                // wrap to [-pi, pi]
+                if (da > Math.PI) da -= Math.PI * 2;
+                if (da < -Math.PI) da += Math.PI * 2;
+                currentPos.a = prevA + da * 0.25;
 
                 segment.style.display = 'block';
                 segment.style.left = currentPos.x + 'px';
                 segment.style.top = currentPos.y + 'px';
-                
-                if (i === bodySegments.length - 1) {
-                    segment.style.transform = `translate(-50%, -50%) rotate(${angle * 180 / Math.PI + 90}deg)`;
-                } else {
-                    const scale = 1 - (i * 0.04);
-                    segment.style.transform = `translate(-50%, -50%) scale(${scale})`;
-                }
+
+                const baseScale = parseFloat(segment.dataset.baseScale || '1');
+
+                // 讓每節依方向旋轉：放射香枝會更像「沿著龍身」在舞
+                const deg = (currentPos.a * 180 / Math.PI) + 90;
+                segment.style.transform = `translate(-50%, -50%) rotate(${deg}deg) scale(${baseScale})`;
 
                 targetX = currentPos.x;
                 targetY = currentPos.y;
@@ -485,13 +595,14 @@
 
         function gameLoop() {
             if (!isGameRunning) return;
-            
+
+            // marker 可視判斷：object3D.visible 常用於 AR.js marker found/lost [web:36]
             if (playerMarker.object3D.visible) {
                 const vector = new THREE.Vector3();
                 playerMarker.object3D.getWorldPosition(vector);
-                
+
                 const camera = document.querySelector('a-scene').camera;
-                vector.project(camera);
+                vector.project(camera); // 轉 NDC 再映射螢幕座標 [web:37]
 
                 const screenX = ((-vector.x + 1) / 2) * gameWidth;
                 const screenY = ((-vector.y + 1) / 2) * gameHeight;
@@ -503,7 +614,6 @@
                 aimCursor.style.top = screenY + 'px';
 
                 updateDragonBody(screenX, screenY);
-
             } else {
                 playerScreenPos.visible = false;
                 aimCursor.style.display = 'none';
@@ -512,17 +622,21 @@
 
             items.forEach(item => {
                 if (!item.active) return;
+
                 item.x += item.vx; item.y += item.vy;
                 if (item.x <= 0 || item.x >= gameWidth - item.width) item.vx *= -1;
                 if (item.y <= 0 || item.y >= gameHeight - item.height) item.vy *= -1;
+
                 item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
                 item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
-                item.element.style.left = item.x + 'px'; item.element.style.top = item.y + 'px';
+
+                item.element.style.left = item.x + 'px';
+                item.element.style.top = item.y + 'px';
 
                 if (playerScreenPos.visible) {
                     const dx = playerScreenPos.x - (item.x + item.width/2);
                     const dy = playerScreenPos.y - (item.y + item.height/2);
-                    if ((dx*dx + dy*dy) < (60 + 35)**2) {
+                    if ((dx*dx + dy*dy) < (60 + 35) ** 2) {
                         handleHit(item);
                     }
                 }
@@ -535,30 +649,33 @@
             const pts = parseInt(item.element.dataset.points);
             score += pts;
             scoreEl.innerText = score;
-            
-            if (pts > 0) {
-                playSound('collect'); 
-            } else {
-                playSound('crunch');  
-            }
+
+            if (pts > 0) playSound('collect');
+            else playSound('crunch');
 
             const popup = document.createElement('div');
             popup.classList.add('score-popup');
             popup.innerText = pts > 0 ? `+${pts}` : pts;
             popup.style.color = pts > 0 ? '#2e7d32' : '#d32f2f';
-            popup.style.left = item.x + 'px'; popup.style.top = item.y + 'px';
+            popup.style.left = item.x + 'px';
+            popup.style.top = item.y + 'px';
             gameArea.appendChild(popup);
             setTimeout(() => popup.remove(), 800);
-            item.active = false; item.element.style.opacity = '0';
+
+            item.active = false;
+            item.element.style.opacity = '0';
+
             setTimeout(() => {
                 if (!isGameRunning) return;
-                item.active = true; item.element.style.opacity = '1';
+                item.active = true;
+                item.element.style.opacity = '1';
                 item.x = Math.random() * (gameWidth - item.width);
                 item.y = Math.random() * (gameHeight - item.height);
-                item.element.innerText = pts > 0 ? goodWords[Math.floor(Math.random() * goodWords.length)] : badWords[Math.floor(Math.random() * badWords.length)];
+                item.element.innerText = pts > 0
+                    ? goodWords[Math.floor(Math.random() * goodWords.length)]
+                    : badWords[Math.floor(Math.random() * badWords.length)];
             }, 500);
         }
     </script>
 </body>
 </html>
-
