@@ -1,351 +1,725 @@
-<!doctype html>
-<html lang="zh-Hant">
+<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>WebAR (Laptop Webcam) 右手腕 + 大坑火龍（含鏡像修正）</title>
+    <title>新春大坑舞火龍遊戲</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 
-  <style>
-    html, body { margin: 0; height: 100%; background:#111; color:#eee;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans TC", sans-serif; }
-    #wrap { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
-    video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-    canvas { pointer-events: none; }
+    <!-- MediaPipe for hand tracking -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.4.1633559619/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.4.1633559619/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1633559619/hands.js"></script>
 
-    /* 由 JS 控制是否鏡像 */
-    .mirror { transform: rotateY(180deg); }
-
-    #hud {
-      position: absolute; left: 12px; top: 12px; z-index: 10;
-      background: rgba(0,0,0,0.45); padding: 10px 12px; border-radius: 10px;
-      backdrop-filter: blur(6px);
-      max-width: min(720px, calc(100vw - 24px));
-    }
-    button { font-size: 14px; padding: 8px 12px; border-radius: 10px; border: 0; cursor: pointer; }
-    #status { margin-top: 8px; font-size: 13px; opacity: 0.9; line-height: 1.35; }
-    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    label { font-size: 13px; opacity: 0.95; display:flex; gap:6px; align-items:center; user-select:none; }
-    input[type="range"] { width: 140px; }
-    select { border-radius: 8px; padding: 6px 8px; border: 0; }
-  </style>
-
-  <script type="module">
-    import { HandLandmarker, FilesetResolver } from
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
-
-    const ui = {
-      btn: null, status: null, video: null, canvas: null, ctx: null,
-      camSel: null, nSeg: null, spacing: null, mirror: null
-    };
-
-    let handLandmarker;
-    let running = false;
-    let lastVideoTime = -1;
-
-    // 顯示鏡像（只影響畫面顯示，不改 MediaPipe 輸入影像本身）
-    let mirrorDisplay = true;
-
-    // 火龍參數
-    let N = 50;
-    let spacing = 10;
-    let nodes = [];
-    let inited = false;
-
-    function resetNodes() {
-      nodes = Array.from({ length: N }, () => ({ x: 0, y: 0 }));
-      inited = false;
-    }
-
-    function applyMirrorClass() {
-      if (mirrorDisplay) {
-        ui.video.classList.add("mirror");
-        ui.canvas.classList.add("mirror");
-      } else {
-        ui.video.classList.remove("mirror");
-        ui.canvas.classList.remove("mirror");
-      }
-    }
-
-    function resizeCanvasToVideo() {
-      if (!ui.video.videoWidth) return;
-      ui.canvas.width = ui.video.videoWidth;
-      ui.canvas.height = ui.video.videoHeight;
-    }
-
-    async function setup() {
-      ui.btn = document.getElementById("btn");
-      ui.status = document.getElementById("status");
-      ui.video = document.getElementById("video");
-      ui.canvas = document.getElementById("canvas");
-      ui.ctx = ui.canvas.getContext("2d");
-
-      ui.camSel = document.getElementById("camSel");
-      ui.nSeg = document.getElementById("nSeg");
-      ui.spacing = document.getElementById("spacing");
-      ui.mirror = document.getElementById("mirror");
-
-      // default for laptop webcam: mirror ON（較似自拍鏡）
-      ui.mirror.checked = mirrorDisplay;
-      applyMirrorClass();
-
-      ui.mirror.addEventListener("change", () => {
-        mirrorDisplay = ui.mirror.checked;
-        applyMirrorClass();
-        resetNodes();
-      });
-
-      // sliders
-      ui.nSeg.value = String(N);
-      ui.spacing.value = String(spacing);
-      document.getElementById("nSegVal").textContent = String(N);
-      document.getElementById("spacingVal").textContent = String(spacing);
-
-      ui.nSeg.addEventListener("input", () => {
-        N = parseInt(ui.nSeg.value, 10);
-        document.getElementById("nSegVal").textContent = String(N);
-        resetNodes();
-      });
-      ui.spacing.addEventListener("input", () => {
-        spacing = parseInt(ui.spacing.value, 10);
-        document.getElementById("spacingVal").textContent = String(spacing);
-      });
-
-      resetNodes();
-      ui.status.textContent = "載入模型中…";
-
-      // FilesetResolver + createFromOptions（官方做法）[page:6]
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-      );
-
-      handLandmarker = await HandLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath:
-            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-          delegate: "GPU"
-        },
-        runningMode: "VIDEO",
-        numHands: 2,
-        minHandDetectionConfidence: 0.5,
-        minHandPresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-
-      ui.status.textContent = "就緒。按 Enable Webcam。";
-      ui.btn.disabled = false;
-      ui.btn.addEventListener("click", toggle);
-
-      window.addEventListener("resize", resizeCanvasToVideo);
-    }
-
-    async function startCamera() {
-      const facingMode = ui.camSel.value; // laptop 通常只得 user，但保留選項
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
-      ui.video.srcObject = stream;
-      await ui.video.play();
-      resizeCanvasToVideo();
-    }
-
-    function stopCamera() {
-      const stream = ui.video.srcObject;
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      ui.video.srcObject = null;
-    }
-
-    async function toggle() {
-      running = !running;
-      ui.btn.textContent = running ? "Stop" : "Enable Webcam";
-
-      if (running) {
-        ui.status.textContent = "啟動相機…";
-        await startCamera();
-        ui.status.textContent = "偵測中：只跟 Right（人體右手腕）。";
-        requestAnimationFrame(loop);
-      } else {
-        ui.status.textContent = "已停止。";
-        stopCamera();
-        ui.ctx.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
-        resetNodes();
-      }
-    }
-
-    // 從結果揀出「Right」嗰隻手（handedness Left/Right + landmarks）[page:6]
-    function pickRightHand(result) {
-      const landmarksArr = result?.landmarks || [];
-      const handednessArr = result?.handedness || [];
-      if (!landmarksArr.length) return null;
-
-      for (let i = 0; i < landmarksArr.length; i++) {
-        const cat = handednessArr?.[i]?.[0];
-        if (cat?.categoryName === "Right") {
-          return { landmarks: landmarksArr[i], score: cat?.score ?? null };
+    <style>
+        /* --- 基礎設定 (保留) --- */
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #000;
         }
-      }
-      return null;
-    }
+        #video-input {
+            width: 100vw !important; height: 100vh !important;
+            position: absolute !important; top: 0 !important; left: 0 !important;
+            z-index: 0 !important; margin: 0 !important;
+            object-fit: cover !important; transform: scaleX(-1) !important;
+        }
+        #global-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: url('image_1.png') no-repeat center center;
+            background-size: cover; z-index: 1; pointer-events: none; opacity: 0.9;
+        }
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 10; overflow: hidden;
+        }
+        #score-board, #timer-board {
+            position: absolute; top: 20px;
+            background: rgba(0, 0, 0, 0.6); padding: 10px 20px;
+            border-radius: 15px; font-size: 20px; font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        #score-board { left: 20px; color: #ffeb3b; text-shadow: 0 0 5px #ff5722; }
+        #timer-board { right: 20px; color: #fff; }
 
-    function toCanvasXY(normX, normY) {
-      // landmarks 的 x/y 係 normalized by image width/height [page:6]
-      // 若顯示鏡像，畫面 x 會左右反；所以把 x 做一次 (1-x) 去對齊顯示座標
-      const xNorm = mirrorDisplay ? (1 - normX) : normX;
-      return {
-        x: xNorm * ui.canvas.width,
-        y: normY * ui.canvas.height
-      };
-    }
-
-    function updateSnake(headX, headY) {
-      if (!inited) {
-        for (const p of nodes) { p.x = headX; p.y = headY; }
-        inited = true;
-      }
-      nodes[0].x += (headX - nodes[0].x) * 0.35;
-      nodes[0].y += (headY - nodes[0].y) * 0.35;
-
-      for (let i = 1; i < nodes.length; i++) {
-        const prev = nodes[i - 1];
-        const cur = nodes[i];
-        const dx = cur.x - prev.x;
-        const dy = cur.y - prev.y;
-        const d = Math.hypot(dx, dy) || 1e-6;
-
-        const targetX = prev.x + (dx / d) * spacing;
-        const targetY = prev.y + (dy / d) * spacing;
-
-        cur.x += (targetX - cur.x) * 0.50;
-        cur.y += (targetY - cur.y) * 0.50;
-      }
-    }
-
-    function drawFireDragon() {
-      const ctx = ui.ctx;
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        const t = i / (nodes.length - 1);
-        const x = nodes[i].x;
-        const y = nodes[i].y;
-
-        const R = 46 - 30 * t;
-        const rays = Math.floor(46 - 18 * t);
-        const alpha = 0.55 - 0.40 * t;
-
-        ctx.strokeStyle = `rgba(255, 110, 20, ${alpha})`;
-        ctx.lineWidth = 1.15;
-
-        const rot = performance.now() * 0.0011 + i * 0.33;
-        for (let k = 0; k < rays; k++) {
-          const a = rot + (k / rays) * Math.PI * 2;
-          const wob1 = 0.35 + 0.12 * Math.sin(k * 12.3 + i * 0.7);
-          const wob2 = 0.95 + 0.22 * Math.sin(k * 7.7 + i * 0.4 + 1.2);
-          const r1 = R * wob1;
-          const r2 = R * wob2;
-
-          ctx.beginPath();
-          ctx.moveTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
-          ctx.lineTo(x + Math.cos(a) * r2, y + Math.sin(a) * r2);
-          ctx.stroke();
+        #aim-cursor {
+            position: absolute; width: 160px; height: 160px;
+            transform: translate(-50%, -50%); display: none;
+            justify-content: center; align-items: center;
+            z-index: 20;
+        }
+        #dragon-body-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 15;
         }
 
-        const grad = ctx.createRadialGradient(x, y, 0, x, y, R);
-        grad.addColorStop(0.00, `rgba(255, 250, 220, ${0.65 - 0.45 * t})`);
-        grad.addColorStop(0.35, `rgba(255, 190, 60, ${0.35 - 0.22 * t})`);
-        grad.addColorStop(1.00, `rgba(255, 60, 0, 0)`);
-
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(x, y, R, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.globalCompositeOperation = "screen";
-      ctx.beginPath();
-      ctx.arc(nodes[0].x, nodes[0].y, 18, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255,250,220,0.70)";
-      ctx.fill();
-      ctx.restore();
-    }
-
-    function loop() {
-      if (!running) return;
-
-      // VIDEO 模式每幀用 detectForVideo()；x/y normalized，handedness Left/Right [page:6]
-      if (ui.video.currentTime !== lastVideoTime) {
-        lastVideoTime = ui.video.currentTime;
-
-        const nowMs = performance.now();
-        const res = handLandmarker.detectForVideo(ui.video, nowMs); // [page:6]
-
-        ui.ctx.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
-
-        const right = pickRightHand(res);
-        if (right?.landmarks?.length) {
-          const wrist = right.landmarks[0]; // landmark #0 = wrist [page:6]
-          const p = toCanvasXY(wrist.x, wrist.y);
-
-          updateSnake(p.x, p.y);
-          drawFireDragon();
-          ui.status.textContent =
-            `偵測中：Right（人體右手腕），score ${right.score?.toFixed?.(2) ?? "?"}，Mirror=${mirrorDisplay ? "ON" : "OFF"}`;
-        } else {
-          ui.status.textContent = `偵測中：未見到 Right（Mirror=${mirrorDisplay ? "ON" : "OFF"}）`;
-          resetNodes();
+        /* --- 珍珠草材質 (保留) --- */
+        .straw-texture {
+            background-color: #d4b483;
+            background-image:
+                radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%),
+                linear-gradient(to bottom, rgba(0,0,0,0.1), transparent 20%, transparent 80%, rgba(0,0,0,0.4)),
+                repeating-linear-gradient(85deg, transparent 0px, transparent 2px, rgba(93, 64, 55, 0.3) 3px, transparent 4px),
+                repeating-linear-gradient(95deg, transparent 0px, transparent 3px, rgba(141, 110, 99, 0.4) 4px, transparent 6px),
+                repeating-linear-gradient(0deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 1px, transparent 5px);
+            border: 1px solid #8d6e63;
+            box-shadow: inset 0 0 10px rgba(62, 39, 35, 0.5);
         }
-      }
 
-      requestAnimationFrame(loop);
-    }
+        /* --- 龍頭樣式 (保留你的版本) --- */
+        .dragon-head-group { position: relative; width: 120px; height: 120px; animation: float-head 2s ease-in-out infinite; }
+        .dh-skull { position: absolute; top: 25px; left: 20px; width: 80px; height: 60px; border-radius: 25px 25px 15px 15px; z-index: 5; }
+        .dh-snout { position: absolute; top: 50px; left: 10px; width: 90px; height: 40px; border-radius: 30px; z-index: 6; }
+        .dh-snout::before, .dh-snout::after { content: ''; position: absolute; bottom: 10px; width: 14px; height: 14px; background: #3e2723; border-radius: 50%; box-shadow: inset 0 0 5px #000; }
+        .dh-snout::before { left: 15px; } .dh-snout::after { right: 15px; }
+        .dh-jaw { position: absolute; bottom: 10px; left: 30px; width: 60px; height: 35px; border-radius: 0 0 25px 25px; z-index: 4; animation: chew 1s ease-in-out infinite alternate; }
+        .dh-eye {
+            position: absolute; top: 20px; width: 24px; height: 24px;
+            background: radial-gradient(circle, #fff 40%, #cfd8dc 100%);
+            border-radius: 50%;
+            border: 3px solid #3e2723;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.9);
+            z-index: 7;
+        }
+        .eye-left { left: 5px; } .eye-right { right: 5px; }
+        .dh-horn { position: absolute; top: -25px; width: 15px; height: 55px; border-radius: 8px; transform-origin: bottom center; z-index: 3; }
+        .horn-left { left: 15px; transform: rotate(-25deg); } .horn-right { right: 15px; transform: rotate(25deg); }
+        .dh-whisker { position: absolute; top: 60px; width: 70px; height: 50px; border-top: 5px solid #a1887f; border-radius: 50%; z-index: 2; opacity: 0.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
+        .whisker-left { right: 85px; transform: rotate(20deg); } .whisker-right { left: 85px; transform: rotate(-20deg); }
 
-    setup();
-  </script>
+        /* --- 香火特效 (沿用) --- */
+        @keyframes incense-flicker {
+            0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.95); filter: drop-shadow(0 0 1px rgba(255,61,0,0.5)); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 3px rgba(255,200,0,0.8)); }
+            100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.0); filter: drop-shadow(0 0 2px rgba(255,61,0,0.6)); }
+        }
+        @keyframes smoke-rise {
+            0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); }
+            50% { opacity: 0.5; }
+            100% { opacity: 0; transform: translate(-50%, -80px) scale(2.5); }
+        }
+        @keyframes float-head { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes chew { 0% { transform: translateY(0); } 100% { transform: translateY(5px); } }
+
+        .incense-glow { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .incense-particles {
+            position: absolute; width: 4px; height: 4px;
+            background: radial-gradient(circle, #fff 20%, #ff3d00 100%);
+            border-radius: 50%; top: 40%; left: 50%;
+            box-shadow:
+                0 -35px 2px #ff9100, 10px -32px 1px #ff3d00, -10px -32px 2px #ff3d00,
+                20px -28px 1px #ff9100, -20px -28px 2px #ff3d00, 30px -20px 1px #ff3d00, -30px -20px 2px #ff9100;
+            filter: drop-shadow(0 0 4px #ff3d00);
+            animation: incense-flicker 0.12s infinite alternate;
+        }
+        .smoke-effect {
+            position: absolute; top: -40px; left: 50%; width: 15px; height: 15px;
+            background: rgba(220,220,220,0.4); border-radius: 50%;
+            box-shadow: 0 0 25px 15px rgba(220,220,220,0.4);
+            transform: translateX(-50%);
+            animation: smoke-rise 2.5s infinite linear;
+            z-index: 1;
+        }
+
+        /* =========================
+           新版：火龍龍身（脊骨 + 放射香枝）
+           ========================= */
+        .dragon-body-segment {
+            position: absolute;
+            width: 70px; height: 70px;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 15;
+            will-change: transform, left, top;
+        }
+
+        /* 這個圓芯用來當「脊骨裹草」的視覺中心 */
+        .segment-core {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 22px; height: 22px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background:
+                radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0) 55%),
+                radial-gradient(circle, #d4b483 0%, #b08b55 70%, #6d4c41 100%);
+            box-shadow:
+                inset 0 0 10px rgba(62,39,35,0.55),
+                0 0 10px rgba(255,120,0,0.12);
+            border: 1px solid rgba(141,110,99,0.7);
+        }
+
+        /* 一根香枝：細長、略有漸層，末端有火點 */
+        .incense-stick {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 3px;
+            height: var(--len, 40px);
+            transform-origin: 50% 100%;
+            transform: translate(-50%, -100%) rotate(var(--rot, 0deg));
+            border-radius: 2px;
+            background: linear-gradient(to top, #7a4b2a 0%, #c58a55 50%, #f2d0a6 100%);
+            filter: drop-shadow(0 0 1px rgba(0,0,0,0.5));
+            opacity: 0.95;
+        }
+
+        .incense-stick::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: -8px;
+            width: 6px; height: 6px;
+            transform: translateX(-50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, #fff 10%, #ffeb3b 35%, #ff3d00 100%);
+            box-shadow:
+                0 0 10px rgba(255, 180, 0, 0.9),
+                0 0 18px rgba(255, 61, 0, 0.65);
+            animation: incense-flicker var(--flicker, 0.12s) infinite alternate;
+        }
+
+        /* 外圍熱暈（整節一起） */
+        .segment-glow {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 120px; height: 120px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 87, 34, 0.16) 0%, rgba(255, 87, 34, 0.08) 35%, transparent 70%);
+            filter: blur(8px);
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        /* 尾巴：更「穗狀」的香枝束 */
+        .dragon-tail {
+            position: absolute;
+            width: 90px; height: 90px;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 14;
+            will-change: transform, left, top;
+        }
+        .tail-core {
+            position: absolute;
+            left: 50%; top: 55%;
+            width: 20px; height: 20px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, #caa26f 0%, #8d6e63 70%, #3e2723 100%);
+            box-shadow: inset 0 0 10px rgba(62,39,35,0.6);
+        }
+        .tail-stick {
+            position: absolute;
+            left: 50%; top: 55%;
+            width: 3px;
+            height: var(--len, 55px);
+            transform-origin: 50% 100%;
+            transform: translate(-50%, -100%) rotate(var(--rot, 0deg));
+            border-radius: 2px;
+            background: linear-gradient(to top, #6d3d1f 0%, #c07a3e 60%, #f6d7b8 100%);
+            opacity: 0.95;
+        }
+        .tail-stick::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: -9px;
+            width: 7px; height: 7px;
+            transform: translateX(-50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, #fff 10%, #ffeb3b 35%, #ff3d00 100%);
+            box-shadow:
+                0 0 12px rgba(255, 200, 0, 0.95),
+                0 0 20px rgba(255, 61, 0, 0.65);
+            animation: incense-flicker 0.14s infinite alternate;
+        }
+
+        /* --- 掉落物體樣式 (保留) --- */
+        .floating-item {
+            position: absolute; font-size: 40px; font-weight: bold;
+            display: flex; justify-content: center; align-items: center;
+            width: 70px; height: 70px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 5; will-change: transform, left, top;
+        }
+        .good-item { color: #d32f2f; border: 3px solid #d32f2f; }
+        .bad-item { color: #333; border: 3px solid #555; }
+        .score-popup { position: absolute; font-size: 36px; font-weight: 900; text-shadow: 1px 1px 0 #fff; animation: floatUp 0.8s ease-out forwards; z-index: 20; }
+        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-60px); } }
+
+        .overlay-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 30; pointer-events: auto; color: white; text-align: center;
+        }
+        button {
+            padding: 15px 40px; font-size: 22px; background: #d32f2f; color: white;
+            border: none; border-radius: 50px; cursor: pointer; margin-top: 20px;
+            font-weight: bold; box-shadow: 0 0 15px #ff5252; transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.95); }
+        #mute-btn {
+            position: absolute; bottom: 20px; right: 20px; z-index: 40;
+            background: rgba(255,255,255,0.5); border: none; padding: 10px;
+            border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto;
+        }
+        #status-text {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7); color: #fff; padding: 10px 20px;
+            border-radius: 10px; font-size: 16px; z-index: 25;
+        }
+    </style>
 </head>
-
 <body>
-  <div id="wrap">
-    <div id="hud">
-      <div class="row">
-        <button id="btn" disabled>Enable Webcam</button>
 
-        <label>
-          Camera
-          <select id="camSel">
-            <option value="user" selected>Webcam (user)</option>
-            <option value="environment">environment</option>
-          </select>
-        </label>
+    <audio id="bgm" loop>
+        <source src="bgm.mp3" type="audio/mp3">
+    </audio>
+    <audio id="sfx-collect">
+        <source src="Collect.mp3" type="audio/mp3">
+    </audio>
+    <audio id="sfx-crunch">
+        <source src="Crunch.mp3" type="audio/mp3">
+    </audio>
+    <audio id="sfx-end">
+        <source src="end.mp3" type="audio/mp3">
+    </audio>
 
-        <label>
-          <input id="mirror" type="checkbox" />
-          Mirror display（鏡面顯示）
-        </label>
+    <video id="video-input" autoplay></video>
+    <div id="global-bg"></div>
 
-        <label>
-          Segments <span id="nSegVal">50</span>
-          <input id="nSeg" type="range" min="20" max="90" step="1" />
-        </label>
+    <div id="ui-layer">
+        <div id="score-board">分數: <span id="score">0</span></div>
+        <div id="timer-board">時間: <span id="timer">60</span></div>
+        <div id="status-text" style="display:none;">Wait for hand detection...</div>
 
-        <label>
-          Spacing <span id="spacingVal">10</span>
-          <input id="spacing" type="range" min="6" max="18" step="1" />
-        </label>
-      </div>
+        <div id="dragon-body-container"></div>
 
-      <div id="status">初始化中…</div>
-      <div style="margin-top:6px; font-size:12px; opacity:0.75;">
-        提示：用 HTTPS 或 localhost 開。若你覺得「左右手顛倒」，先關掉 Mirror display 測試一次。
-      </div>
+        <div id="aim-cursor">
+            <div class="dragon-head-group">
+                <div class="smoke-effect"></div>
+                <div class="dh-horn horn-left straw-texture"></div>
+                <div class="dh-horn horn-right straw-texture"></div>
+                <div class="dh-whisker whisker-left"></div>
+                <div class="dh-whisker whisker-right"></div>
+                <div class="dh-skull straw-texture"></div>
+                <div class="dh-jaw straw-texture"></div>
+                <div class="dh-snout straw-texture"></div>
+                <div class="dh-eye eye-left"></div>
+                <div class="dh-eye eye-right"></div>
+                <div class="incense-glow">
+                    <div class="incense-particles"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-area"></div>
+        <button id="mute-btn" onclick="toggleMute()">🔊</button>
     </div>
 
-    <video id="video" playsinline muted></video>
-    <canvas id="canvas"></canvas>
-  </div>
+    <div id="start-screen" class="overlay-screen">
+        <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 40px;">🔥 大坑舞火龍 🔥</h1>
+        <p style="font-size: 18px; color: #ddd;">請舉起右手<br>控制龍頭收集吉祥字！</p>
+        <button onclick="startGame()">起龍！(Start)</button>
+    </div>
+
+    <div id="game-over-screen" class="overlay-screen" style="display: none;">
+        <h1>時間到！</h1>
+        <p>最終分數: <span id="final-score" style="font-size: 40px; font-weight: bold; color: #ffeb3b;">0</span></p>
+        <button onclick="startGame()">再舞一次</button>
+    </div>
+
+    <script>
+        // --- 音效管理 ---
+        const sounds = {
+            bgm: document.getElementById('bgm'),
+            collect: document.getElementById('sfx-collect'),
+            crunch: document.getElementById('sfx-crunch'),
+            end: document.getElementById('sfx-end')
+        };
+        let isMuted = false;
+        sounds.bgm.volume = 0.3;
+        sounds.collect.volume = 0.8;
+        sounds.crunch.volume = 0.8;
+
+        function playSound(name) {
+            if (isMuted) return;
+            const audio = sounds[name];
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play().catch(e => console.log("Audio play failed:", e));
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const btn = document.getElementById('mute-btn');
+            if (isMuted) { sounds.bgm.pause(); btn.innerText = '🔇'; }
+            else { if (isGameRunning) sounds.bgm.play().catch(()=>{}); btn.innerText = '🔊'; }
+        }
+
+        // --- MediaPipe Hand Detection ---
+        const videoElement = document.getElementById('video-input');
+        const statusText = document.getElementById('status-text');
+        let handDetector = null;
+        let handsDetected = false;
+
+        async function initHandDetection() {
+            const hands = new Hands({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1633559619/${file}`;
+                }
+            });
+            
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onHandsResults);
+            handDetector = hands;
+
+            const camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    await hands.send({ image: videoElement });
+                },
+                width: 1280,
+                height: 720
+            });
+            camera.start();
+        }
+
+        let rightHandPos = { x: -100, y: -100, visible: false };
+        const landmarkIndices = {
+            MIDDLE_FINGER_TIP: 12,  // 右手中指尖端
+            WRIST: 0,
+            INDEX_FINGER_TIP: 8,
+            PINKY_TIP: 20
+        };
+
+        function onHandsResults(results) {
+            if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+                rightHandPos.visible = false;
+                handsDetected = false;
+                if (statusText) statusText.style.display = 'block';
+                return;
+            }
+
+            handsDetected = true;
+            if (statusText) statusText.style.display = 'none';
+
+            // 只處理第一隻檢測到的手（應該是右手）
+            const landmarks = results.multiHandLandmarks[0];
+            const handedness = results.multiHandedness && results.multiHandedness[0];
+            
+            // 只追蹤右手；如果需要自動偵測手勢方向，可檢查 handedness.label === 'Right'
+            if (handedness && handedness.label === 'Left') {
+                // 可選：忽略左手或進行鏡像映射
+                rightHandPos.visible = false;
+                return;
+            }
+
+            // 使用中指尖端來追蹤
+            const fingerTip = landmarks[landmarkIndices.MIDDLE_FINGER_TIP];
+            
+            // 將 MediaPipe 座標轉換為螢幕座標
+            // MediaPipe 返回的是 0-1 之間的標準化座標
+            rightHandPos.x = fingerTip.x * window.innerWidth;
+            rightHandPos.y = fingerTip.y * window.innerHeight;
+            rightHandPos.visible = true;
+        }
+
+        // --- 遊戲變數 ---
+        const goodWords = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '馬', '年'];
+        const badWords = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
+        let score = 0;
+        let timeLeft = 60;
+        let isGameRunning = false;
+        let items = [];
+        let timerInterval = null;
+        let gameWidth = window.innerWidth;
+        let gameHeight = window.innerHeight;
+        let playerScreenPos = { x: -100, y: -100, visible: false };
+
+        // --- 龍身參數（可調）---
+        const bodySegmentCount = 14;
+        const bodySpacing = 26;
+        const sticksPerSegment = 28;
+        const stickLenMin = 26;
+        const stickLenMax = 46;
+
+        const bodySegments = [];
+        const bodyPositions = [];
+
+        const gameArea = document.getElementById('game-area');
+        const scoreEl = document.getElementById('score');
+        const timerEl = document.getElementById('timer');
+        const aimCursor = document.getElementById('aim-cursor');
+        const dragonBodyContainer = document.getElementById('dragon-body-container');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalScoreEl = document.getElementById('final-score');
+
+        // --- 建立一節「放射香枝」身體 ---
+        function buildIncenseSegment(isTail=false) {
+            const seg = document.createElement('div');
+            seg.classList.add(isTail ? 'dragon-tail' : 'dragon-body-segment');
+
+            if (!isTail) {
+                const glow = document.createElement('div');
+                glow.className = 'segment-glow';
+                seg.appendChild(glow);
+
+                const core = document.createElement('div');
+                core.className = 'segment-core';
+                seg.appendChild(core);
+
+                for (let i = 0; i < sticksPerSegment; i++) {
+                    const stick = document.createElement('div');
+                    stick.className = 'incense-stick';
+                    const rot = (360 / sticksPerSegment) * i + (Math.random() * 10 - 5);
+                    const len = stickLenMin + Math.random() * (stickLenMax - stickLenMin);
+                    const flicker = (0.09 + Math.random() * 0.08).toFixed(2) + 's';
+                    stick.style.setProperty('--rot', rot + 'deg');
+                    stick.style.setProperty('--len', len + 'px');
+                    stick.style.setProperty('--flicker', flicker);
+                    seg.appendChild(stick);
+                }
+            } else {
+                const core = document.createElement('div');
+                core.className = 'tail-core';
+                seg.appendChild(core);
+
+                const tailSticks = 36;
+                for (let i = 0; i < tailSticks; i++) {
+                    const stick = document.createElement('div');
+                    stick.className = 'tail-stick';
+                    const rot = (360 / tailSticks) * i + (Math.random() * 12 - 6);
+                    const len = 40 + Math.random() * 28;
+                    stick.style.setProperty('--rot', rot + 'deg');
+                    stick.style.setProperty('--len', len + 'px');
+                    seg.appendChild(stick);
+                }
+            }
+
+            return seg;
+        }
+
+        // --- 初始化龍身 ---
+        function initDragonBody() {
+            dragonBodyContainer.innerHTML = '';
+            bodySegments.length = 0;
+            bodyPositions.length = 0;
+
+            for (let i = 0; i < bodySegmentCount; i++) {
+                const el = buildIncenseSegment(false);
+                const scale = 1 - (i * 0.022);
+                el.dataset.baseScale = scale.toFixed(3);
+
+                dragonBodyContainer.appendChild(el);
+                bodySegments.push(el);
+                bodyPositions.push({ x: -100, y: -100, a: 0 });
+            }
+
+            const tail = buildIncenseSegment(true);
+            tail.dataset.baseScale = '0.72';
+            dragonBodyContainer.appendChild(tail);
+            bodySegments.push(tail);
+            bodyPositions.push({ x: -100, y: -100, a: 0 });
+        }
+
+        window.addEventListener('resize', () => {
+            gameWidth = window.innerWidth;
+            gameHeight = window.innerHeight;
+        });
+
+        function startGame() {
+            if (!handsDetected) {
+                alert('Please ensure your right hand is visible to the camera!');
+                return;
+            }
+
+            if (!isMuted) sounds.bgm.play().catch(e => console.log("BGM play failed:", e));
+
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+
+            score = 0;
+            timeLeft = 60;
+            scoreEl.innerText = score;
+            timerEl.innerText = timeLeft;
+            gameArea.innerHTML = '';
+            items = [];
+            isGameRunning = true;
+
+            initDragonBody();
+            spawnItems(6, 'good');
+            spawnItems(4, 'bad');
+
+            gameLoop();
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.innerText = timeLeft;
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+        }
+
+        function endGame() {
+            isGameRunning = false;
+            clearInterval(timerInterval);
+            sounds.bgm.pause(); sounds.bgm.currentTime = 0;
+            playSound('end');
+            finalScoreEl.innerText = score;
+            gameOverScreen.style.display = 'flex';
+        }
+
+        function spawnItems(count, type) {
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                el.classList.add('floating-item');
+                el.classList.add(type === 'good' ? 'good-item' : 'bad-item');
+                el.innerText = type === 'good' ?
+                    goodWords[Math.floor(Math.random() * goodWords.length)] :
+                    badWords[Math.floor(Math.random() * badWords.length)];
+                el.dataset.points = type === 'good' ? 15 : -5;
+
+                gameArea.appendChild(el);
+                const size = 70;
+
+                items.push({
+                    element: el,
+                    x: Math.random() * (gameWidth - size),
+                    y: Math.random() * (gameHeight - size),
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    width: size, height: size,
+                    active: true
+                });
+            }
+        }
+
+        function updateDragonBody(headX, headY) {
+            let targetX = headX;
+            let targetY = headY;
+
+            for (let i = 0; i < bodySegments.length; i++) {
+                const segment = bodySegments[i];
+                const currentPos = bodyPositions[i];
+
+                const dx = targetX - currentPos.x;
+                const dy = targetY - currentPos.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                const angle = Math.atan2(dy, dx);
+
+                if (dist > bodySpacing) {
+                    const moveDist = dist - bodySpacing;
+                    currentPos.x += Math.cos(angle) * moveDist * 0.55;
+                    currentPos.y += Math.sin(angle) * moveDist * 0.55;
+                }
+
+                const prevA = currentPos.a || angle;
+                let da = angle - prevA;
+                if (da > Math.PI) da -= Math.PI * 2;
+                if (da < -Math.PI) da += Math.PI * 2;
+                currentPos.a = prevA + da * 0.25;
+
+                segment.style.display = 'block';
+                segment.style.left = currentPos.x + 'px';
+                segment.style.top = currentPos.y + 'px';
+
+                const baseScale = parseFloat(segment.dataset.baseScale || '1');
+                const deg = (currentPos.a * 180 / Math.PI) + 90;
+                segment.style.transform = `translate(-50%, -50%) rotate(${deg}deg) scale(${baseScale})`;
+
+                targetX = currentPos.x;
+                targetY = currentPos.y;
+            }
+        }
+
+        function gameLoop() {
+            if (!isGameRunning) return;
+
+            if (rightHandPos.visible) {
+                playerScreenPos = { x: rightHandPos.x, y: rightHandPos.y, visible: true };
+                aimCursor.style.display = 'flex';
+                aimCursor.style.left = rightHandPos.x + 'px';
+                aimCursor.style.top = rightHandPos.y + 'px';
+                updateDragonBody(rightHandPos.x, rightHandPos.y);
+            } else {
+                playerScreenPos.visible = false;
+                aimCursor.style.display = 'none';
+                bodySegments.forEach(seg => seg.style.display = 'none');
+            }
+
+            items.forEach(item => {
+                if (!item.active) return;
+
+                item.x += item.vx; item.y += item.vy;
+                if (item.x <= 0 || item.x >= gameWidth - item.width) item.vx *= -1;
+                if (item.y <= 0 || item.y >= gameHeight - item.height) item.vy *= -1;
+
+                item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
+                item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
+
+                item.element.style.left = item.x + 'px';
+                item.element.style.top = item.y + 'px';
+
+                if (playerScreenPos.visible) {
+                    const dx = playerScreenPos.x - (item.x + item.width/2);
+                    const dy = playerScreenPos.y - (item.y + item.height/2);
+                    if ((dx*dx + dy*dy) < (60 + 35) ** 2) {
+                        handleHit(item);
+                    }
+                }
+            });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function handleHit(item) {
+            const pts = parseInt(item.element.dataset.points);
+            score += pts;
+            scoreEl.innerText = score;
+
+            if (pts > 0) playSound('collect');
+            else playSound('crunch');
+
+            const popup = document.createElement('div');
+            popup.classList.add('score-popup');
+            popup.innerText = pts > 0 ? `+${pts}` : pts;
+            popup.style.color = pts > 0 ? '#2e7d32' : '#d32f2f';
+            popup.style.left = item.x + 'px';
+            popup.style.top = item.y + 'px';
+            gameArea.appendChild(popup);
+            setTimeout(() => popup.remove(), 800);
+
+            item.active = false;
+            item.element.style.opacity = '0';
+
+            setTimeout(() => {
+                if (!isGameRunning) return;
+                item.active = true;
+                item.element.style.opacity = '1';
+                item.x = Math.random() * (gameWidth - item.width);
+                item.y = Math.random() * (gameHeight - item.height);
+                item.element.innerText = pts > 0
+                    ? goodWords[Math.floor(Math.random() * goodWords.length)]
+                    : badWords[Math.floor(Math.random() * badWords.length)];
+            }, 500);
+        }
+
+        // Initialize hand detection when page loads
+        window.addEventListener('load', () => {
+            initHandDetection();
+        });
+    </script>
 </body>
 </html>
