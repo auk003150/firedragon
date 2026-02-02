@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>新春大坑舞火龍遊戲（手部追蹤版）</title>
+  <title>新春大坑舞火龍遊戲（手腕控制）</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 
-  <!-- MediaPipe Tasks Vision (Hand Landmarker) via CDN -->
+  <!-- MediaPipe Tasks Vision (Hand Landmarker) -->
   <script type="module" src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs" crossorigin="anonymous"></script>
 
   <style>
@@ -16,7 +16,7 @@
       position: absolute; top: 0; left: 0;
       width: 100vw; height: 100vh;
       object-fit: cover;
-      transform: scaleX(-1); /* 前鏡像 */
+      transform: scaleX(-1);
       z-index: 0;
       background: #000;
     }
@@ -55,7 +55,6 @@
       pointer-events: none; z-index: 15;
     }
 
-    /* --- 珍珠草材質 --- */
     .straw-texture {
       background-color: #d4b483;
       background-image:
@@ -68,7 +67,7 @@
       box-shadow: inset 0 0 10px rgba(62, 39, 35, 0.5);
     }
 
-    /* --- 龍頭 --- */
+    /* 龍頭 */
     .dragon-head-group { position: relative; width: 120px; height: 120px; animation: float-head 2s ease-in-out infinite; }
     .dh-skull { position: absolute; top: 25px; left: 20px; width: 80px; height: 60px; border-radius: 25px 25px 15px 15px; z-index: 5; }
     .dh-snout { position: absolute; top: 50px; left: 10px; width: 90px; height: 40px; border-radius: 30px; z-index: 6; }
@@ -122,7 +121,7 @@
       z-index: 1;
     }
 
-    /* 火龍龍身（脊骨 + 放射香枝） */
+    /* 火龍龍身 */
     .dragon-body-segment {
       position: absolute;
       width: 70px; height: 70px;
@@ -183,6 +182,7 @@
       pointer-events: none;
       opacity: 0.8;
     }
+
     .dragon-tail {
       position: absolute;
       width: 90px; height: 90px;
@@ -227,7 +227,7 @@
       animation: incense-flicker 0.14s infinite alternate;
     }
 
-    /* 物件 */
+    /* 遊戲物件 */
     .floating-item {
       position: absolute; font-size: 40px; font-weight: bold;
       display: flex; justify-content: center; align-items: center;
@@ -305,15 +305,14 @@
 
     <div id="game-area"></div>
     <button id="mute-btn" onclick="toggleMute()">🔊</button>
-
-    <div id="hint">把手舉到鏡頭前，系統會揀「最大/最近鏡頭」嗰隻手；用食指指尖控制龍頭。</div>
+    <div id="hint">把手舉到鏡頭前，系統會揀「最大/最近鏡頭」嗰隻手；用「手腕」控制龍頭。</div>
   </div>
 
   <div id="start-screen" class="overlay-screen">
     <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 40px;">🔥 大坑舞火龍 🔥</h1>
     <p style="font-size: 18px; color: #ddd;">
       學生手持竹棒揮動龍公仔：請先把手舉到鏡頭前<br>
-      系統會自動鎖定畫面最大/最近嘅一隻手，食指指尖控制龍頭。
+      系統會自動鎖定畫面最大/最近嘅一隻手，用「手腕」控制龍頭。
     </p>
     <button id="start-btn">開始</button>
   </div>
@@ -325,10 +324,7 @@
   </div>
 
   <script type="module">
-    import {
-      FilesetResolver,
-      HandLandmarker
-    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs";
+    import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs";
 
     // ===== 音效 =====
     const sounds = {
@@ -352,10 +348,7 @@
     function playSound(name) {
       if (isMuted) return;
       const audio = sounds[name];
-      if (audio) {
-        audio.currentTime = 0;
-        audio.play().catch(()=>{});
-      }
+      if (audio) { audio.currentTime = 0; audio.play().catch(()=>{}); }
     }
 
     // ===== 遊戲狀態 =====
@@ -390,17 +383,16 @@
     const bodySegments = [];
     const bodyPositions = [];
 
-    // ===== 手部追蹤 + 穩定化（失手寬限 + EMA）=====
-    const DETECT_EVERY_N_FRAMES = 2;   // 降低推論頻率，提升手機 FPS
+    // ===== 手部追蹤 + 穩定化 =====
+    const DETECT_EVERY_N_FRAMES = 2;   // 降低推論頻率
     const LOST_GRACE_MS = 550;         // 偵測不到手後仍保持最後位置
     const FADE_OUT_MS = 350;
-    const EMA_ALPHA = 0.35;            // 指尖座標平滑（0~1）
+    const EMA_ALPHA = 0.35;            // 平滑（越大越跟手但更抖）
 
     let frameCount = 0;
     let lastHandSeenTs = 0;
     let hasEverSeenHand = false;
     let smoothX = -100, smoothY = -100;
-
     const playerScreenPos = { x: -100, y: -100, visible: false };
 
     function fixSizes() {
@@ -537,7 +529,6 @@
       items = [];
       isGameRunning = true;
 
-      // reset hand smoothing
       frameCount = 0;
       lastHandSeenTs = 0;
       hasEverSeenHand = false;
@@ -623,7 +614,7 @@
       }, 500);
     }
 
-    // ===== MediaPipe Hand Landmarker 初始化 =====
+    // ===== MediaPipe Hand Landmarker =====
     let handLandmarker = null;
     let lastVideoTime = -1;
 
@@ -640,23 +631,20 @@
     async function initHandLandmarker() {
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-      ); // CDN wasm root [web:100]
+      ); // wasm root 用法見官方說明 [web:100]
 
-      // 線上 model（如要離線，把 hand_landmarker.task 放到同目錄，改成 "hand_landmarker.task"）
       handLandmarker = await HandLandmarker.createFromModelPath(
         vision,
         "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task"
-      ); // 例子做法見官方/套件示例 [web:103]
+      );
 
       await handLandmarker.setOptions({
         runningMode: "VIDEO",
         numHands: 2
-      }); // video mode 用 detectForVideo [web:100]
+      }); // VIDEO 用 detectForVideo [web:100]
     }
 
     function pickLargestHand(detections) {
-      // detections.handLandmarks: Array< Array<landmark> >
-      // landmark.x/y 是 0..1 正規化座標，可乘上畫面寬高得到像素 [web:88]
       const hands = detections?.handLandmarks || [];
       if (!hands.length) return null;
 
@@ -664,7 +652,6 @@
       let bestScore = -Infinity;
 
       for (const hand of hands) {
-        // 用 bounding box 面積當「最大/最近」 proxy（不用 handedness）
         let minX = 1, minY = 1, maxX = 0, maxY = 0;
         for (const lm of hand) {
           if (lm.x < minX) minX = lm.x;
@@ -686,12 +673,11 @@
         hasEverSeenHand = true;
         lastHandSeenTs = now;
 
-        // 食指指尖：INDEX_FINGER_TIP = 8 [web:107]
-        const tip = hand[8];
+        // 用手腕控制：landmark 0；x/y 係 0..1 正規化座標 [web:88][web:100]
+        const wrist = hand[0];
 
-        // 將 0..1 正規化座標轉成螢幕座標；注意 video 有鏡像，UI 亦鏡像，所以用 tip.x 直接對應就可
-        const rawX = tip.x * gameWidth;
-        const rawY = tip.y * gameHeight;
+        const rawX = wrist.x * gameWidth;
+        const rawY = wrist.y * gameHeight;
 
         smoothX = smoothX + EMA_ALPHA * (rawX - smoothX);
         smoothY = smoothY + EMA_ALPHA * (rawY - smoothY);
@@ -707,7 +693,6 @@
         return;
       }
 
-      // 無手：失手寬限 + 漸隱
       if (hasEverSeenHand && (now - lastHandSeenTs) <= LOST_GRACE_MS) {
         playerScreenPos.visible = true;
         setDragonVisible(true, 1);
@@ -728,12 +713,12 @@
       }
     }
 
-    // ===== 主 loop =====
     function gameLoop() {
       if (!isGameRunning) return;
 
-      // 手部推論：用 video mode 的 detectForVideo [web:100]
       frameCount++;
+
+      // VIDEO mode：用 detectForVideo()；每 N 幀做一次推論 [web:100]
       if (handLandmarker && cam.readyState >= 2 && (frameCount % DETECT_EVERY_N_FRAMES === 0)) {
         if (cam.currentTime !== lastVideoTime) {
           const detections = handLandmarker.detectForVideo(cam, performance.now());
@@ -741,11 +726,9 @@
           lastVideoTime = cam.currentTime;
         }
       } else {
-        // 即使唔推論，都要處理漸隱/保持（靠時間）
         updateFromHand(null);
       }
 
-      // 物件移動 + 碰撞
       items.forEach(item => {
         if (!item.active) return;
 
@@ -755,6 +738,7 @@
 
         item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
         item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
+
         item.element.style.left = item.x + 'px';
         item.element.style.top = item.y + 'px';
 
@@ -768,9 +752,8 @@
       requestAnimationFrame(gameLoop);
     }
 
-    // ===== 啟動流程 =====
+    // ===== 啟動：按「開始」先要權限、載模型 =====
     document.getElementById('start-btn').addEventListener('click', async () => {
-      // iOS/Chrome autoplay policy：用 click 觸發權限 + 音樂
       await initCamera();
       await initHandLandmarker();
       startGame();
