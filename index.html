@@ -72,7 +72,7 @@
           <button id="mirrorBtn" class="secondary">Mirror camera: ON</button>
           <button id="restartBtn" class="secondary" style="display:none;">Play again</button>
         </div>
-        <div id="hint">Using the official hosted hand landmarker model URL to avoid GitHub Pages 404s. [web:23]</div>
+        <div id="hint">HandLandmarker must be initialized in VIDEO mode when using detectForVideo(). [page:0]</div>
         <div id="err"></div>
       </div>
     </div>
@@ -81,7 +81,7 @@
   <script type="module">
     import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
-    // Official model URL example from @mediapipe/tasks-vision docs [web:23]
+    // Hosted model URL example (no local .task needed). [page:0]
     const MODEL_URL =
       "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
@@ -137,9 +137,17 @@
     async function initHandLandmarker() {
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-      );
-      // Use hosted model URL (no local .task needed) [web:23]
-      handLandmarker = await HandLandmarker.createFromModelPath(vision, MODEL_URL);
+      ); // wasm assets path shown in Tasks Vision docs. [page:0]
+
+      // IMPORTANT: Set runningMode: "VIDEO" because we call detectForVideo(). [page:0]
+      handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: MODEL_URL },
+        runningMode: "VIDEO",
+        numHands: 2,
+        minHandDetectionConfidence: 0.5,
+        minHandPresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      }); // [page:0]
     }
 
     async function initCamera() {
@@ -321,6 +329,7 @@
       ctx.fillStyle = fill;
       ctx.strokeStyle = stroke;
       ctx.lineWidth = 2;
+
       ctx.beginPath(); ctx.arc(0, 0, b.r, 0, Math.PI * 2);
       ctx.fill(); ctx.stroke();
 
@@ -349,6 +358,8 @@
       if (!lm || !lm[0]) return; // landmark 0 = wrist
 
       let x = lm[0].x, y = lm[0].y;
+
+      // Video is mirrored visually; flip x so control matches what user sees.
       if (mirror) x = 1 - x;
 
       dragonX = dragonX + (x - dragonX) * SMOOTHING;
@@ -361,7 +372,7 @@
 
       if (video.readyState >= 2 && handLandmarker) {
         if (video.currentTime !== lastVideoTime) {
-          const res = handLandmarker.detectForVideo(video, performance.now());
+          const res = handLandmarker.detectForVideo(video, performance.now()); // requires VIDEO mode [page:0]
           updateWristFromLandmarks(res);
           lastVideoTime = video.currentTime;
         }
@@ -384,6 +395,7 @@
       handleCollisions();
 
       ctx.clearRect(0, 0, w, h);
+
       if (!hasWrist) {
         ctx.save();
         ctx.fillStyle = "rgba(255,255,255,0.75)";
@@ -430,7 +442,7 @@
       try {
         await initCamera();
         resize();
-        await initHandLandmarker(); // hosted model [web:23]
+        await initHandLandmarker();
         await startGame();
       } catch (e) {
         overlay.style.display = "grid";
