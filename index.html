@@ -1,272 +1,299 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>新春大坑舞火龍遊戲（手腕控制）</title>
+  <title>新春大坑舞火龍遊戲（手腕控制・最終版）</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 
-  <!-- MediaPipe Tasks Vision (Hand Landmarker) -->
   <script type="module" src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs" crossorigin="anonymous"></script>
 
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; background: #000; }
 
-    /* 相機畫面 */
-    #cam {
-      position: absolute; top: 0; left: 0;
-      width: 100vw; height: 100vh;
-      object-fit: cover;
+    #cam{
+      position:absolute; top:0; left:0;
+      width:100vw; height:100vh;
+      object-fit:cover;
       transform: scaleX(-1);
-      z-index: 0;
-      background: #000;
+      z-index:0; background:#000;
     }
 
-    #global-bg {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      background: url('image_1.png') no-repeat center center;
-      background-size: cover; z-index: 1; pointer-events: none; opacity: 0.9;
+    #global-bg{
+      position:absolute; top:0; left:0; width:100%; height:100%;
+      background:url('image_1.png') no-repeat center center;
+      background-size:cover;
+      z-index:1; pointer-events:none; opacity:0.9;
     }
 
-    #ui-layer {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none; z-index: 10; overflow: hidden;
+    #ui-layer{
+      position:absolute; top:0; left:0; width:100%; height:100%;
+      pointer-events:none;
+      z-index:10;
+      overflow:hidden;
     }
 
-    #score-board, #timer-board {
-      position: absolute; top: 20px;
-      background: rgba(0, 0, 0, 0.6); padding: 10px 20px;
-      border-radius: 15px; font-size: 20px; font-weight: bold;
+    #score-board, #timer-board{
+      position:absolute; top:20px;
+      background: rgba(0,0,0,0.6);
+      padding:10px 20px;
+      border-radius:15px;
+      font-size:20px; font-weight:bold;
       box-shadow: 0 4px 8px rgba(0,0,0,0.5);
       backdrop-filter: blur(5px);
       border: 1px solid rgba(255,255,255,0.3);
+      pointer-events:none;
     }
-    #score-board { left: 20px; color: #ffeb3b; text-shadow: 0 0 5px #ff5722; }
-    #timer-board { right: 20px; color: #fff; }
+    #score-board{ left:20px; color:#ffeb3b; text-shadow:0 0 5px #ff5722; }
+    #timer-board{ right:20px; color:#fff; }
 
-    #aim-cursor {
-      position: absolute; width: 160px; height: 160px;
-      transform: translate(-50%, -50%); display: none;
-      justify-content: center; align-items: center;
-      z-index: 20;
-      opacity: 1;
-    }
-    #dragon-body-container {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none; z-index: 15;
+    #aim-cursor{
+      position:absolute;
+      width:160px; height:160px;
+      transform: translate(-50%, -50%);
+      display:none;
+      justify-content:center; align-items:center;
+      z-index:20;
+      opacity:1;
+      pointer-events:none;
     }
 
-    .straw-texture {
-      background-color: #d4b483;
+    #dragon-body-container{
+      position:absolute; inset:0;
+      pointer-events:none;
+      z-index:15;
+    }
+
+    /* debug：固定最頂，唔會被蓋住 */
+    #debug{
+      position: fixed;
+      left: 12px; bottom: 12px;
+      z-index: 2147483647;
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.35;
+      pointer-events: none;
+      white-space: pre-line;
+      max-width: min(520px, calc(100vw - 24px));
+    }
+
+    /* --- 珍珠草材質 --- */
+    .straw-texture{
+      background-color:#d4b483;
       background-image:
         radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%),
         linear-gradient(to bottom, rgba(0,0,0,0.1), transparent 20%, transparent 80%, rgba(0,0,0,0.4)),
-        repeating-linear-gradient(85deg, transparent 0px, transparent 2px, rgba(93, 64, 55, 0.3) 3px, transparent 4px),
-        repeating-linear-gradient(95deg, transparent 0px, transparent 3px, rgba(141, 110, 99, 0.4) 4px, transparent 6px),
+        repeating-linear-gradient(85deg, transparent 0px, transparent 2px, rgba(93,64,55,0.3) 3px, transparent 4px),
+        repeating-linear-gradient(95deg, transparent 0px, transparent 3px, rgba(141,110,99,0.4) 4px, transparent 6px),
         repeating-linear-gradient(0deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 1px, transparent 5px);
-      border: 1px solid #8d6e63;
-      box-shadow: inset 0 0 10px rgba(62, 39, 35, 0.5);
+      border:1px solid #8d6e63;
+      box-shadow: inset 0 0 10px rgba(62,39,35,0.5);
     }
 
-    /* 龍頭 */
-    .dragon-head-group { position: relative; width: 120px; height: 120px; animation: float-head 2s ease-in-out infinite; }
-    .dh-skull { position: absolute; top: 25px; left: 20px; width: 80px; height: 60px; border-radius: 25px 25px 15px 15px; z-index: 5; }
-    .dh-snout { position: absolute; top: 50px; left: 10px; width: 90px; height: 40px; border-radius: 30px; z-index: 6; }
-    .dh-snout::before, .dh-snout::after { content: ''; position: absolute; bottom: 10px; width: 14px; height: 14px; background: #3e2723; border-radius: 50%; box-shadow: inset 0 0 5px #000; }
-    .dh-snout::before { left: 15px; } .dh-snout::after { right: 15px; }
-    .dh-jaw { position: absolute; bottom: 10px; left: 30px; width: 60px; height: 35px; border-radius: 0 0 25px 25px; z-index: 4; animation: chew 1s ease-in-out infinite alternate; }
-    .dh-eye {
-      position: absolute; top: 20px; width: 24px; height: 24px;
+    /* --- 龍頭 --- */
+    .dragon-head-group{ position:relative; width:120px; height:120px; animation: float-head 2s ease-in-out infinite; }
+    .dh-skull{ position:absolute; top:25px; left:20px; width:80px; height:60px; border-radius:25px 25px 15px 15px; z-index:5; }
+    .dh-snout{ position:absolute; top:50px; left:10px; width:90px; height:40px; border-radius:30px; z-index:6; }
+    .dh-snout::before, .dh-snout::after{ content:''; position:absolute; bottom:10px; width:14px; height:14px; background:#3e2723; border-radius:50%; box-shadow: inset 0 0 5px #000; }
+    .dh-snout::before{ left:15px; } .dh-snout::after{ right:15px; }
+    .dh-jaw{ position:absolute; bottom:10px; left:30px; width:60px; height:35px; border-radius:0 0 25px 25px; z-index:4; animation: chew 1s ease-in-out infinite alternate; }
+    .dh-eye{
+      position:absolute; top:20px; width:24px; height:24px;
       background: radial-gradient(circle, #fff 40%, #cfd8dc 100%);
-      border-radius: 50%;
-      border: 3px solid #3e2723;
-      box-shadow: 0 0 15px rgba(255, 255, 255, 0.9);
-      z-index: 7;
+      border-radius:50%;
+      border:3px solid #3e2723;
+      box-shadow:0 0 15px rgba(255,255,255,0.9);
+      z-index:7;
     }
-    .eye-left { left: 5px; } .eye-right { right: 5px; }
-    .dh-horn { position: absolute; top: -25px; width: 15px; height: 55px; border-radius: 8px; transform-origin: bottom center; z-index: 3; }
-    .horn-left { left: 15px; transform: rotate(-25deg); } .horn-right { right: 15px; transform: rotate(25deg); }
-    .dh-whisker { position: absolute; top: 60px; width: 70px; height: 50px; border-top: 5px solid #a1887f; border-radius: 50%; z-index: 2; opacity: 0.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
-    .whisker-left { right: 85px; transform: rotate(20deg); } .whisker-right { left: 85px; transform: rotate(-20deg); }
+    .eye-left{ left:5px; } .eye-right{ right:5px; }
+    .dh-horn{ position:absolute; top:-25px; width:15px; height:55px; border-radius:8px; transform-origin: bottom center; z-index:3; }
+    .horn-left{ left:15px; transform: rotate(-25deg); } .horn-right{ right:15px; transform: rotate(25deg); }
+    .dh-whisker{ position:absolute; top:60px; width:70px; height:50px; border-top:5px solid #a1887f; border-radius:50%; z-index:2; opacity:0.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
+    .whisker-left{ right:85px; transform: rotate(20deg); } .whisker-right{ left:85px; transform: rotate(-20deg); }
 
-    @keyframes incense-flicker {
-      0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.95); filter: drop-shadow(0 0 1px rgba(255,61,0,0.5)); }
-      50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 3px rgba(255,200,0,0.8)); }
-      100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.0); filter: drop-shadow(0 0 2px rgba(255,61,0,0.6)); }
+    @keyframes incense-flicker{
+      0%{ opacity:0.8; transform: translate(-50%, -50%) scale(0.95); filter: drop-shadow(0 0 1px rgba(255,61,0,0.5)); }
+      50%{ opacity:1; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 3px rgba(255,200,0,0.8)); }
+      100%{ opacity:0.9; transform: translate(-50%, -50%) scale(1.0); filter: drop-shadow(0 0 2px rgba(255,61,0,0.6)); }
     }
-    @keyframes smoke-rise {
-      0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); }
-      50% { opacity: 0.5; }
-      100% { opacity: 0; transform: translate(-50%, -80px) scale(2.5); }
+    @keyframes smoke-rise{
+      0%{ opacity:0; transform: translate(-50%, 0) scale(0.5); }
+      50%{ opacity:0.5; }
+      100%{ opacity:0; transform: translate(-50%, -80px) scale(2.5); }
     }
-    @keyframes float-head { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-    @keyframes chew { 0% { transform: translateY(0); } 100% { transform: translateY(5px); } }
+    @keyframes float-head{ 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-8px);} }
+    @keyframes chew{ 0%{ transform: translateY(0);} 100%{ transform: translateY(5px);} }
 
-    .incense-glow { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-    .incense-particles {
-      position: absolute; width: 4px; height: 4px;
+    .incense-glow{ position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10; }
+    .incense-particles{
+      position:absolute; width:4px; height:4px;
       background: radial-gradient(circle, #fff 20%, #ff3d00 100%);
-      border-radius: 50%; top: 40%; left: 50%;
+      border-radius:50%;
+      top:40%; left:50%;
       box-shadow:
         0 -35px 2px #ff9100, 10px -32px 1px #ff3d00, -10px -32px 2px #ff3d00,
         20px -28px 1px #ff9100, -20px -28px 2px #ff3d00, 30px -20px 1px #ff3d00, -30px -20px 2px #ff9100;
       filter: drop-shadow(0 0 4px #ff3d00);
       animation: incense-flicker 0.12s infinite alternate;
     }
-    .smoke-effect {
-      position: absolute; top: -40px; left: 50%; width: 15px; height: 15px;
-      background: rgba(220,220,220,0.4); border-radius: 50%;
+    .smoke-effect{
+      position:absolute; top:-40px; left:50%;
+      width:15px; height:15px;
+      background: rgba(220,220,220,0.4);
+      border-radius:50%;
       box-shadow: 0 0 25px 15px rgba(220,220,220,0.4);
       transform: translateX(-50%);
       animation: smoke-rise 2.5s infinite linear;
-      z-index: 1;
+      z-index:1;
     }
 
-    /* 火龍龍身 */
-    .dragon-body-segment {
-      position: absolute;
-      width: 70px; height: 70px;
+    /* --- 火龍龍身（脊骨 + 放射香枝） --- */
+    .dragon-body-segment{
+      position:absolute;
+      width:70px; height:70px;
       transform: translate(-50%, -50%);
-      display: none;
-      z-index: 15;
+      display:none;
+      z-index:15;
       will-change: transform, left, top, opacity;
-      opacity: 1;
+      opacity:1;
     }
-    .segment-core {
-      position: absolute;
-      left: 50%; top: 50%;
-      width: 22px; height: 22px;
+    .segment-core{
+      position:absolute; left:50%; top:50%;
+      width:22px; height:22px;
       transform: translate(-50%, -50%);
-      border-radius: 50%;
+      border-radius:50%;
       background:
         radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0) 55%),
         radial-gradient(circle, #d4b483 0%, #b08b55 70%, #6d4c41 100%);
-      box-shadow:
-        inset 0 0 10px rgba(62,39,35,0.55),
-        0 0 10px rgba(255,120,0,0.12);
-      border: 1px solid rgba(141,110,99,0.7);
+      box-shadow: inset 0 0 10px rgba(62,39,35,0.55), 0 0 10px rgba(255,120,0,0.12);
+      border:1px solid rgba(141,110,99,0.7);
     }
-    .incense-stick {
-      position: absolute;
-      left: 50%; top: 50%;
-      width: 3px;
-      height: var(--len, 40px);
+    .incense-stick{
+      position:absolute; left:50%; top:50%;
+      width:3px; height: var(--len, 40px);
       transform-origin: 50% 100%;
       transform: translate(-50%, -100%) rotate(var(--rot, 0deg));
-      border-radius: 2px;
+      border-radius:2px;
       background: linear-gradient(to top, #7a4b2a 0%, #c58a55 50%, #f2d0a6 100%);
       filter: drop-shadow(0 0 1px rgba(0,0,0,0.5));
-      opacity: 0.95;
+      opacity:0.95;
     }
-    .incense-stick::after {
-      content: '';
-      position: absolute;
-      left: 50%;
-      top: -8px;
-      width: 6px; height: 6px;
+    .incense-stick::after{
+      content:'';
+      position:absolute; left:50%; top:-8px;
+      width:6px; height:6px;
       transform: translateX(-50%);
-      border-radius: 50%;
+      border-radius:50%;
       background: radial-gradient(circle, #fff 10%, #ffeb3b 35%, #ff3d00 100%);
-      box-shadow:
-        0 0 10px rgba(255, 180, 0, 0.9),
-        0 0 18px rgba(255, 61, 0, 0.65);
+      box-shadow: 0 0 10px rgba(255,180,0,0.9), 0 0 18px rgba(255,61,0,0.65);
       animation: incense-flicker var(--flicker, 0.12s) infinite alternate;
     }
-    .segment-glow {
-      position: absolute;
-      left: 50%; top: 50%;
-      width: 120px; height: 120px;
+    .segment-glow{
+      position:absolute; left:50%; top:50%;
+      width:120px; height:120px;
       transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 87, 34, 0.16) 0%, rgba(255, 87, 34, 0.08) 35%, transparent 70%);
+      border-radius:50%;
+      background: radial-gradient(circle, rgba(255,87,34,0.16) 0%, rgba(255,87,34,0.08) 35%, transparent 70%);
       filter: blur(8px);
-      pointer-events: none;
-      opacity: 0.8;
+      pointer-events:none;
+      opacity:0.8;
     }
-
-    .dragon-tail {
-      position: absolute;
-      width: 90px; height: 90px;
+    .dragon-tail{
+      position:absolute;
+      width:90px; height:90px;
       transform: translate(-50%, -50%);
-      display: none;
-      z-index: 14;
+      display:none;
+      z-index:14;
       will-change: transform, left, top, opacity;
-      opacity: 1;
+      opacity:1;
     }
-    .tail-core {
-      position: absolute;
-      left: 50%; top: 55%;
-      width: 20px; height: 20px;
+    .tail-core{
+      position:absolute; left:50%; top:55%;
+      width:20px; height:20px;
       transform: translate(-50%, -50%);
-      border-radius: 50%;
+      border-radius:50%;
       background: radial-gradient(circle, #caa26f 0%, #8d6e63 70%, #3e2723 100%);
       box-shadow: inset 0 0 10px rgba(62,39,35,0.6);
     }
-    .tail-stick {
-      position: absolute;
-      left: 50%; top: 55%;
-      width: 3px;
-      height: var(--len, 55px);
+    .tail-stick{
+      position:absolute; left:50%; top:55%;
+      width:3px; height: var(--len, 55px);
       transform-origin: 50% 100%;
       transform: translate(-50%, -100%) rotate(var(--rot, 0deg));
-      border-radius: 2px;
+      border-radius:2px;
       background: linear-gradient(to top, #6d3d1f 0%, #c07a3e 60%, #f6d7b8 100%);
-      opacity: 0.95;
+      opacity:0.95;
     }
-    .tail-stick::after {
-      content: '';
-      position: absolute;
-      left: 50%;
-      top: -9px;
-      width: 7px; height: 7px;
+    .tail-stick::after{
+      content:'';
+      position:absolute; left:50%; top:-9px;
+      width:7px; height:7px;
       transform: translateX(-50%);
-      border-radius: 50%;
+      border-radius:50%;
       background: radial-gradient(circle, #fff 10%, #ffeb3b 35%, #ff3d00 100%);
-      box-shadow:
-        0 0 12px rgba(255, 200, 0, 0.95),
-        0 0 20px rgba(255, 61, 0, 0.65);
+      box-shadow: 0 0 12px rgba(255,200,0,0.95), 0 0 20px rgba(255,61,0,0.65);
       animation: incense-flicker 0.14s infinite alternate;
     }
 
-    /* 遊戲物件 */
-    .floating-item {
-      position: absolute; font-size: 40px; font-weight: bold;
-      display: flex; justify-content: center; align-items: center;
-      width: 70px; height: 70px; border-radius: 50%;
-      background: rgba(255, 255, 255, 0.9);
+    .floating-item{
+      position:absolute;
+      font-size:40px; font-weight:bold;
+      display:flex; justify-content:center; align-items:center;
+      width:70px; height:70px;
+      border-radius:50%;
+      background: rgba(255,255,255,0.9);
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-      z-index: 5; will-change: transform, left, top;
+      z-index:5;
+      will-change: left, top;
     }
-    .good-item { color: #d32f2f; border: 3px solid #d32f2f; }
-    .bad-item { color: #333; border: 3px solid #555; }
-    .score-popup { position: absolute; font-size: 36px; font-weight: 900; text-shadow: 1px 1px 0 #fff; animation: floatUp 0.8s ease-out forwards; z-index: 20; }
-    @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-60px); } }
+    .good-item{ color:#d32f2f; border:3px solid #d32f2f; }
+    .bad-item{ color:#333; border:3px solid #555; }
+    .score-popup{
+      position:absolute;
+      font-size:36px; font-weight:900;
+      text-shadow:1px 1px 0 #fff;
+      animation: floatUp 0.8s ease-out forwards;
+      z-index:20;
+      pointer-events:none;
+    }
+    @keyframes floatUp{ 0%{opacity:1; transform: translateY(0);} 100%{opacity:0; transform: translateY(-60px);} }
 
-    .overlay-screen {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    .overlay-screen{
+      position:absolute; inset:0;
       background: rgba(0,0,0,0.85);
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      z-index: 30; pointer-events: auto; color: white; text-align: center;
+      display:flex; flex-direction:column;
+      justify-content:center; align-items:center;
+      z-index:30;
+      pointer-events:auto;
+      color:#fff;
+      text-align:center;
       padding: 0 18px;
     }
-    button {
-      padding: 15px 40px; font-size: 22px; background: #d32f2f; color: white;
-      border: none; border-radius: 50px; cursor: pointer; margin-top: 20px;
-      font-weight: bold; box-shadow: 0 0 15px #ff5252; transition: transform 0.1s;
+    button{
+      padding: 15px 40px;
+      font-size: 22px;
+      background: #d32f2f;
+      color: white;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      margin-top: 20px;
+      font-weight: bold;
+      box-shadow: 0 0 15px #ff5252;
+      transition: transform 0.1s;
     }
-    button:active { transform: scale(0.95); }
-    #mute-btn {
-      position: absolute; bottom: 20px; right: 20px; z-index: 40;
-      background: rgba(255,255,255,0.5); border: none; padding: 10px;
-      border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto;
-    }
+    button:active{ transform: scale(0.95); }
 
-    #hint {
-      position: absolute; bottom: 20px; left: 20px; z-index: 40;
-      background: rgba(0,0,0,0.55);
-      color: #fff; padding: 10px 12px; border-radius: 12px;
-      font-size: 14px; line-height: 1.4;
-      max-width: min(420px, calc(100vw - 40px));
-      pointer-events: none;
+    #mute-btn{
+      position:absolute; bottom:20px; right:20px; z-index:40;
+      background: rgba(255,255,255,0.5);
+      border:none; padding:10px;
+      border-radius:50%;
+      font-size:24px;
+      cursor:pointer;
+      pointer-events:auto;
     }
   </style>
 </head>
@@ -305,14 +332,16 @@
 
     <div id="game-area"></div>
     <button id="mute-btn" onclick="toggleMute()">🔊</button>
-    <div id="hint">把手舉到鏡頭前，系統會揀「最大/最近鏡頭」嗰隻手；用「手腕」控制龍頭。</div>
   </div>
+
+  <!-- debug 移到 ui-layer 外面，確保一定可見 -->
+  <div id="debug">JS module 未啟動</div>
 
   <div id="start-screen" class="overlay-screen">
     <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 40px;">🔥 大坑舞火龍 🔥</h1>
     <p style="font-size: 18px; color: #ddd;">
-      學生手持竹棒揮動龍公仔：請先把手舉到鏡頭前<br>
-      系統會自動鎖定畫面最大/最近嘅一隻手，用「手腕」控制龍頭。
+      請按「開始」授權相機並載入模型<br>
+      系統會鎖定畫面最大/最近鏡頭嗰隻手，用「手腕」控制龍頭。
     </p>
     <button id="start-btn">開始</button>
   </div>
@@ -326,7 +355,22 @@
   <script type="module">
     import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs";
 
-    // ===== 音效 =====
+    // ========= DOM =========
+    const debugEl = document.getElementById('debug');
+    const cam = document.getElementById('cam');
+
+    const gameArea = document.getElementById('game-area');
+    const scoreEl = document.getElementById('score');
+    const timerEl = document.getElementById('timer');
+    const aimCursor = document.getElementById('aim-cursor');
+    const dragonBodyContainer = document.getElementById('dragon-body-container');
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const finalScoreEl = document.getElementById('final-score');
+
+    debugEl.textContent = "JS module 已啟動 ✅";
+
+    // ========= 音效 =========
     const sounds = {
       bgm: document.getElementById('bgm'),
       collect: document.getElementById('sfx-collect'),
@@ -338,22 +382,22 @@
     sounds.collect.volume = 0.8;
     sounds.crunch.volume = 0.8;
 
-    window.toggleMute = function toggleMute() {
+    window.toggleMute = function toggleMute(){
       isMuted = !isMuted;
       const btn = document.getElementById('mute-btn');
-      if (isMuted) { sounds.bgm.pause(); btn.innerText = '🔇'; }
+      if (isMuted){ sounds.bgm.pause(); btn.innerText = '🔇'; }
       else { if (isGameRunning) sounds.bgm.play().catch(()=>{}); btn.innerText = '🔊'; }
     };
-
-    function playSound(name) {
+    function playSound(name){
       if (isMuted) return;
-      const audio = sounds[name];
-      if (audio) { audio.currentTime = 0; audio.play().catch(()=>{}); }
+      const a = sounds[name];
+      if (a){ a.currentTime = 0; a.play().catch(()=>{}); }
     }
 
-    // ===== 遊戲狀態 =====
-    const goodWords = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '馬', '年'];
-    const badWords = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
+    // ========= 遊戲狀態 =========
+    const goodWords = ['福','春','財','安','旺','吉','祥','賀','馬','年'];
+    const badWords  = ['⚽','🍔','🎧','🧊','🧼','🍺','💡','📎','🧽','🧯'];
+
     let score = 0;
     let timeLeft = 60;
     let isGameRunning = false;
@@ -362,18 +406,10 @@
 
     let gameWidth = window.innerWidth;
     let gameHeight = window.innerHeight;
+    function fixSizes(){ gameWidth = window.innerWidth; gameHeight = window.innerHeight; }
+    window.addEventListener('resize', fixSizes);
 
-    const gameArea = document.getElementById('game-area');
-    const scoreEl = document.getElementById('score');
-    const timerEl = document.getElementById('timer');
-    const aimCursor = document.getElementById('aim-cursor');
-    const dragonBodyContainer = document.getElementById('dragon-body-container');
-    const startScreen = document.getElementById('start-screen');
-    const gameOverScreen = document.getElementById('game-over-screen');
-    const finalScoreEl = document.getElementById('final-score');
-    const cam = document.getElementById('cam');
-
-    // ===== 龍身參數 =====
+    // ========= 火龍身體 =========
     const bodySegmentCount = 14;
     const bodySpacing = 26;
     const sticksPerSegment = 28;
@@ -383,60 +419,33 @@
     const bodySegments = [];
     const bodyPositions = [];
 
-    // ===== 手部追蹤 + 穩定化 =====
-    const DETECT_EVERY_N_FRAMES = 2;   // 降低推論頻率
-    const LOST_GRACE_MS = 550;         // 偵測不到手後仍保持最後位置
-    const FADE_OUT_MS = 350;
-    const EMA_ALPHA = 0.35;            // 平滑（越大越跟手但更抖）
-
-    let frameCount = 0;
-    let lastHandSeenTs = 0;
-    let hasEverSeenHand = false;
-    let smoothX = -100, smoothY = -100;
-    const playerScreenPos = { x: -100, y: -100, visible: false };
-
-    function fixSizes() {
-      gameWidth = window.innerWidth;
-      gameHeight = window.innerHeight;
-    }
-    window.addEventListener('resize', fixSizes);
-
-    // ===== 建立火龍身體 =====
-    function buildIncenseSegment(isTail=false) {
+    function buildIncenseSegment(isTail=false){
       const seg = document.createElement('div');
       seg.classList.add(isTail ? 'dragon-tail' : 'dragon-body-segment');
 
-      if (!isTail) {
-        const glow = document.createElement('div');
-        glow.className = 'segment-glow';
-        seg.appendChild(glow);
+      if (!isTail){
+        const glow = document.createElement('div'); glow.className = 'segment-glow'; seg.appendChild(glow);
+        const core = document.createElement('div'); core.className = 'segment-core'; seg.appendChild(core);
 
-        const core = document.createElement('div');
-        core.className = 'segment-core';
-        seg.appendChild(core);
-
-        for (let i = 0; i < sticksPerSegment; i++) {
+        for (let i=0; i<sticksPerSegment; i++){
           const stick = document.createElement('div');
           stick.className = 'incense-stick';
-          const rot = (360 / sticksPerSegment) * i + (Math.random() * 10 - 5);
-          const len = stickLenMin + Math.random() * (stickLenMax - stickLenMin);
-          const flicker = (0.09 + Math.random() * 0.08).toFixed(2) + 's';
+          const rot = (360/sticksPerSegment)*i + (Math.random()*10 - 5);
+          const len = stickLenMin + Math.random()*(stickLenMax - stickLenMin);
+          const flicker = (0.09 + Math.random()*0.08).toFixed(2) + 's';
           stick.style.setProperty('--rot', rot + 'deg');
           stick.style.setProperty('--len', len + 'px');
           stick.style.setProperty('--flicker', flicker);
           seg.appendChild(stick);
         }
       } else {
-        const core = document.createElement('div');
-        core.className = 'tail-core';
-        seg.appendChild(core);
-
+        const core = document.createElement('div'); core.className = 'tail-core'; seg.appendChild(core);
         const tailSticks = 36;
-        for (let i = 0; i < tailSticks; i++) {
+        for (let i=0; i<tailSticks; i++){
           const stick = document.createElement('div');
           stick.className = 'tail-stick';
-          const rot = (360 / tailSticks) * i + (Math.random() * 12 - 6);
-          const len = 40 + Math.random() * 28;
+          const rot = (360/tailSticks)*i + (Math.random()*12 - 6);
+          const len = 40 + Math.random()*28;
           stick.style.setProperty('--rot', rot + 'deg');
           stick.style.setProperty('--len', len + 'px');
           seg.appendChild(stick);
@@ -445,29 +454,29 @@
       return seg;
     }
 
-    function initDragonBody() {
+    function initDragonBody(){
       dragonBodyContainer.innerHTML = '';
       bodySegments.length = 0;
       bodyPositions.length = 0;
 
-      for (let i = 0; i < bodySegmentCount; i++) {
+      for (let i=0; i<bodySegmentCount; i++){
         const el = buildIncenseSegment(false);
-        const scale = 1 - (i * 0.022);
+        const scale = 1 - (i*0.022);
         el.dataset.baseScale = scale.toFixed(3);
         dragonBodyContainer.appendChild(el);
         bodySegments.push(el);
-        bodyPositions.push({ x: -100, y: -100, a: 0 });
+        bodyPositions.push({x:-100, y:-100, a:0});
       }
 
       const tail = buildIncenseSegment(true);
       tail.dataset.baseScale = '0.72';
       dragonBodyContainer.appendChild(tail);
       bodySegments.push(tail);
-      bodyPositions.push({ x: -100, y: -100, a: 0 });
+      bodyPositions.push({x:-100, y:-100, a:0});
     }
 
-    function setDragonVisible(visible, alpha=1) {
-      if (visible) {
+    function setDragonVisible(visible, alpha=1){
+      if (visible){
         aimCursor.style.display = 'flex';
         aimCursor.style.opacity = String(alpha);
         bodySegments.forEach(seg => { seg.style.display = 'block'; seg.style.opacity = String(alpha); });
@@ -477,11 +486,9 @@
       }
     }
 
-    function updateDragonBody(headX, headY) {
-      let targetX = headX;
-      let targetY = headY;
-
-      for (let i = 0; i < bodySegments.length; i++) {
+    function updateDragonBody(headX, headY){
+      let targetX = headX, targetY = headY;
+      for (let i=0; i<bodySegments.length; i++){
         const segment = bodySegments[i];
         const currentPos = bodyPositions[i];
 
@@ -490,7 +497,7 @@
         const dist = Math.sqrt(dx*dx + dy*dy);
         const angle = Math.atan2(dy, dx);
 
-        if (dist > bodySpacing) {
+        if (dist > bodySpacing){
           const moveDist = dist - bodySpacing;
           currentPos.x += Math.cos(angle) * moveDist * 0.55;
           currentPos.y += Math.sin(angle) * moveDist * 0.55;
@@ -498,12 +505,12 @@
 
         const prevA = currentPos.a || angle;
         let da = angle - prevA;
-        if (da > Math.PI) da -= Math.PI * 2;
-        if (da < -Math.PI) da += Math.PI * 2;
-        currentPos.a = prevA + da * 0.25;
+        if (da > Math.PI) da -= Math.PI*2;
+        if (da < -Math.PI) da += Math.PI*2;
+        currentPos.a = prevA + da*0.25;
 
         segment.style.left = currentPos.x + 'px';
-        segment.style.top = currentPos.y + 'px';
+        segment.style.top  = currentPos.y + 'px';
 
         const baseScale = parseFloat(segment.dataset.baseScale || '1');
         const deg = (currentPos.a * 180 / Math.PI) + 90;
@@ -514,8 +521,245 @@
       }
     }
 
-    // ===== 遊戲流程 =====
-    window.startGame = function startGame() {
+    // ========= 物件 =========
+    function spawnItems(count, type){
+      for (let i=0; i<count; i++){
+        const el = document.createElement('div');
+        el.classList.add('floating-item', type === 'good' ? 'good-item' : 'bad-item');
+        el.innerText = type === 'good'
+          ? goodWords[Math.floor(Math.random()*goodWords.length)]
+          : badWords[Math.floor(Math.random()*badWords.length)];
+        el.dataset.points = type === 'good' ? 15 : -5;
+        gameArea.appendChild(el);
+
+        items.push({
+          element: el,
+          x: Math.random()*(gameWidth - 70),
+          y: Math.random()*(gameHeight - 70),
+          vx: (Math.random() - 0.5)*4,
+          vy: (Math.random() - 0.5)*4,
+          width: 70, height: 70,
+          active: true
+        });
+      }
+    }
+
+    function handleHit(item){
+      const pts = parseInt(item.element.dataset.points);
+      score += pts;
+      scoreEl.innerText = score;
+      if (pts > 0) playSound('collect'); else playSound('crunch');
+
+      const popup = document.createElement('div');
+      popup.classList.add('score-popup');
+      popup.innerText = pts > 0 ? `+${pts}` : pts;
+      popup.style.color = pts > 0 ? '#2e7d32' : '#d32f2f';
+      popup.style.left = item.x + 'px';
+      popup.style.top  = item.y + 'px';
+      gameArea.appendChild(popup);
+      setTimeout(()=>popup.remove(), 800);
+
+      item.active = false;
+      item.element.style.opacity = '0';
+      setTimeout(()=>{
+        if (!isGameRunning) return;
+        item.active = true;
+        item.element.style.opacity = '1';
+        item.x = Math.random()*(gameWidth - item.width);
+        item.y = Math.random()*(gameHeight - item.height);
+        item.element.innerText = pts > 0
+          ? goodWords[Math.floor(Math.random()*goodWords.length)]
+          : badWords[Math.floor(Math.random()*badWords.length)];
+      }, 500);
+    }
+
+    // ========= 手部追蹤 =========
+    // 先確保穩定偵測：每幀推論；如果效能唔夠，之後再改返 2 或 3
+    const DETECT_EVERY_N_FRAMES = 1;
+
+    const LOST_GRACE_MS = 550;
+    const FADE_OUT_MS = 350;
+    const EMA_ALPHA = 0.35;
+
+    let frameCount = 0;
+    let lastHandSeenTs = 0;
+    let hasEverSeenHand = false;
+    let smoothX = -100, smoothY = -100;
+    const playerScreenPos = { x: -100, y: -100, visible: false };
+
+    let handLandmarker = null;
+    let lastVideoTime = -1;
+
+    async function initCamera(){
+      debugEl.textContent = "開啟相機中…";
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      cam.srcObject = stream;
+
+      // 關鍵：等 metadata 有 videoWidth/videoHeight，避免 IMAGE_DIMENSIONS 警告/投影問題 [web:100]
+      await new Promise((resolve) => { cam.onloadedmetadata = () => resolve(); });
+
+      await cam.play();
+      fixSizes();
+
+      debugEl.textContent = `相機就緒 ✅ (${cam.videoWidth}×${cam.videoHeight})`;
+    }
+
+    async function initHandLandmarker(){
+      debugEl.textContent = "載入 WASM…";
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+      ); // 官方 web 用法 [web:100]
+
+      debugEl.textContent = "載入模型…";
+      handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task"
+        },
+        runningMode: "VIDEO",
+        numHands: 2,
+        // 容錯：握棒/遮擋時更易「先認到」
+        minHandDetectionConfidence: 0.2,
+        minHandPresenceConfidence: 0.2,
+        minTrackingConfidence: 0.2
+      }); // createFromOptions + modelAssetPath [web:100]
+
+      debugEl.textContent = "模型就緒 ✅（把手放近鏡頭）";
+    }
+
+    function pickLargestHand(result){
+      const hands = result?.handLandmarks || [];
+      if (!hands.length) return null;
+
+      let best = null, bestArea = -1;
+      for (const hand of hands){
+        let minX=1, minY=1, maxX=0, maxY=0;
+        for (const lm of hand){
+          if (lm.x < minX) minX = lm.x;
+          if (lm.y < minY) minY = lm.y;
+          if (lm.x > maxX) maxX = lm.x;
+          if (lm.y > maxY) maxY = lm.y;
+        }
+        const area = Math.max(0, maxX-minX) * Math.max(0, maxY-minY);
+        if (area > bestArea){ bestArea = area; best = hand; }
+      }
+      return best;
+    }
+
+    function updateFromHand(result){
+      const now = performance.now();
+      const hand = pickLargestHand(result);
+
+      if (hand){
+        hasEverSeenHand = true;
+        lastHandSeenTs = now;
+
+        // 手腕 = landmark 0；x/y 為 0..1 正規化 [web:100]
+        const wrist = hand[0];
+        const rawX = wrist.x * gameWidth;
+        const rawY = wrist.y * gameHeight;
+
+        smoothX = smoothX + EMA_ALPHA * (rawX - smoothX);
+        smoothY = smoothY + EMA_ALPHA * (rawY - smoothY);
+
+        playerScreenPos.x = smoothX;
+        playerScreenPos.y = smoothY;
+        playerScreenPos.visible = true;
+
+        setDragonVisible(true, 1);
+        aimCursor.style.left = smoothX + 'px';
+        aimCursor.style.top  = smoothY + 'px';
+        updateDragonBody(smoothX, smoothY);
+        return;
+      }
+
+      if (hasEverSeenHand && (now - lastHandSeenTs) <= LOST_GRACE_MS){
+        playerScreenPos.visible = true;
+        setDragonVisible(true, 1);
+        aimCursor.style.left = smoothX + 'px';
+        aimCursor.style.top  = smoothY + 'px';
+        updateDragonBody(smoothX, smoothY);
+      } else if (hasEverSeenHand && (now - lastHandSeenTs) <= (LOST_GRACE_MS + FADE_OUT_MS)){
+        const t = (now - lastHandSeenTs - LOST_GRACE_MS) / FADE_OUT_MS;
+        const alpha = Math.max(0, 1 - t);
+        playerScreenPos.visible = true;
+        setDragonVisible(true, alpha);
+        aimCursor.style.left = smoothX + 'px';
+        aimCursor.style.top  = smoothY + 'px';
+        updateDragonBody(smoothX, smoothY);
+      } else {
+        playerScreenPos.visible = false;
+        setDragonVisible(false, 0);
+      }
+    }
+
+    // debug stats
+    let dbgLast = performance.now();
+    let dbgFrames = 0;
+    let lastHandsCount = 0;
+
+    function gameLoop(){
+      if (!isGameRunning) return;
+
+      frameCount++;
+
+      // 關鍵：未有 videoWidth/Height 就唔做推論，避免投影問題 [web:100]
+      if (!cam.videoWidth || !cam.videoHeight){
+        requestAnimationFrame(gameLoop);
+        return;
+      }
+
+      if (handLandmarker && cam.readyState >= 2 && (frameCount % DETECT_EVERY_N_FRAMES === 0)){
+        if (cam.currentTime !== lastVideoTime){
+          const result = handLandmarker.detectForVideo(cam, performance.now()); // VIDEO mode [web:100]
+          lastHandsCount = (result?.handLandmarks || []).length;
+          updateFromHand(result);
+          lastVideoTime = cam.currentTime;
+        }
+      } else {
+        updateFromHand(null);
+      }
+
+      // items
+      items.forEach(item => {
+        if (!item.active) return;
+        item.x += item.vx; item.y += item.vy;
+        if (item.x <= 0 || item.x >= gameWidth - item.width) item.vx *= -1;
+        if (item.y <= 0 || item.y >= gameHeight - item.height) item.vy *= -1;
+
+        item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
+        item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
+        item.element.style.left = item.x + 'px';
+        item.element.style.top  = item.y + 'px';
+
+        if (playerScreenPos.visible){
+          const dx = playerScreenPos.x - (item.x + item.width/2);
+          const dy = playerScreenPos.y - (item.y + item.height/2);
+          if ((dx*dx + dy*dy) < (60 + 35) ** 2) handleHit(item);
+        }
+      });
+
+      // debug panel
+      dbgFrames++;
+      const now = performance.now();
+      if (now - dbgLast >= 500){
+        const fps = Math.round((dbgFrames * 1000) / (now - dbgLast));
+        debugEl.textContent =
+          `模型: ${handLandmarker ? "就緒" : "未就緒"}\n` +
+          `推論FPS: ${fps}\n` +
+          `偵測到手: ${lastHandsCount}\n` +
+          `Video: ${cam.videoWidth}×${cam.videoHeight}`;
+        dbgLast = now;
+        dbgFrames = 0;
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // ========= 遊戲控制 =========
+    window.startGame = function startGame(){
       if (!isMuted) sounds.bgm.play().catch(()=>{});
 
       startScreen.style.display = 'none';
@@ -538,17 +782,17 @@
       spawnItems(6, 'good');
       spawnItems(4, 'bad');
 
-      gameLoop();
-
       if (timerInterval) clearInterval(timerInterval);
       timerInterval = setInterval(() => {
         timeLeft--;
         timerEl.innerText = timeLeft;
         if (timeLeft <= 0) endGame();
       }, 1000);
+
+      gameLoop();
     };
 
-    function endGame() {
+    function endGame(){
       isGameRunning = false;
       clearInterval(timerInterval);
       sounds.bgm.pause(); sounds.bgm.currentTime = 0;
@@ -557,206 +801,16 @@
       gameOverScreen.style.display = 'flex';
     }
 
-    function spawnItems(count, type) {
-      for (let i = 0; i < count; i++) {
-        const el = document.createElement('div');
-        el.classList.add('floating-item');
-        el.classList.add(type === 'good' ? 'good-item' : 'bad-item');
-        el.innerText = type === 'good'
-          ? goodWords[Math.floor(Math.random() * goodWords.length)]
-          : badWords[Math.floor(Math.random() * badWords.length)];
-        el.dataset.points = type === 'good' ? 15 : -5;
-
-        gameArea.appendChild(el);
-        const size = 70;
-
-        items.push({
-          element: el,
-          x: Math.random() * (gameWidth - size),
-          y: Math.random() * (gameHeight - size),
-          vx: (Math.random() - 0.5) * 4,
-          vy: (Math.random() - 0.5) * 4,
-          width: size, height: size,
-          active: true
-        });
-      }
-    }
-
-    function handleHit(item) {
-      const pts = parseInt(item.element.dataset.points);
-      score += pts;
-      scoreEl.innerText = score;
-
-      if (pts > 0) playSound('collect');
-      else playSound('crunch');
-
-      const popup = document.createElement('div');
-      popup.classList.add('score-popup');
-      popup.innerText = pts > 0 ? `+${pts}` : pts;
-      popup.style.color = pts > 0 ? '#2e7d32' : '#d32f2f';
-      popup.style.left = item.x + 'px';
-      popup.style.top = item.y + 'px';
-      gameArea.appendChild(popup);
-      setTimeout(() => popup.remove(), 800);
-
-      item.active = false;
-      item.element.style.opacity = '0';
-
-      setTimeout(() => {
-        if (!isGameRunning) return;
-        item.active = true;
-        item.element.style.opacity = '1';
-        item.x = Math.random() * (gameWidth - item.width);
-        item.y = Math.random() * (gameHeight - item.height);
-        item.element.innerText = pts > 0
-          ? goodWords[Math.floor(Math.random() * goodWords.length)]
-          : badWords[Math.floor(Math.random() * badWords.length)];
-      }, 500);
-    }
-
-    // ===== MediaPipe Hand Landmarker =====
-    let handLandmarker = null;
-    let lastVideoTime = -1;
-
-    async function initCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false
-      });
-      cam.srcObject = stream;
-      await cam.play();
-      fixSizes();
-    }
-
-    async function initHandLandmarker() {
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-      ); // wasm root 用法見官方說明 [web:100]
-
-      handLandmarker = await HandLandmarker.createFromModelPath(
-        vision,
-        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task"
-      );
-
-      await handLandmarker.setOptions({
-        runningMode: "VIDEO",
-        numHands: 2
-      }); // VIDEO 用 detectForVideo [web:100]
-    }
-
-    function pickLargestHand(detections) {
-      const hands = detections?.handLandmarks || [];
-      if (!hands.length) return null;
-
-      let best = null;
-      let bestScore = -Infinity;
-
-      for (const hand of hands) {
-        let minX = 1, minY = 1, maxX = 0, maxY = 0;
-        for (const lm of hand) {
-          if (lm.x < minX) minX = lm.x;
-          if (lm.y < minY) minY = lm.y;
-          if (lm.x > maxX) maxX = lm.x;
-          if (lm.y > maxY) maxY = lm.y;
-        }
-        const area = Math.max(0, (maxX - minX)) * Math.max(0, (maxY - minY));
-        if (area > bestScore) { bestScore = area; best = hand; }
-      }
-      return best;
-    }
-
-    function updateFromHand(detections) {
-      const now = performance.now();
-      const hand = pickLargestHand(detections);
-
-      if (hand) {
-        hasEverSeenHand = true;
-        lastHandSeenTs = now;
-
-        // 用手腕控制：landmark 0；x/y 係 0..1 正規化座標 [web:88][web:100]
-        const wrist = hand[0];
-
-        const rawX = wrist.x * gameWidth;
-        const rawY = wrist.y * gameHeight;
-
-        smoothX = smoothX + EMA_ALPHA * (rawX - smoothX);
-        smoothY = smoothY + EMA_ALPHA * (rawY - smoothY);
-
-        playerScreenPos.x = smoothX;
-        playerScreenPos.y = smoothY;
-        playerScreenPos.visible = true;
-
-        setDragonVisible(true, 1);
-        aimCursor.style.left = smoothX + 'px';
-        aimCursor.style.top = smoothY + 'px';
-        updateDragonBody(smoothX, smoothY);
-        return;
-      }
-
-      if (hasEverSeenHand && (now - lastHandSeenTs) <= LOST_GRACE_MS) {
-        playerScreenPos.visible = true;
-        setDragonVisible(true, 1);
-        aimCursor.style.left = smoothX + 'px';
-        aimCursor.style.top = smoothY + 'px';
-        updateDragonBody(smoothX, smoothY);
-      } else if (hasEverSeenHand && (now - lastHandSeenTs) <= (LOST_GRACE_MS + FADE_OUT_MS)) {
-        const t = (now - lastHandSeenTs - LOST_GRACE_MS) / FADE_OUT_MS;
-        const alpha = Math.max(0, 1 - t);
-        playerScreenPos.visible = true;
-        setDragonVisible(true, alpha);
-        aimCursor.style.left = smoothX + 'px';
-        aimCursor.style.top = smoothY + 'px';
-        updateDragonBody(smoothX, smoothY);
-      } else {
-        playerScreenPos.visible = false;
-        setDragonVisible(false, 0);
-      }
-    }
-
-    function gameLoop() {
-      if (!isGameRunning) return;
-
-      frameCount++;
-
-      // VIDEO mode：用 detectForVideo()；每 N 幀做一次推論 [web:100]
-      if (handLandmarker && cam.readyState >= 2 && (frameCount % DETECT_EVERY_N_FRAMES === 0)) {
-        if (cam.currentTime !== lastVideoTime) {
-          const detections = handLandmarker.detectForVideo(cam, performance.now());
-          updateFromHand(detections);
-          lastVideoTime = cam.currentTime;
-        }
-      } else {
-        updateFromHand(null);
-      }
-
-      items.forEach(item => {
-        if (!item.active) return;
-
-        item.x += item.vx; item.y += item.vy;
-        if (item.x <= 0 || item.x >= gameWidth - item.width) item.vx *= -1;
-        if (item.y <= 0 || item.y >= gameHeight - item.height) item.vy *= -1;
-
-        item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
-        item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
-
-        item.element.style.left = item.x + 'px';
-        item.element.style.top = item.y + 'px';
-
-        if (playerScreenPos.visible) {
-          const dx = playerScreenPos.x - (item.x + item.width/2);
-          const dy = playerScreenPos.y - (item.y + item.height/2);
-          if ((dx*dx + dy*dy) < (60 + 35) ** 2) handleHit(item);
-        }
-      });
-
-      requestAnimationFrame(gameLoop);
-    }
-
-    // ===== 啟動：按「開始」先要權限、載模型 =====
+    // ========= Start =========
     document.getElementById('start-btn').addEventListener('click', async () => {
-      await initCamera();
-      await initHandLandmarker();
-      startGame();
+      try{
+        await initCamera();
+        await initHandLandmarker();
+        startGame();
+      } catch (e){
+        debugEl.textContent = "初始化失敗：\n" + (e?.message || String(e));
+        console.error(e);
+      }
     });
   </script>
 </body>
