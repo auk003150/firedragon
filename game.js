@@ -86,8 +86,9 @@ function drawDragon(ctx, x, y, scale) {
 }
 
 function collision(bubble, x, y) {
-  let dx = bubble.x - x, dy = bubble.y - y;
-  return Math.sqrt(dx * dx + dy * dy) < bubble.radius + 40; // Collision logic based on sizes
+  let dx = bubble.x - x;
+  let dy = bubble.y - y;
+  return Math.sqrt(dx * dx + dy * dy) < bubble.radius + 40; // Ensure this line matches parentheses correctly
 }
 
 function updateScoreAndHit() {
