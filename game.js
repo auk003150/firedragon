@@ -59,10 +59,114 @@ function drawBubbles() {
   }
 }
 
-function drawDragon() {
+function drawDragon(ctx, x, y, scale) {
+  ctx.save();  // Save transformation state
+  
+  ctx.translate(x, y);  // Translate starting position
+  ctx.scale(scale, scale); // Scale dragon dynamically
+  
+  // Draw Dragon Head
+  drawDragonHead(ctx);
+
+  // Draw Spiky Body
+  drawDragonBody(ctx);
+
+  // Draw Tail
+  drawDragonTail(ctx);
+
+  ctx.restore();  // Restore original state
+}
+
+function drawDragonHead(ctx) {
   ctx.save();
-  ctx.globalAlpha = 0.93;
-  ctx.drawImage(DRAGON, dragonPos.x - 40, dragonPos.y - 42, dragonSize, dragonSize);
+  
+  // Dragon Head Base
+  ctx.beginPath();
+  ctx.arc(0, 0, 50, Math.PI * 0.2, Math.PI * 1.8);
+  ctx.fillStyle = '#A0522D'; // Brownish base
+  ctx.fill();
+  
+  // Dragon Eye
+  ctx.beginPath();
+  ctx.arc(-30, -10, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#000'; // Eye Color
+  ctx.fill();
+  
+  // Spikes Around Head
+  for (let i = 0; i < 10; i++) {
+    const angle = Math.PI * 0.2 + (Math.PI * 0.16) * i;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * 50, Math.sin(angle) * 50);
+    ctx.lineTo(Math.cos(angle) * 70, Math.sin(angle) * 70);
+    ctx.strokeStyle = '#FFD700'; // Golden spike color
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  
+  ctx.restore();
+}
+
+function drawDragonBody(ctx) {
+  ctx.save();
+  let bodyLength = 8; // Number of body sections
+  let spikeFrequency = 30; // Spikes per section
+  let bodyWidth = 40; // The width of the curve
+  
+  ctx.translate(0, 50); // Offset body below head
+
+  for (let section = 0; section < bodyLength; section++) {
+    const yOffset = section % 2 === 0 ? -bodyWidth : bodyWidth; // Alternating body shape like a sine wave
+    
+    // Draw body curve
+    ctx.beginPath();
+    ctx.moveTo(-bodyWidth, yOffset);
+    ctx.lineTo(0, 0);
+    ctx.lineTo(bodyWidth, yOffset);
+    ctx.strokeStyle = '#A0522D';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    
+    // Add spikes along body
+    for (let s = 0; s < spikeFrequency; s++) {
+      const spikeAngle = 2 * Math.PI * (s / spikeFrequency);
+      const xPos = Math.sin(spikeAngle) * bodyWidth;
+      const yPos = yOffset + Math.cos(spikeAngle) * bodyWidth * 0.5;
+
+      ctx.beginPath();
+      ctx.moveTo(xPos, yPos);
+      ctx.lineTo(xPos + 15, yPos + 15); // Draw Each Spiky arrow flaring outward direction.
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.translate(0, yOffset); // Adjust body movement curve below last rendered body
+  }
+
+  ctx.restore();
+}
+
+function drawDragonTail(ctx) {
+  ctx.save();
+  
+  ctx.translate(0, 50); // Offset tail
+  ctx.beginPath();
+  ctx.arc(0, -40, 20, 0, Math.PI * 2);
+  ctx.fillStyle = '#A0522D'; // Tail Base color
+  ctx.fill();
+
+  for (let spike = 0; spike < 12; spike++) {
+    const angle = Math.PI * 2 * (spike / 12);
+    const xPos = Math.cos(angle) * 20;
+    const yPos = Math.sin(angle) * 20;
+
+    ctx.beginPath();
+    ctx.moveTo(xPos, yPos);
+    ctx.lineTo(xPos * 1.4, yPos * 1.4);
+    ctx.strokeStyle = '#FFD700'; // Spiky glowing tail spikes
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -104,8 +208,8 @@ function gameLoop(ts) {
   // Draw bubbles
   drawBubbles();
 
-  // Draw dragon at wrist position
-  drawDragon();
+  // Draw Dragon
+  drawDragon(ctx, dragonPos.x, dragonPos.y, 0.8); // Scale factor makes dragon dynamic
 
   // Move bubbles
   updateBubbles();
