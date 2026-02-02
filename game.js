@@ -147,7 +147,7 @@ function startHandTracking() {
       // Landmarks[0]-> Wrist is index 0, index finger tip is 8
       let wristMarker = results.multiHandLandmarks[0][0];
       if (wristMarker) {
-        let x = -(wristMarker.x * canvas.width); // Fix mirroring issue
+        let x = canvas.width - (wristMarker.x * canvas.width); // Fix mirroring issue
         let y = wristMarker.y * canvas.height;
         dragonPos.x = x;
         dragonPos.y = y;
