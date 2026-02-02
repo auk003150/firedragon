@@ -12,24 +12,24 @@
       background: #000;
     }
 
-    /* Background image */
-    #global-bg {
+    /* Background MP4 (NEW) */
+    #bg-video {
       position: absolute; inset: 0;
-      background: url('animated.mp4') no-repeat center center;
-      background-size: cover;
-      z-index: 1;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: 0;
+      opacity: 0.8; /* 80% opacity background layer */
       pointer-events: none;
-      opacity: 0.65;
     }
 
-    /* Camera background (subtle) */
+    /* Camera background (visible so you can see your face) */
     #video {
       position: absolute; inset: 0;
       width: 100%; height: 100%;
       object-fit: cover;
       transform: scaleX(-1);
-      opacity: 0.18;
-      z-index: 0;
+      opacity: 0.32; /* increased a bit so face is visible */
+      z-index: 1;
     }
 
     /* UI layer */
@@ -56,11 +56,7 @@
     #timer-board { right: 16px; color: #fff; }
 
     /* Game area for bubbles */
-    #game-area {
-      position: absolute; inset: 0;
-      z-index: 5;
-      pointer-events: none;
-    }
+    #game-area { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 
     /* Cursor (dragon head) */
     #aim-cursor {
@@ -73,13 +69,9 @@
     }
 
     /* Dragon body container */
-    #dragon-body-container {
-      position: absolute; inset: 0;
-      pointer-events: none;
-      z-index: 15;
-    }
+    #dragon-body-container { position: absolute; inset: 0; pointer-events: none; z-index: 15; }
 
-    /* --- Straw texture (your code) --- */
+    /* --- Straw texture --- */
     .straw-texture {
       background-color: #d4b483;
       background-image:
@@ -92,7 +84,7 @@
       box-shadow: inset 0 0 10px rgba(62, 39, 35, 0.5);
     }
 
-    /* --- Dragon head styles (your code) --- */
+    /* --- Dragon head --- */
     .dragon-head-group { position: relative; width: 120px; height: 120px; animation: float-head 2s ease-in-out infinite; }
     .dh-skull { position: absolute; top: 25px; left: 20px; width: 80px; height: 60px; border-radius: 25px 25px 15px 15px; z-index: 5; }
     .dh-snout { position: absolute; top: 50px; left: 10px; width: 90px; height: 40px; border-radius: 30px; z-index: 6; }
@@ -113,7 +105,7 @@
     .dh-whisker { position: absolute; top: 60px; width: 70px; height: 50px; border-top: 5px solid #a1887f; border-radius: 50%; z-index: 2; opacity: 0.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
     .whisker-left { right: 85px; transform: rotate(20deg); } .whisker-right { left: 85px; transform: rotate(-20deg); }
 
-    /* --- Incense effects (your code) --- */
+    /* --- Incense effects --- */
     @keyframes incense-flicker {
       0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.95); filter: drop-shadow(0 0 1px rgba(255,61,0,0.5)); }
       50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 3px rgba(255,200,0,0.8)); }
@@ -149,37 +141,28 @@
       z-index: 1;
     }
 
-    /* --- Dragon body segments (your code) --- */
+    /* --- Dragon body segments --- */
     .dragon-body-segment {
-      position: absolute;
-      width: 70px; height: 70px;
+      position: absolute; width: 70px; height: 70px;
       transform: translate(-50%, -50%);
-      display: none;
-      z-index: 15;
+      display: none; z-index: 15;
       will-change: transform, left, top;
       pointer-events: none;
     }
-
     .segment-core {
-      position: absolute;
-      left: 50%; top: 50%;
+      position: absolute; left: 50%; top: 50%;
       width: 22px; height: 22px;
       transform: translate(-50%, -50%);
       border-radius: 50%;
       background:
         radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0) 55%),
         radial-gradient(circle, #d4b483 0%, #b08b55 70%, #6d4c41 100%);
-      box-shadow:
-        inset 0 0 10px rgba(62,39,35,0.55),
-        0 0 10px rgba(255,120,0,0.12);
+      box-shadow: inset 0 0 10px rgba(62,39,35,0.55), 0 0 10px rgba(255,120,0,0.12);
       border: 1px solid rgba(141,110,99,0.7);
     }
-
     .incense-stick {
-      position: absolute;
-      left: 50%; top: 50%;
-      width: 3px;
-      height: var(--len, 40px);
+      position: absolute; left: 50%; top: 50%;
+      width: 3px; height: var(--len, 40px);
       transform-origin: 50% 100%;
       transform: translate(-50%, -100%) rotate(var(--rot, 0deg));
       border-radius: 2px;
@@ -189,22 +172,16 @@
     }
     .incense-stick::after {
       content: '';
-      position: absolute;
-      left: 50%;
-      top: -8px;
+      position: absolute; left: 50%; top: -8px;
       width: 6px; height: 6px;
       transform: translateX(-50%);
       border-radius: 50%;
       background: radial-gradient(circle, #fff 10%, #ffeb3b 35%, #ff3d00 100%);
-      box-shadow:
-        0 0 10px rgba(255, 180, 0, 0.9),
-        0 0 18px rgba(255, 61, 0, 0.65);
+      box-shadow: 0 0 10px rgba(255, 180, 0, 0.9), 0 0 18px rgba(255, 61, 0, 0.65);
       animation: incense-flicker var(--flicker, 0.12s) infinite alternate;
     }
-
     .segment-glow {
-      position: absolute;
-      left: 50%; top: 50%;
+      position: absolute; left: 50%; top: 50%;
       width: 120px; height: 120px;
       transform: translate(-50%, -50%);
       border-radius: 50%;
@@ -213,19 +190,15 @@
       pointer-events: none;
       opacity: 0.8;
     }
-
     .dragon-tail {
-      position: absolute;
-      width: 90px; height: 90px;
+      position: absolute; width: 90px; height: 90px;
       transform: translate(-50%, -50%);
-      display: none;
-      z-index: 14;
+      display: none; z-index: 14;
       will-change: transform, left, top;
       pointer-events: none;
     }
     .tail-core {
-      position: absolute;
-      left: 50%; top: 55%;
+      position: absolute; left: 50%; top: 55%;
       width: 20px; height: 20px;
       transform: translate(-50%, -50%);
       border-radius: 50%;
@@ -233,10 +206,8 @@
       box-shadow: inset 0 0 10px rgba(62,39,35,0.6);
     }
     .tail-stick {
-      position: absolute;
-      left: 50%; top: 55%;
-      width: 3px;
-      height: var(--len, 55px);
+      position: absolute; left: 50%; top: 55%;
+      width: 3px; height: var(--len, 55px);
       transform-origin: 50% 100%;
       transform: translate(-50%, -100%) rotate(var(--rot, 0deg));
       border-radius: 2px;
@@ -245,20 +216,16 @@
     }
     .tail-stick::after {
       content: '';
-      position: absolute;
-      left: 50%;
-      top: -9px;
+      position: absolute; left: 50%; top: -9px;
       width: 7px; height: 7px;
       transform: translateX(-50%);
       border-radius: 50%;
       background: radial-gradient(circle, #fff 10%, #ffeb3b 35%, #ff3d00 100%);
-      box-shadow:
-        0 0 12px rgba(255, 200, 0, 0.95),
-        0 0 20px rgba(255, 61, 0, 0.65);
+      box-shadow: 0 0 12px rgba(255, 200, 0, 0.95), 0 0 20px rgba(255, 61, 0, 0.65);
       animation: incense-flicker 0.14s infinite alternate;
     }
 
-    /* Bubbles (UPDATED background color) */
+    /* Bubbles */
     .floating-item {
       position: absolute;
       font-size: 40px;
@@ -268,7 +235,7 @@
       align-items: center;
       width: 70px; height: 70px;
       border-radius: 50%;
-      background-color: #fff9d1; /* <-- requested update [page:0] */
+      background-color: #fff9d1;
       box-shadow: 0 4px 10px rgba(0,0,0,0.35);
       z-index: 6;
       will-change: transform, left, top;
@@ -288,7 +255,7 @@
     }
     @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-60px); } }
 
-    /* Overlay screens */
+    /* Overlays */
     .overlay-screen {
       position: absolute; inset: 0;
       background: rgba(0,0,0,0.82);
@@ -316,7 +283,6 @@
     }
     .overlay-screen button:active { transform: scale(0.97); }
 
-    /* Mute button */
     #mute-btn {
       position: absolute; bottom: 16px; right: 16px;
       z-index: 50;
@@ -333,13 +299,19 @@
 </head>
 
 <body>
+  <!-- NEW: looping mp4 background -->
+  <video id="bg-video" autoplay muted loop playsinline preload="auto">
+    <source src="animated.mp4" type="video/mp4" />
+  </video>
+
+  <!-- Audio -->
   <audio id="bgm" loop src="bgm.mp3"></audio>
   <audio id="sfx-collect" src="Collect.mp3"></audio>
   <audio id="sfx-crunch" src="Crunch.mp3"></audio>
   <audio id="sfx-end" src="end.mp3"></audio>
 
+  <!-- Webcam -->
   <video id="video" playsinline autoplay muted></video>
-  <div id="global-bg"></div>
 
   <div id="ui-layer">
     <div id="score-board">分數: <span id="score">0</span></div>
@@ -409,6 +381,8 @@
     const stickLenMax = 46;
 
     const video = document.getElementById('video');
+    const bgVideo = document.getElementById('bg-video');
+
     const gameArea = document.getElementById('game-area');
     const scoreEl = document.getElementById('score');
     const timerEl = document.getElementById('timer');
@@ -452,6 +426,9 @@
     }
     document.getElementById('mute-btn').addEventListener('click', () => setMuted(!isMuted));
 
+    // Ensure bg video plays (autoplay works best when muted) [page:1]
+    bgVideo.muted = true;
+
     // Game vars
     let score = 0;
     let timeLeft = GAME_SECONDS;
@@ -462,7 +439,7 @@
     let gameHeight = window.innerHeight;
 
     let cursor = { x: -100, y: -100, visible: false };
-    let mirror = true; // video is mirrored
+    let mirror = true; // webcam is mirrored
 
     // Dragon body arrays
     const bodySegments = [];
@@ -508,7 +485,6 @@
           seg.appendChild(stick);
         }
       }
-
       return seg;
     }
 
@@ -521,7 +497,6 @@
         const el = buildIncenseSegment(false);
         const scale = 1 - (i * 0.022);
         el.dataset.baseScale = scale.toFixed(3);
-
         dragonBodyContainer.appendChild(el);
         bodySegments.push(el);
         bodyPositions.push({ x: -100, y: -100, a: 0 });
@@ -589,8 +564,7 @@
     async function initHandLandmarker() {
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-      ); // [page:0]
-
+      );
       handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: MODEL_URL },
         runningMode: "VIDEO",
@@ -598,7 +572,7 @@
         minHandDetectionConfidence: 0.5,
         minHandPresenceConfidence: 0.5,
         minTrackingConfidence: 0.5
-      }); // [page:0]
+      }); // VIDEO mode required for detectForVideo [page:1]
     }
 
     function updateWristFromLandmarks(result) {
@@ -614,7 +588,7 @@
       }
 
       const lm = result.landmarks[idx];
-      if (!lm || !lm[0]) return; // wrist
+      if (!lm || !lm[0]) return;
 
       let x = lm[0].x;
       let y = lm[0].y;
@@ -633,11 +607,10 @@
         const el = document.createElement('div');
         el.classList.add('floating-item', type === 'good' ? 'good-item' : 'bad-item');
 
-        const text = type === 'good'
+        el.textContent = type === 'good'
           ? goodWords[Math.floor(Math.random() * goodWords.length)]
           : badWords[Math.floor(Math.random() * badWords.length)];
 
-        el.textContent = text;
         el.dataset.kind = type;
         el.dataset.points = String(type === 'good' ? GOOD_POINTS : BAD_POINTS);
 
@@ -693,7 +666,6 @@
     function loop() {
       if (!isGameRunning) return;
 
-      // Detect once per new video frame [page:0]
       if (video.readyState >= 2 && handLandmarker) {
         if (video.currentTime !== lastVideoTime) {
           const res = handLandmarker.detectForVideo(video, performance.now());
@@ -742,6 +714,9 @@
     function startGame() {
       errEl.style.display = 'none';
 
+      // Try to ensure background MP4 is playing (muted autoplay should be allowed) [page:1]
+      bgVideo.play().catch(()=>{});
+
       score = 0;
       timeLeft = GAME_SECONDS;
       scoreEl.textContent = '0';
@@ -752,8 +727,8 @@
       isGameRunning = true;
 
       initDragonBody();
-      spawnItems(START_GOOD, 'good');
-      spawnItems(START_BAD, 'bad');
+      spawnItems(6, 'good');
+      spawnItems(4, 'bad');
 
       startScreen.style.display = 'none';
       gameOverScreen.style.display = 'none';
