@@ -3,106 +3,73 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>WebAR Wrist + 竹龍跟隨 (MediaPipe)</title>
+  <title>WebAR (Laptop Webcam) 右手腕 + 大坑火龍（含鏡像修正）</title>
 
-  <!-- MediaPipe Tasks Vision (Hand Landmarker) -->
+  <style>
+    html, body { margin: 0; height: 100%; background:#111; color:#eee;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans TC", sans-serif; }
+    #wrap { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+    video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    canvas { pointer-events: none; }
+
+    /* 由 JS 控制是否鏡像 */
+    .mirror { transform: rotateY(180deg); }
+
+    #hud {
+      position: absolute; left: 12px; top: 12px; z-index: 10;
+      background: rgba(0,0,0,0.45); padding: 10px 12px; border-radius: 10px;
+      backdrop-filter: blur(6px);
+      max-width: min(720px, calc(100vw - 24px));
+    }
+    button { font-size: 14px; padding: 8px 12px; border-radius: 10px; border: 0; cursor: pointer; }
+    #status { margin-top: 8px; font-size: 13px; opacity: 0.9; line-height: 1.35; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    label { font-size: 13px; opacity: 0.95; display:flex; gap:6px; align-items:center; user-select:none; }
+    input[type="range"] { width: 140px; }
+    select { border-radius: 8px; padding: 6px 8px; border: 0; }
+  </style>
+
   <script type="module">
     import { HandLandmarker, FilesetResolver } from
       "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
     const ui = {
-      btn: null,
-      status: null,
-      video: null,
-      canvas: null,
-      ctx: null
+      btn: null, status: null, video: null, canvas: null, ctx: null,
+      camSel: null, nSeg: null, spacing: null, mirror: null
     };
 
     let handLandmarker;
     let running = false;
     let lastVideoTime = -1;
 
-    // 竹龍狀態：用一串節點做「跟隨 + 慣性」
-    const N = 30;                 // 節數
-    const spacing = 10;           // 節點間距（像素）
-    const nodes = Array.from({ length: N }, () => ({ x: 0, y: 0 }));
+    // 顯示鏡像（只影響畫面顯示，不改 MediaPipe 輸入影像本身）
+    let mirrorDisplay = true;
+
+    // 火龍參數
+    let N = 50;
+    let spacing = 10;
+    let nodes = [];
     let inited = false;
 
-    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-
-    function resizeCanvasToVideo() {
-      ui.canvas.width = ui.video.videoWidth;
-      ui.canvas.height = ui.video.videoHeight;
-      ui.canvas.style.width = ui.video.videoWidth + "px";
-      ui.canvas.style.height = ui.video.videoHeight + "px";
+    function resetNodes() {
+      nodes = Array.from({ length: N }, () => ({ x: 0, y: 0 }));
+      inited = false;
     }
 
-    function drawBambooDragon(headX, headY) {
-      const ctx = ui.ctx;
-
-      // 初始化節點到頭部位置
-      if (!inited) {
-        for (const p of nodes) { p.x = headX; p.y = headY; }
-        inited = true;
+    function applyMirrorClass() {
+      if (mirrorDisplay) {
+        ui.video.classList.add("mirror");
+        ui.canvas.classList.add("mirror");
+      } else {
+        ui.video.classList.remove("mirror");
+        ui.canvas.classList.remove("mirror");
       }
+    }
 
-      // 頭節點追隨手腕（加一點平滑）
-      nodes[0].x += (headX - nodes[0].x) * 0.35;
-      nodes[0].y += (headY - nodes[0].y) * 0.35;
-
-      // 其餘節點：保持固定距離，形成「蛇形/龍身」
-      for (let i = 1; i < N; i++) {
-        const prev = nodes[i - 1];
-        const cur = nodes[i];
-        const dx = cur.x - prev.x;
-        const dy = cur.y - prev.y;
-        const d = Math.hypot(dx, dy) || 1e-6;
-        const targetX = prev.x + (dx / d) * spacing;
-        const targetY = prev.y + (dy / d) * spacing;
-
-        // 往目標位置拉回（平滑）
-        cur.x += (targetX - cur.x) * 0.45;
-        cur.y += (targetY - cur.y) * 0.45;
-      }
-
-      // 畫身體（綠色節狀）
-      ctx.save();
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-
-      // 身體主線
-      ctx.beginPath();
-      ctx.moveTo(nodes[0].x, nodes[0].y);
-      for (let i = 1; i < N; i++) ctx.lineTo(nodes[i].x, nodes[i].y);
-      ctx.strokeStyle = "rgba(30,160,60,0.9)";
-      ctx.lineWidth = 10;
-      ctx.stroke();
-
-      // 節點（像竹節）
-      for (let i = 0; i < N; i++) {
-        const t = i / (N - 1);
-        const r = 10 - 6 * t; // 越尾巴越細
-        ctx.beginPath();
-        ctx.arc(nodes[i].x, nodes[i].y, r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(70, 200, 90, ${0.85 - 0.5 * t})`;
-        ctx.fill();
-
-        // 竹節環
-        ctx.beginPath();
-        ctx.arc(nodes[i].x, nodes[i].y, r * 0.85, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(10, 90, 30, ${0.35 - 0.2 * t})`;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-
-      // 簡單龍頭（兩個眼點）
-      ctx.beginPath();
-      ctx.arc(nodes[0].x - 6, nodes[0].y - 4, 2.2, 0, Math.PI * 2);
-      ctx.arc(nodes[0].x + 6, nodes[0].y - 4, 2.2, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(20,40,20,0.9)";
-      ctx.fill();
-
-      ctx.restore();
+    function resizeCanvasToVideo() {
+      if (!ui.video.videoWidth) return;
+      ui.canvas.width = ui.video.videoWidth;
+      ui.canvas.height = ui.video.videoHeight;
     }
 
     async function setup() {
@@ -112,9 +79,41 @@
       ui.canvas = document.getElementById("canvas");
       ui.ctx = ui.canvas.getContext("2d");
 
+      ui.camSel = document.getElementById("camSel");
+      ui.nSeg = document.getElementById("nSeg");
+      ui.spacing = document.getElementById("spacing");
+      ui.mirror = document.getElementById("mirror");
+
+      // default for laptop webcam: mirror ON（較似自拍鏡）
+      ui.mirror.checked = mirrorDisplay;
+      applyMirrorClass();
+
+      ui.mirror.addEventListener("change", () => {
+        mirrorDisplay = ui.mirror.checked;
+        applyMirrorClass();
+        resetNodes();
+      });
+
+      // sliders
+      ui.nSeg.value = String(N);
+      ui.spacing.value = String(spacing);
+      document.getElementById("nSegVal").textContent = String(N);
+      document.getElementById("spacingVal").textContent = String(spacing);
+
+      ui.nSeg.addEventListener("input", () => {
+        N = parseInt(ui.nSeg.value, 10);
+        document.getElementById("nSegVal").textContent = String(N);
+        resetNodes();
+      });
+      ui.spacing.addEventListener("input", () => {
+        spacing = parseInt(ui.spacing.value, 10);
+        document.getElementById("spacingVal").textContent = String(spacing);
+      });
+
+      resetNodes();
       ui.status.textContent = "載入模型中…";
 
-      // 官方建議：用 FilesetResolver 指向 wasm root，再 createFromOptions [page:1]
+      // FilesetResolver + createFromOptions（官方做法）[page:6]
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
       );
@@ -126,36 +125,37 @@
           delegate: "GPU"
         },
         runningMode: "VIDEO",
-        numHands: 1
+        numHands: 2,
+        minHandDetectionConfidence: 0.5,
+        minHandPresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
       });
 
-      ui.status.textContent = "就緒。";
+      ui.status.textContent = "就緒。按 Enable Webcam。";
       ui.btn.disabled = false;
-
       ui.btn.addEventListener("click", toggle);
+
+      window.addEventListener("resize", resizeCanvasToVideo);
     }
 
     async function startCamera() {
+      const facingMode = ui.camSel.value; // laptop 通常只得 user，但保留選項
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: "user",     // 前鏡頭；想用後鏡頭可改成 "environment"
+          facingMode,
           width: { ideal: 1280 },
           height: { ideal: 720 }
         },
         audio: false
       });
       ui.video.srcObject = stream;
-
       await ui.video.play();
       resizeCanvasToVideo();
-      window.addEventListener("resize", resizeCanvasToVideo);
     }
 
     function stopCamera() {
       const stream = ui.video.srcObject;
-      if (stream) {
-        for (const t of stream.getTracks()) t.stop();
-      }
+      if (stream) stream.getTracks().forEach(t => t.stop());
       ui.video.srcObject = null;
     }
 
@@ -166,35 +166,138 @@
       if (running) {
         ui.status.textContent = "啟動相機…";
         await startCamera();
-        ui.status.textContent = "偵測中（把手腕放到鏡頭前）";
+        ui.status.textContent = "偵測中：只跟 Right（人體右手腕）。";
         requestAnimationFrame(loop);
       } else {
         ui.status.textContent = "已停止。";
         stopCamera();
         ui.ctx.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
-        inited = false;
+        resetNodes();
       }
+    }
+
+    // 從結果揀出「Right」嗰隻手（handedness Left/Right + landmarks）[page:6]
+    function pickRightHand(result) {
+      const landmarksArr = result?.landmarks || [];
+      const handednessArr = result?.handedness || [];
+      if (!landmarksArr.length) return null;
+
+      for (let i = 0; i < landmarksArr.length; i++) {
+        const cat = handednessArr?.[i]?.[0];
+        if (cat?.categoryName === "Right") {
+          return { landmarks: landmarksArr[i], score: cat?.score ?? null };
+        }
+      }
+      return null;
+    }
+
+    function toCanvasXY(normX, normY) {
+      // landmarks 的 x/y 係 normalized by image width/height [page:6]
+      // 若顯示鏡像，畫面 x 會左右反；所以把 x 做一次 (1-x) 去對齊顯示座標
+      const xNorm = mirrorDisplay ? (1 - normX) : normX;
+      return {
+        x: xNorm * ui.canvas.width,
+        y: normY * ui.canvas.height
+      };
+    }
+
+    function updateSnake(headX, headY) {
+      if (!inited) {
+        for (const p of nodes) { p.x = headX; p.y = headY; }
+        inited = true;
+      }
+      nodes[0].x += (headX - nodes[0].x) * 0.35;
+      nodes[0].y += (headY - nodes[0].y) * 0.35;
+
+      for (let i = 1; i < nodes.length; i++) {
+        const prev = nodes[i - 1];
+        const cur = nodes[i];
+        const dx = cur.x - prev.x;
+        const dy = cur.y - prev.y;
+        const d = Math.hypot(dx, dy) || 1e-6;
+
+        const targetX = prev.x + (dx / d) * spacing;
+        const targetY = prev.y + (dy / d) * spacing;
+
+        cur.x += (targetX - cur.x) * 0.50;
+        cur.y += (targetY - cur.y) * 0.50;
+      }
+    }
+
+    function drawFireDragon() {
+      const ctx = ui.ctx;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const t = i / (nodes.length - 1);
+        const x = nodes[i].x;
+        const y = nodes[i].y;
+
+        const R = 46 - 30 * t;
+        const rays = Math.floor(46 - 18 * t);
+        const alpha = 0.55 - 0.40 * t;
+
+        ctx.strokeStyle = `rgba(255, 110, 20, ${alpha})`;
+        ctx.lineWidth = 1.15;
+
+        const rot = performance.now() * 0.0011 + i * 0.33;
+        for (let k = 0; k < rays; k++) {
+          const a = rot + (k / rays) * Math.PI * 2;
+          const wob1 = 0.35 + 0.12 * Math.sin(k * 12.3 + i * 0.7);
+          const wob2 = 0.95 + 0.22 * Math.sin(k * 7.7 + i * 0.4 + 1.2);
+          const r1 = R * wob1;
+          const r2 = R * wob2;
+
+          ctx.beginPath();
+          ctx.moveTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
+          ctx.lineTo(x + Math.cos(a) * r2, y + Math.sin(a) * r2);
+          ctx.stroke();
+        }
+
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, R);
+        grad.addColorStop(0.00, `rgba(255, 250, 220, ${0.65 - 0.45 * t})`);
+        grad.addColorStop(0.35, `rgba(255, 190, 60, ${0.35 - 0.22 * t})`);
+        grad.addColorStop(1.00, `rgba(255, 60, 0, 0)`);
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(x, y, R, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalCompositeOperation = "screen";
+      ctx.beginPath();
+      ctx.arc(nodes[0].x, nodes[0].y, 18, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,250,220,0.70)";
+      ctx.fill();
+      ctx.restore();
     }
 
     function loop() {
       if (!running) return;
 
-      // 避免同一幀重複算（官方範例也用 currentTime 來判斷）[page:1]
+      // VIDEO 模式每幀用 detectForVideo()；x/y normalized，handedness Left/Right [page:6]
       if (ui.video.currentTime !== lastVideoTime) {
         lastVideoTime = ui.video.currentTime;
 
         const nowMs = performance.now();
-        const res = handLandmarker.detectForVideo(ui.video, nowMs); // video 模式用 detectForVideo [page:1]
+        const res = handLandmarker.detectForVideo(ui.video, nowMs); // [page:6]
 
         ui.ctx.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
 
-        if (res?.landmarks?.length) {
-          // landmark #0 = wrist（手腕），x/y 是 normalized [0,1]（官方說明）[page:1]
-          const wrist = res.landmarks[0][0];
-          const x = wrist.x * ui.canvas.width;
-          const y = wrist.y * ui.canvas.height;
+        const right = pickRightHand(res);
+        if (right?.landmarks?.length) {
+          const wrist = right.landmarks[0]; // landmark #0 = wrist [page:6]
+          const p = toCanvasXY(wrist.x, wrist.y);
 
-          drawBambooDragon(x, y);
+          updateSnake(p.x, p.y);
+          drawFireDragon();
+          ui.status.textContent =
+            `偵測中：Right（人體右手腕），score ${right.score?.toFixed?.(2) ?? "?"}，Mirror=${mirrorDisplay ? "ON" : "OFF"}`;
+        } else {
+          ui.status.textContent = `偵測中：未見到 Right（Mirror=${mirrorDisplay ? "ON" : "OFF"}）`;
+          resetNodes();
         }
       }
 
@@ -203,29 +306,42 @@
 
     setup();
   </script>
-
-  <style>
-    html, body { margin: 0; height: 100%; background:#111; color:#eee; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans TC", sans-serif; }
-    #wrap { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
-    video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-    video { transform: rotateY(180deg); }      /* 鏡像（自拍視角） */
-    canvas { pointer-events: none; transform: rotateY(180deg); } /* 讓疊圖跟 video 同方向 */
-    #hud {
-      position: absolute; left: 12px; top: 12px; z-index: 10;
-      background: rgba(0,0,0,0.45); padding: 10px 12px; border-radius: 10px;
-      backdrop-filter: blur(6px);
-      max-width: min(520px, calc(100vw - 24px));
-    }
-    button { font-size: 14px; padding: 8px 12px; border-radius: 10px; border: 0; cursor: pointer; }
-    #status { margin-top: 8px; font-size: 13px; opacity: 0.9; line-height: 1.3; }
-  </style>
 </head>
 
 <body>
   <div id="wrap">
     <div id="hud">
-      <button id="btn" disabled>Enable Webcam</button>
+      <div class="row">
+        <button id="btn" disabled>Enable Webcam</button>
+
+        <label>
+          Camera
+          <select id="camSel">
+            <option value="user" selected>Webcam (user)</option>
+            <option value="environment">environment</option>
+          </select>
+        </label>
+
+        <label>
+          <input id="mirror" type="checkbox" />
+          Mirror display（鏡面顯示）
+        </label>
+
+        <label>
+          Segments <span id="nSegVal">50</span>
+          <input id="nSeg" type="range" min="20" max="90" step="1" />
+        </label>
+
+        <label>
+          Spacing <span id="spacingVal">10</span>
+          <input id="spacing" type="range" min="6" max="18" step="1" />
+        </label>
+      </div>
+
       <div id="status">初始化中…</div>
+      <div style="margin-top:6px; font-size:12px; opacity:0.75;">
+        提示：用 HTTPS 或 localhost 開。若你覺得「左右手顛倒」，先關掉 Mirror display 測試一次。
+      </div>
     </div>
 
     <video id="video" playsinline muted></video>
