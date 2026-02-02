@@ -3,15 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wrist Dragon Bubble Game</title>
+  <title>Wrist Fire Dragon Game</title>
 
   <style>
     :root { --hud-bg: rgba(0,0,0,0.55); --hud-fg:#fff; --accent:#ffd166; }
     html, body { height:100%; margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:var(--hud-fg); background:#111; overflow:hidden; }
     #stage { position:relative; width:100vw; height:100vh; background:url("image_1.png") center/cover no-repeat fixed; }
+
     #cameraWrap { position:absolute; inset:0; display:grid; place-items:center; }
     #video { position:absolute; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); opacity:0.18; filter:saturate(1.1) contrast(1.05); }
     #gameCanvas { position:absolute; width:100%; height:100%; }
+
     #hud { position:absolute; top:12px; left:12px; right:12px; display:flex; gap:10px; align-items:center; justify-content:space-between; pointer-events:none; }
     .panel { background:var(--hud-bg); border:1px solid rgba(255,255,255,0.14); backdrop-filter:blur(4px); padding:10px 12px; border-radius:12px; display:flex; gap:14px; align-items:center; }
     .stat { display:grid; gap:2px; line-height:1.1; }
@@ -19,7 +21,7 @@
     .value { font-size:18px; font-weight:700; color:var(--accent); }
 
     #overlay { position:absolute; inset:0; display:grid; place-items:center; background:radial-gradient(circle at center, rgba(0,0,0,0.35), rgba(0,0,0,0.78)); }
-    #card { width:min(600px, calc(100vw - 36px)); background:rgba(0,0,0,0.65); border:1px solid rgba(255,255,255,0.18); border-radius:18px; padding:18px 18px 14px; box-shadow:0 18px 60px rgba(0,0,0,0.4); }
+    #card { width:min(640px, calc(100vw - 36px)); background:rgba(0,0,0,0.65); border:1px solid rgba(255,255,255,0.18); border-radius:18px; padding:18px 18px 14px; box-shadow:0 18px 60px rgba(0,0,0,0.4); }
     #card h1 { margin:0 0 8px; font-size:20px; letter-spacing:0.2px; }
     #card p { margin:6px 0; opacity:0.9; font-size:14px; line-height:1.35; }
     #controls { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
@@ -65,14 +67,14 @@
     <div id="overlay">
       <div id="card">
         <h1>Tai Hang Fire Dragon — Wrist Game</h1>
-        <p>Raise your <b>right</b> hand and move your wrist to control the dragon.</p>
+        <p>Raise your <b>right</b> hand and move your wrist to control the fire dragon.</p>
         <p>Hit word bubbles (+10). Avoid emoji bubbles (−5).</p>
         <div id="controls">
           <button id="startBtn">Start (unlock audio + camera)</button>
           <button id="mirrorBtn" class="secondary">Mirror camera: ON</button>
           <button id="restartBtn" class="secondary" style="display:none;">Play again</button>
         </div>
-        <div id="hint">HandLandmarker must be initialized in VIDEO mode when using detectForVideo(). [page:0]</div>
+        <div id="hint">Hand tracking uses MediaPipe HandLandmarker in VIDEO mode (needed for detectForVideo). [page:0]</div>
         <div id="err"></div>
       </div>
     </div>
@@ -81,10 +83,11 @@
   <script type="module">
     import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
-    // Hosted model URL example (no local .task needed). [page:0]
+    // Hosted model URL (no local .task needed on GitHub Pages).
     const MODEL_URL =
       "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
+    // Gameplay
     const EMOJIS = ['⚽', '🍔', '🎧', '🧊', '🧧', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
     const WORDS  = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '馬', '年'];
 
@@ -95,10 +98,19 @@
     const SCORE_WORD = +10;
     const SCORE_EMOJI = -5;
 
-    const DRAGON_RADIUS = 36;
+    // Collisions
+    const DRAGON_RADIUS = 44;   // a bit bigger for the larger dragon head
     const BUBBLE_RADIUS = 28;
+
+    // Wrist smoothing
     const SMOOTHING = 0.22;
 
+    // Dragon realism / performance knobs
+    const DRAGON_TRAIL_MAX = 28;
+    const TRAIL_SPACING_PX = 12;
+    const MAX_SPIKES = 240;
+
+    // DOM
     const video = document.getElementById("video");
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
@@ -112,6 +124,7 @@
     const timeEl = document.getElementById("time");
     const errEl = document.getElementById("err");
 
+    // Audio
     const sfxCrunch  = new Audio("Crunch.mp3");
     const sfxCollect = new Audio("Collect.mp3");
     const bgm        = new Audio("bgm.mp3");
@@ -131,15 +144,16 @@
       errEl.textContent = msg;
     }
 
+    // MediaPipe
     let handLandmarker = null;
     let lastVideoTime = -1;
 
     async function initHandLandmarker() {
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-      ); // wasm assets path shown in Tasks Vision docs. [page:0]
+      ); // wasm root shown in MediaPipe docs [page:0]
 
-      // IMPORTANT: Set runningMode: "VIDEO" because we call detectForVideo(). [page:0]
+      // Must be VIDEO mode if we call detectForVideo() [page:0]
       handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: MODEL_URL },
         runningMode: "VIDEO",
@@ -159,6 +173,18 @@
       await video.play();
     }
 
+    // Utilities
+    function rand(min, max) { return Math.random() * (max - min) + min; }
+    function pick(arr) { return arr[(Math.random() * arr.length) | 0]; }
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+    function hitTestCircle(ax, ay, ar, bx, by, br) {
+      const dx = ax - bx, dy = ay - by, rr = ar + br;
+      return (dx*dx + dy*dy) <= (rr*rr);
+    }
+
+    // Game state
     let mirror = true;
     let running = false;
     let score = 0;
@@ -168,10 +194,16 @@
     let spawnTimer = 0;
     let gameTimerInterval = null;
 
+    // Dragon control (normalized)
     let dragonX = 0.5, dragonY = 0.65;
+    // Dragon actual pixel head position
     let dragonPx = { x: 0, y: 0 };
     let dragonVel = { x: 0, y: 0 };
     let hasWrist = false;
+
+    // Dragon body trail + sparks
+    let dragonTrail = [];
+    let sparks = [];
 
     function resize() {
       canvas.width = Math.floor(window.innerWidth * devicePixelRatio);
@@ -180,9 +212,46 @@
     }
     window.addEventListener("resize", resize);
 
-    function rand(min, max) { return Math.random() * (max - min) + min; }
-    function pick(arr) { return arr[(Math.random() * arr.length) | 0]; }
+    function pushTrailPoint(x, y) {
+      const p = { x, y };
+      if (dragonTrail.length === 0) { dragonTrail.push(p); return; }
+      const last = dragonTrail[dragonTrail.length - 1];
+      if (dist(p, last) >= TRAIL_SPACING_PX) {
+        dragonTrail.push(p);
+        if (dragonTrail.length > DRAGON_TRAIL_MAX) dragonTrail.shift();
+      }
+    }
 
+    function samplePolyline(points, stepPx) {
+      if (points.length < 2) return points.slice();
+      const out = [points[0]];
+      let acc = 0;
+      for (let i = 1; i < points.length; i++) {
+        let a = points[i - 1], b = points[i];
+        let segLen = dist(a, b);
+        if (segLen === 0) continue;
+        let dx = (b.x - a.x) / segLen;
+        let dy = (b.y - a.y) / segLen;
+
+        while (acc + segLen >= stepPx) {
+          const t = (stepPx - acc);
+          const nx = a.x + dx * t;
+          const ny = a.y + dy * t;
+          out.push({ x: nx, y: ny });
+
+          a = { x: nx, y: ny };
+          segLen = dist(a, b);
+          acc = 0;
+          if (segLen === 0) break;
+          dx = (b.x - a.x) / segLen;
+          dy = (b.y - a.y) / segLen;
+        }
+        acc += segLen;
+      }
+      return out;
+    }
+
+    // Bubbles
     function spawnBubble() {
       const isEmoji = Math.random() < 0.55;
       const text = isEmoji ? pick(EMOJIS) : pick(WORDS);
@@ -205,12 +274,19 @@
       timeLeft = GAME_SECONDS;
       bubbles = [];
       spawnTimer = 0;
+
       scoreEl.textContent = String(score);
       timeEl.textContent = String(timeLeft);
+
       dragonX = 0.5; dragonY = 0.65;
       dragonPx.x = window.innerWidth * dragonX;
       dragonPx.y = window.innerHeight * dragonY;
+      dragonVel.x = 0; dragonVel.y = 0;
+
+      dragonTrail = [];
+      sparks = [];
       hasWrist = false;
+
       errEl.style.display = "none";
     }
 
@@ -227,11 +303,6 @@
       restartBtn.style.display = "inline-block";
     }
 
-    function hitTestCircle(ax, ay, ar, bx, by, br) {
-      const dx = ax - bx, dy = ay - by, rr = ar + br;
-      return (dx*dx + dy*dy) <= (rr*rr);
-    }
-
     function handleCollisions() {
       const px = dragonPx.x, py = dragonPx.y;
       for (let i = bubbles.length - 1; i >= 0; i--) {
@@ -245,78 +316,7 @@
       }
     }
 
-    function drawDragon(x, y, t) {
-      ctx.save();
-      ctx.translate(x, y);
-
-      const angle = Math.atan2(dragonVel.y, dragonVel.x) || 0;
-      ctx.rotate(angle * 0.25);
-
-      const g = ctx.createRadialGradient(0, 0, 6, 0, 0, 70);
-      g.addColorStop(0, "rgba(255,210,80,0.65)");
-      g.addColorStop(0.45, "rgba(255,95,48,0.28)");
-      g.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(0, 0, 70, 0, Math.PI * 2); ctx.fill();
-
-      ctx.lineCap = "round"; ctx.lineJoin = "round";
-      const wig = Math.sin(t * 0.012) * 10;
-      const len = 140;
-
-      ctx.strokeStyle = "rgba(255, 160, 60, 0.9)";
-      ctx.lineWidth = 16;
-      ctx.beginPath();
-      ctx.moveTo(-len, wig);
-      ctx.quadraticCurveTo(-60, -25 - wig*0.2, -18, 0);
-      ctx.quadraticCurveTo(18, 18 + wig*0.25, 42, 0);
-      ctx.stroke();
-
-      ctx.strokeStyle = "rgba(255, 70, 30, 0.85)";
-      ctx.lineWidth = 9;
-      ctx.beginPath();
-      ctx.moveTo(-len + 10, wig + 6);
-      ctx.quadraticCurveTo(-56, -18 - wig*0.1, -18, 0);
-      ctx.quadraticCurveTo(18, 16 + wig*0.15, 42, 0);
-      ctx.stroke();
-
-      ctx.fillStyle = "rgba(255, 220, 120, 0.92)";
-      ctx.strokeStyle = "rgba(140, 30, 15, 0.55)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(52, 0, 20, 16, 0, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
-
-      ctx.fillStyle = "rgba(255, 120, 40, 0.9)";
-      ctx.beginPath();
-      ctx.moveTo(66, -2);
-      ctx.quadraticCurveTo(82, 0, 66, 6);
-      ctx.quadraticCurveTo(70, 2, 66, -2);
-      ctx.fill();
-
-      ctx.fillStyle = "rgba(30, 10, 8, 0.85)";
-      ctx.beginPath(); ctx.arc(54, -5, 2.8, 0, Math.PI * 2); ctx.fill();
-
-      ctx.strokeStyle = "rgba(255, 235, 190, 0.75)";
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 10; i++) {
-        const a = -0.9 + i * 0.18 + Math.sin(t*0.01 + i) * 0.02;
-        const L = 28 + (i % 3) * 8;
-        ctx.beginPath();
-        ctx.moveTo(50, 0);
-        ctx.lineTo(50 + Math.cos(a) * L, Math.sin(a) * L);
-        ctx.stroke();
-      }
-
-      ctx.strokeStyle = "rgba(255, 245, 220, 0.8)";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(44, -10); ctx.lineTo(36, -26);
-      ctx.moveTo(52, -12); ctx.lineTo(50, -30);
-      ctx.stroke();
-
-      ctx.restore();
-    }
-
+    // Drawing: bubbles
     function drawBubble(b, t) {
       const wob = Math.sin(t * 0.004 + b.wobble) * 3;
       const x = b.x, y = b.y + wob;
@@ -326,12 +326,15 @@
 
       const fill = (b.kind === "emoji") ? "rgba(255, 90, 90, 0.22)" : "rgba(80, 255, 170, 0.18)";
       const stroke = (b.kind === "emoji") ? "rgba(255, 90, 90, 0.7)" : "rgba(80, 255, 170, 0.75)";
+
       ctx.fillStyle = fill;
       ctx.strokeStyle = stroke;
       ctx.lineWidth = 2;
 
-      ctx.beginPath(); ctx.arc(0, 0, b.r, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, b.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
 
       ctx.font = (b.kind === "word") ? "24px system-ui" : "26px system-ui";
       ctx.textAlign = "center";
@@ -342,10 +345,192 @@
       ctx.restore();
     }
 
+    // Drawing: realistic fire dragon
+    function drawDragonHead(hx, hy, ang, t) {
+      ctx.save();
+      ctx.translate(hx, hy);
+      ctx.rotate(ang);
+
+      // Head glow
+      const g = ctx.createRadialGradient(10, 0, 6, 10, 0, 70);
+      g.addColorStop(0, "rgba(255,220,140,0.55)");
+      g.addColorStop(0.35, "rgba(255,120,60,0.22)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(10, 0, 70, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Skull
+      ctx.fillStyle = "rgba(200,120,55,0.72)";
+      ctx.strokeStyle = "rgba(60,25,18,0.45)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(12, 0, 24, 17, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Mouth flame
+      ctx.fillStyle = "rgba(255,110,40,0.85)";
+      ctx.beginPath();
+      ctx.moveTo(30, -4);
+      ctx.quadraticCurveTo(52, 0, 30, 10);
+      ctx.quadraticCurveTo(38, 2, 30, -4);
+      ctx.fill();
+
+      // Eye (flashlight-like)
+      const blink = 0.7 + 0.3 * Math.sin(t * 0.02);
+      ctx.fillStyle = `rgba(255,255,220,${0.55 * blink})`;
+      ctx.beginPath();
+      ctx.arc(10, -6, 4.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(20,10,8,0.75)";
+      ctx.beginPath();
+      ctx.arc(11, -6, 1.9, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Horns
+      ctx.strokeStyle = "rgba(245,230,200,0.65)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, -11); ctx.lineTo(-12, -30);
+      ctx.moveTo(9, -13); ctx.lineTo(6, -35);
+      ctx.stroke();
+
+      // Whiskers
+      ctx.strokeStyle = "rgba(255,235,200,0.55)";
+      ctx.lineWidth = 1.8;
+      for (let i = 0; i < 18; i++) {
+        const a = -1.1 + i * 0.12 + Math.sin(t * 0.01 + i) * 0.03;
+        const L = 18 + (i % 4) * 7;
+        ctx.beginPath();
+        ctx.moveTo(6, 0);
+        ctx.lineTo(6 + Math.cos(a) * L, Math.sin(a) * L);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function drawDragon(x, y, t) {
+      const curve = (dragonTrail.length >= 2) ? dragonTrail.slice() : [{ x, y }];
+
+      ctx.save();
+
+      // Overall warm haze around head
+      {
+        const g = ctx.createRadialGradient(x, y, 10, x, y, 170);
+        g.addColorStop(0, "rgba(255,200,120,0.35)");
+        g.addColorStop(0.35, "rgba(255,120,60,0.16)");
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, 170, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (curve.length < 2) {
+        drawDragonHead(x, y, 0, t);
+        ctx.restore();
+        return;
+      }
+
+      // Rope spine
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "rgba(25,18,16,0.55)";
+      ctx.lineWidth = 18;
+      ctx.beginPath();
+      ctx.moveTo(curve[0].x, curve[0].y);
+      for (let i = 1; i < curve.length; i++) ctx.lineTo(curve[i].x, curve[i].y);
+      ctx.stroke();
+
+      // Straw wrap (2 layers)
+      for (let k = 0; k < 2; k++) {
+        ctx.strokeStyle = (k === 0) ? "rgba(150,90,35,0.65)" : "rgba(220,150,70,0.38)";
+        ctx.lineWidth = (k === 0) ? 14 : 10;
+        ctx.beginPath();
+        ctx.moveTo(curve[0].x, curve[0].y);
+        for (let i = 1; i < curve.length; i++) {
+          const p = curve[i];
+          const jx = Math.sin(t * 0.003 + i * 1.7 + k) * 0.6;
+          const jy = Math.cos(t * 0.003 + i * 1.3 + k) * 0.6;
+          ctx.lineTo(p.x + jx, p.y + jy);
+        }
+        ctx.stroke();
+      }
+
+      // Incense spikes + ember tips
+      const samples = samplePolyline(curve, 10);
+      const step = Math.max(1, Math.floor(samples.length / MAX_SPIKES));
+
+      for (let i = 1; i < samples.length - 1; i += step) {
+        const p0 = samples[i - 1], p1 = samples[i], p2 = samples[i + 1];
+        const tx = p2.x - p0.x, ty = p2.y - p0.y;
+        const tl = Math.hypot(tx, ty) || 1;
+        const nx = -ty / tl, ny = tx / tl;
+
+        const headness = i / (samples.length - 1); // 0 tail -> 1 head
+        const baseLen = 10 + headness * 14;
+        const jitter = Math.sin(t * 0.01 + i * 0.9) * 3;
+        const len = baseLen + jitter;
+
+        const side = (i % 2 === 0) ? 1 : -1;
+        const sx = p1.x + nx * side * 2;
+        const sy = p1.y + ny * side * 2;
+        const ex = sx + nx * side * len + (Math.random() - 0.5) * 2.2;
+        const ey = sy + ny * side * len + (Math.random() - 0.5) * 2.2;
+
+        ctx.strokeStyle = "rgba(240,200,150,0.33)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+
+        const glow = 0.35 + 0.35 * Math.max(0, Math.sin(t * 0.02 + i));
+        ctx.fillStyle = `rgba(255,140,60,${glow})`;
+        ctx.beginPath();
+        ctx.arc(ex, ey, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (headness > 0.55 && Math.random() < 0.02) {
+          sparks.push({ x: ex, y: ey, vx: (Math.random() - 0.5) * 1.2, vy: -Math.random() * 1.8, life: 28 + Math.random() * 18 });
+        }
+      }
+
+      // Head direction from last segment
+      const a = curve[curve.length - 2];
+      const b = curve[curve.length - 1];
+      const ang = Math.atan2(b.y - a.y, b.x - a.x);
+      drawDragonHead(b.x, b.y, ang, t);
+
+      // Sparks
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i];
+        s.x += s.vx;
+        s.y += s.vy;
+        s.vy += 0.03;
+        s.life -= 1;
+
+        const alpha = clamp(s.life / 40, 0, 1);
+        ctx.fillStyle = `rgba(255,170,80,${0.6 * alpha})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (s.life <= 0) sparks.splice(i, 1);
+      }
+
+      ctx.restore();
+    }
+
+    // Tracking: right wrist (mirror-aware)
     function updateWristFromLandmarks(result) {
       hasWrist = false;
       if (!result || !result.landmarks || result.landmarks.length === 0) return;
 
+      // Prefer Right hand; fallback to first hand.
       let idx = 0;
       if (result.handednesses && result.handednesses.length) {
         const rightIndex = result.handednesses.findIndex(h =>
@@ -355,13 +540,10 @@
       }
 
       const lm = result.landmarks[idx];
-      if (!lm || !lm[0]) return; // landmark 0 = wrist
+      if (!lm || !lm[0]) return; // wrist landmark #0 [page:0]
 
-      let x = lm[0].x, y = lm[0].y;
-
-      // Video is mirrored visually; flip x so control matches what user sees.
-      if (mirror) x = 1 - x;
-
+      let x = lm[0].x, y = lm[0].y; // normalized
+      if (mirror) x = 1 - x; // compensate for mirrored video
       dragonX = dragonX + (x - dragonX) * SMOOTHING;
       dragonY = dragonY + (y - dragonY) * SMOOTHING;
       hasWrist = true;
@@ -370,9 +552,10 @@
     function tick(t) {
       if (!running) return;
 
+      // Detect once per new video frame (VIDEO mode). [page:0]
       if (video.readyState >= 2 && handLandmarker) {
         if (video.currentTime !== lastVideoTime) {
-          const res = handLandmarker.detectForVideo(video, performance.now()); // requires VIDEO mode [page:0]
+          const res = handLandmarker.detectForVideo(video, performance.now());
           updateWristFromLandmarks(res);
           lastVideoTime = video.currentTime;
         }
@@ -386,14 +569,20 @@
       dragonPx.x += dragonVel.x * 0.35;
       dragonPx.y += dragonVel.y * 0.35;
 
+      // Update dragon body trail
+      pushTrailPoint(dragonPx.x, dragonPx.y);
+
+      // Spawn + expire bubbles
       spawnTimer += 16.7;
       if (spawnTimer >= SPAWN_EVERY_MS) { spawnTimer = 0; spawnBubble(); }
 
       const now = performance.now();
       bubbles = bubbles.filter(b => (now - b.bornAt) < BUBBLE_LIFETIME_MS);
 
+      // Collisions + scoring
       handleCollisions();
 
+      // Draw frame
       ctx.clearRect(0, 0, w, h);
 
       if (!hasWrist) {
@@ -417,7 +606,6 @@
 
       resetGame();
       endMusic.pause(); endMusic.currentTime = 0;
-
       safePlay(bgm);
 
       running = true;
@@ -440,8 +628,8 @@
       startBtn.disabled = true;
       startBtn.textContent = "Starting…";
       try {
-        await initCamera();
         resize();
+        await initCamera();
         await initHandLandmarker();
         await startGame();
       } catch (e) {
