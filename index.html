@@ -367,7 +367,7 @@
         // 方案一新增：失鎖寬限 + EMA 平滑
         const LOST_GRACE_MS = 700;    // 失鎖後仍「保持最後位置」的時間
         const FADE_OUT_MS = 350;      // 超過寬限後的漸隱時間
-        const EMA_ALPHA = 0.28;       // 位置平滑係數（0~1，越大越跟手、越抖）
+        const EMA_ALPHA = 0.;       // 位置平滑係數（0~1，越大越跟手、越抖）
 
         let lastSeenTs = 0;           // 最近一次 markerFound 的時間
         let hasEverSeen = false;      // 避免未見過就用(0,0)
