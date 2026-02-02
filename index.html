@@ -258,7 +258,7 @@
       animation: incense-flicker 0.14s infinite alternate;
     }
 
-    /* Bubbles */
+    /* Bubbles (UPDATED background color) */
     .floating-item {
       position: absolute;
       font-size: 40px;
@@ -268,7 +268,7 @@
       align-items: center;
       width: 70px; height: 70px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.9);
+      background-color: #fff9d1; /* <-- requested update [page:0] */
       box-shadow: 0 4px 10px rgba(0,0,0,0.35);
       z-index: 6;
       will-change: transform, left, top;
@@ -333,15 +333,12 @@
 </head>
 
 <body>
-  <!-- Audio -->
   <audio id="bgm" loop src="bgm.mp3"></audio>
   <audio id="sfx-collect" src="Collect.mp3"></audio>
   <audio id="sfx-crunch" src="Crunch.mp3"></audio>
   <audio id="sfx-end" src="end.mp3"></audio>
 
-  <!-- Camera -->
   <video id="video" playsinline autoplay muted></video>
-
   <div id="global-bg"></div>
 
   <div id="ui-layer">
@@ -350,7 +347,6 @@
 
     <div id="dragon-body-container"></div>
 
-    <!-- Dragon head (your DOM head) -->
     <div id="aim-cursor">
       <div class="dragon-head-group">
         <div class="smoke-effect"></div>
@@ -389,35 +385,29 @@
   <script type="module">
     import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
-    // Hand Landmarker web guide: detectForVideo requires VIDEO mode. [page:0]
     const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
-    // Game config
     const goodWords = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '馬', '年'];
     const badWords  = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
 
     const GAME_SECONDS = 60;
-    const GOOD_POINTS = 10;     // per your original requirement
-    const BAD_POINTS  = -5;     // per your original requirement
+    const GOOD_POINTS = 10;
+    const BAD_POINTS  = -5;
 
     const START_GOOD = 6;
     const START_BAD  = 4;
 
-    // Wrist smoothing
     const SMOOTHING = 0.22;
 
-    // Collision radii (head vs bubble)
     const HEAD_R = 60;
     const ITEM_R = 35;
 
-    // Dragon body parameters (from your code)
     const bodySegmentCount = 14;
     const bodySpacing = 26;
     const sticksPerSegment = 28;
     const stickLenMin = 26;
     const stickLenMax = 46;
 
-    // DOM
     const video = document.getElementById('video');
     const gameArea = document.getElementById('game-area');
     const scoreEl = document.getElementById('score');
@@ -432,7 +422,6 @@
     const restartBtn2 = document.getElementById('restartBtn2');
     const errEl = document.getElementById('err');
 
-    // Audio
     const sounds = {
       bgm: document.getElementById('bgm'),
       collect: document.getElementById('sfx-collect'),
@@ -440,6 +429,8 @@
       end: document.getElementById('sfx-end')
     };
     let isMuted = false;
+    let isGameRunning = false;
+
     sounds.bgm.volume = 0.3;
     sounds.collect.volume = 0.85;
     sounds.crunch.volume = 0.85;
@@ -461,25 +452,22 @@
     }
     document.getElementById('mute-btn').addEventListener('click', () => setMuted(!isMuted));
 
-    // Game state
+    // Game vars
     let score = 0;
     let timeLeft = GAME_SECONDS;
-    let isGameRunning = false;
     let items = [];
     let timerInterval = null;
 
     let gameWidth = window.innerWidth;
     let gameHeight = window.innerHeight;
 
-    // Wrist-controlled cursor position (pixels)
     let cursor = { x: -100, y: -100, visible: false };
-    let mirror = true; // video is mirrored; we compensate in x
+    let mirror = true; // video is mirrored
 
-    // Dragon body DOM elements (your code)
+    // Dragon body arrays
     const bodySegments = [];
     const bodyPositions = [];
 
-    // --- Build dragon body segment (extracted from your code) ---
     function buildIncenseSegment(isTail=false) {
       const seg = document.createElement('div');
       seg.classList.add(isTail ? 'dragon-tail' : 'dragon-body-segment');
@@ -565,7 +553,6 @@
           currentPos.y += Math.sin(angle) * moveDist * 0.55;
         }
 
-        // Smooth angle
         const prevA = currentPos.a || angle;
         let da = angle - prevA;
         if (da > Math.PI) da -= Math.PI * 2;
@@ -588,6 +575,7 @@
     // MediaPipe
     let handLandmarker = null;
     let lastVideoTime = -1;
+    let wristN = { x: 0.5, y: 0.65 };
 
     async function initCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -610,16 +598,13 @@
         minHandDetectionConfidence: 0.5,
         minHandPresenceConfidence: 0.5,
         minTrackingConfidence: 0.5
-      }); // detectForVideo requires VIDEO mode [page:0]
+      }); // [page:0]
     }
 
-    // Wrist mapping
-    let wristN = { x: 0.5, y: 0.65 };
     function updateWristFromLandmarks(result) {
       cursor.visible = false;
       if (!result || !result.landmarks || result.landmarks.length === 0) return;
 
-      // Prefer Right hand, fallback to 0
       let idx = 0;
       if (result.handednesses && result.handednesses.length) {
         const rightIndex = result.handednesses.findIndex(h =>
@@ -629,11 +614,11 @@
       }
 
       const lm = result.landmarks[idx];
-      if (!lm || !lm[0]) return; // wrist landmark
+      if (!lm || !lm[0]) return; // wrist
 
       let x = lm[0].x;
       let y = lm[0].y;
-      if (mirror) x = 1 - x; // mirror compensation
+      if (mirror) x = 1 - x;
 
       wristN.x = wristN.x + (x - wristN.x) * SMOOTHING;
       wristN.y = wristN.y + (y - wristN.y) * SMOOTHING;
@@ -643,7 +628,6 @@
       cursor.visible = true;
     }
 
-    // Items
     function spawnItems(count, type) {
       for (let i = 0; i < count; i++) {
         const el = document.createElement('div');
@@ -706,11 +690,10 @@
       }, 450);
     }
 
-    // Main loop
     function loop() {
       if (!isGameRunning) return;
 
-      // Hand detection once per video frame [page:0]
+      // Detect once per new video frame [page:0]
       if (video.readyState >= 2 && handLandmarker) {
         if (video.currentTime !== lastVideoTime) {
           const res = handLandmarker.detectForVideo(video, performance.now());
@@ -729,7 +712,6 @@
         bodySegments.forEach(seg => seg.style.display = 'none');
       }
 
-      // Move items + collisions
       for (const item of items) {
         if (!item.active) continue;
 
@@ -750,9 +732,7 @@
           const cy = item.y + item.height / 2;
           const dx = cursor.x - cx;
           const dy = cursor.y - cy;
-          if ((dx*dx + dy*dy) < (HEAD_R + ITEM_R) ** 2) {
-            handleHit(item);
-          }
+          if ((dx*dx + dy*dy) < (HEAD_R + ITEM_R) ** 2) handleHit(item);
         }
       }
 
@@ -761,6 +741,7 @@
 
     function startGame() {
       errEl.style.display = 'none';
+
       score = 0;
       timeLeft = GAME_SECONDS;
       scoreEl.textContent = '0';
@@ -802,13 +783,11 @@
       gameOverScreen.style.display = 'flex';
     }
 
-    // Resize
     window.addEventListener('resize', () => {
       gameWidth = window.innerWidth;
       gameHeight = window.innerHeight;
     });
 
-    // Start buttons
     startBtn.addEventListener('click', async () => {
       startBtn.disabled = true;
       try {
@@ -822,6 +801,7 @@
         startBtn.disabled = false;
       }
     });
+
     restartBtn2.addEventListener('click', () => startGame());
   </script>
 </body>
