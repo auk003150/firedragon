@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>新春大坑舞火龍遊戲 (Half Size)</title>
+  <title>新春大坑舞火龍遊戲 (Short Dragon)</title>
 
   <style>
     html, body {
@@ -58,11 +58,10 @@
     /* Game area for bubbles */
     #game-area { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 
-    /* Cursor (dragon head) - SCALED DOWN BY 50% HERE */
+    /* Cursor (dragon head) - REVERTED TO ORIGINAL SIZE */
     #aim-cursor {
       position: absolute; width: 160px; height: 160px;
-      /* Added scale(0.5) to shrink the visual head */
-      transform: translate(-50%, -50%) scale(0.5);
+      transform: translate(-50%, -50%);
       display: none;
       justify-content: center; align-items: center;
       z-index: 20;
@@ -340,7 +339,7 @@
     <button id="mute-btn" title="Mute/unmute">🔊</button>
 
     <div id="start-screen" class="overlay-screen">
-      <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 38px; margin:0;">🔥 大坑舞火龍 (Mini) 🔥</h1>
+      <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 38px; margin:0;">🔥 大坑舞火龍 (Short) 🔥</h1>
       <p style="font-size: 16px; color: #ddd; margin: 10px 0 0;">
         用「右手手腕」控制龍頭收集吉祥字！<br>避開 Emoji 泡泡。
       </p>
@@ -372,15 +371,17 @@
 
     const SMOOTHING = 0.22;
 
-    /* --- UPDATED CONSTANTS FOR HALF SIZE --- */
-    const HEAD_R = 30;         // Was 60
-    const ITEM_R = 35;         // Kept same to make game playable (hitbox relative to bubble)
+    /* --- REVERTED CONSTANTS FOR FULL SIZE --- */
+    const HEAD_R = 60;         // Back to 60
+    const ITEM_R = 35;
 
-    const bodySegmentCount = 14;
-    const bodySpacing = 13;    // Was 26
+    /* --- CHANGED: REDUCED SEGMENT COUNT --- */
+    const bodySegmentCount = 5; // Reduced from 14 to 5
+    
+    const bodySpacing = 26;    // Back to 26
     const sticksPerSegment = 28;
-    const stickLenMin = 13;    // Was 26
-    const stickLenMax = 23;    // Was 46
+    const stickLenMin = 26;    // Back to 26
+    const stickLenMax = 46;    // Back to 46
 
     const video = document.getElementById('video');
     const bgVideo = document.getElementById('bg-video');
@@ -481,8 +482,8 @@
           const stick = document.createElement('div');
           stick.className = 'tail-stick';
           const rot = (360 / tailSticks) * i + (Math.random() * 12 - 6);
-          // Reduced tail stick length for half size
-          const len = 20 + Math.random() * 14; 
+          // Reverted tail stick length for full size
+          const len = 40 + Math.random() * 28; 
           stick.style.setProperty('--rot', rot + 'deg');
           stick.style.setProperty('--len', len + 'px');
           seg.appendChild(stick);
@@ -498,8 +499,8 @@
 
       for (let i = 0; i < bodySegmentCount; i++) {
         const el = buildIncenseSegment(false);
-        // Updated scale: multiply by 0.5
-        const scale = 0.5 * (1 - (i * 0.022));
+        // Reverted scale logic
+        const scale = 1 - (i * 0.022);
         el.dataset.baseScale = scale.toFixed(3);
         dragonBodyContainer.appendChild(el);
         bodySegments.push(el);
@@ -507,8 +508,8 @@
       }
 
       const tail = buildIncenseSegment(true);
-      // Updated tail scale: 0.72 * 0.5 = 0.36
-      tail.dataset.baseScale = '0.36';
+      // Reverted tail scale
+      tail.dataset.baseScale = '0.72';
       dragonBodyContainer.appendChild(tail);
       bodySegments.push(tail);
       bodyPositions.push({ x: -100, y: -100, a: 0 });
@@ -681,7 +682,6 @@
 
       if (cursor.visible) {
         aimCursor.style.display = 'flex';
-        // Note: CSS transform handles the scale(0.5)
         aimCursor.style.left = cursor.x + 'px';
         aimCursor.style.top = cursor.y + 'px';
         updateDragonBody(cursor.x, cursor.y);
@@ -710,7 +710,6 @@
           const cy = item.y + item.height / 2;
           const dx = cursor.x - cx;
           const dy = cursor.y - cy;
-          // HEAD_R is now 30, matching the visual
           if ((dx*dx + dy*dy) < (HEAD_R + ITEM_R) ** 2) handleHit(item);
         }
       }
