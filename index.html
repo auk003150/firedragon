@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>新春大坑舞火龍遊戲 (Short Dragon)</title>
+  <title>新春大坑舞火龍遊戲</title>
 
   <style>
     html, body {
@@ -58,171 +58,26 @@
     /* Game area for bubbles */
     #game-area { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 
-    /* Cursor (dragon head) - REVERTED TO ORIGINAL SIZE */
-    #aim-cursor {
-      position: absolute; width: 160px; height: 160px;
+    /* Cursor (Dragon Image Container) */
+    #dragon-cursor {
+      position: absolute; 
+      width: 500px;  /* 你可以根據圖片大小調整這裡 */
+      height: 500px; /* 你可以根據圖片大小調整這裡 */
       transform: translate(-50%, -50%);
-      display: none;
+      display: none; /* 遊戲開始才顯示 */
       justify-content: center; align-items: center;
       z-index: 20;
       pointer-events: none;
-    }
-
-    /* Dragon body container */
-    #dragon-body-container { position: absolute; inset: 0; pointer-events: none; z-index: 15; }
-
-    /* --- Straw texture --- */
-    .straw-texture {
-      background-color: #d4b483;
-      background-image:
-        radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%),
-        linear-gradient(to bottom, rgba(0,0,0,0.1), transparent 20%, transparent 80%, rgba(0,0,0,0.4)),
-        repeating-linear-gradient(85deg, transparent 0px, transparent 2px, rgba(93, 64, 55, 0.3) 3px, transparent 4px),
-        repeating-linear-gradient(95deg, transparent 0px, transparent 3px, rgba(141, 110, 99, 0.4) 4px, transparent 6px),
-        repeating-linear-gradient(0deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 1px, transparent 5px);
-      border: 1px solid #8d6e63;
-      box-shadow: inset 0 0 10px rgba(62, 39, 35, 0.5);
-    }
-
-    /* --- Dragon head --- */
-    .dragon-head-group { position: relative; width: 120px; height: 120px; animation: float-head 2s ease-in-out infinite; }
-    .dh-skull { position: absolute; top: 25px; left: 20px; width: 80px; height: 60px; border-radius: 25px 25px 15px 15px; z-index: 5; }
-    .dh-snout { position: absolute; top: 50px; left: 10px; width: 90px; height: 40px; border-radius: 30px; z-index: 6; }
-    .dh-snout::before, .dh-snout::after { content: ''; position: absolute; bottom: 10px; width: 14px; height: 14px; background: #3e2723; border-radius: 50%; box-shadow: inset 0 0 5px #000; }
-    .dh-snout::before { left: 15px; } .dh-snout::after { right: 15px; }
-    .dh-jaw { position: absolute; bottom: 10px; left: 30px; width: 60px; height: 35px; border-radius: 0 0 25px 25px; z-index: 4; animation: chew 1s ease-in-out infinite alternate; }
-    .dh-eye {
-      position: absolute; top: 20px; width: 24px; height: 24px;
-      background: radial-gradient(circle, #fff 40%, #cfd8dc 100%);
-      border-radius: 50%;
-      border: 3px solid #3e2723;
-      box-shadow: 0 0 15px rgba(255, 255, 255, 0.9);
-      z-index: 7;
-    }
-    .eye-left { left: 5px; } .eye-right { right: 5px; }
-    .dh-horn { position: absolute; top: -25px; width: 15px; height: 55px; border-radius: 8px; transform-origin: bottom center; z-index: 3; }
-    .horn-left { left: 15px; transform: rotate(-25deg); } .horn-right { right: 15px; transform: rotate(25deg); }
-    .dh-whisker { position: absolute; top: 60px; width: 70px; height: 50px; border-top: 5px solid #a1887f; border-radius: 50%; z-index: 2; opacity: 0.9; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
-    .whisker-left { right: 85px; transform: rotate(20deg); } .whisker-right { left: 85px; transform: rotate(-20deg); }
-
-    /* --- Incense effects --- */
-    @keyframes incense-flicker {
-      0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.95); filter: drop-shadow(0 0 1px rgba(255,61,0,0.5)); }
-      50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 3px rgba(255,200,0,0.8)); }
-      100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.0); filter: drop-shadow(0 0 2px rgba(255,61,0,0.6)); }
-    }
-    @keyframes smoke-rise {
-      0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); }
-      50% { opacity: 0.5; }
-      100% { opacity: 0; transform: translate(-50%, -80px) scale(2.5); }
-    }
-    @keyframes float-head { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-    @keyframes chew { 0% { transform: translateY(0); } 100% { transform: translateY(5px); } }
-
-    .incense-glow { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
-    .incense-particles {
-      position: absolute; width: 4px; height: 4px;
-      background: radial-gradient(circle, #fff 20%, #ff3d00 100%);
-      border-radius: 50%;
-      top: 40%; left: 50%;
-      box-shadow:
-        0 -35px 2px #ff9100, 10px -32px 1px #ff3d00, -10px -32px 2px #ff3d00,
-        20px -28px 1px #ff9100, -20px -28px 2px #ff3d00, 30px -20px 1px #ff3d00, -30px -20px 2px #ff9100;
-      filter: drop-shadow(0 0 4px #ff3d00);
-      animation: incense-flicker 0.12s infinite alternate;
-      transform: translate(-50%, -50%);
-    }
-    .smoke-effect {
-      position: absolute; top: -40px; left: 50%; width: 15px; height: 15px;
-      background: rgba(220,220,220,0.4); border-radius: 50%;
-      box-shadow: 0 0 25px 15px rgba(220,220,220,0.4);
-      transform: translateX(-50%);
-      animation: smoke-rise 2.5s infinite linear;
-      z-index: 1;
-    }
-
-    /* --- Dragon body segments --- */
-    .dragon-body-segment {
-      position: absolute; width: 70px; height: 70px;
-      transform: translate(-50%, -50%);
-      display: none; z-index: 15;
       will-change: transform, left, top;
-      pointer-events: none;
+      transition: transform 0.1s ease-out; /* 讓翻轉稍微平滑一點 */
     }
-    .segment-core {
-      position: absolute; left: 50%; top: 50%;
-      width: 22px; height: 22px;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background:
-        radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0) 55%),
-        radial-gradient(circle, #d4b483 0%, #b08b55 70%, #6d4c41 100%);
-      box-shadow: inset 0 0 10px rgba(62,39,35,0.55), 0 0 10px rgba(255,120,0,0.12);
-      border: 1px solid rgba(141,110,99,0.7);
-    }
-    .incense-stick {
-      position: absolute; left: 50%; top: 50%;
-      width: 3px; height: var(--len, 40px);
-      transform-origin: 50% 100%;
-      transform: translate(-50%, -100%) rotate(var(--rot, 0deg));
-      border-radius: 2px;
-      background: linear-gradient(to top, #7a4b2a 0%, #c58a55 50%, #f2d0a6 100%);
-      filter: drop-shadow(0 0 1px rgba(0,0,0,0.5));
-      opacity: 0.95;
-    }
-    .incense-stick::after {
-      content: '';
-      position: absolute; left: 50%; top: -8px;
-      width: 6px; height: 6px;
-      transform: translateX(-50%);
-      border-radius: 50%;
-      background: radial-gradient(circle, #fff 10%, #ffeb3b 35%, #ff3d00 100%);
-      box-shadow: 0 0 10px rgba(255, 180, 0, 0.9), 0 0 18px rgba(255, 61, 0, 0.65);
-      animation: incense-flicker var(--flicker, 0.12s) infinite alternate;
-    }
-    .segment-glow {
-      position: absolute; left: 50%; top: 50%;
-      width: 120px; height: 120px;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 87, 34, 0.16) 0%, rgba(255, 87, 34, 0.08) 35%, transparent 70%);
-      filter: blur(8px);
-      pointer-events: none;
-      opacity: 0.8;
-    }
-    .dragon-tail {
-      position: absolute; width: 90px; height: 90px;
-      transform: translate(-50%, -50%);
-      display: none; z-index: 14;
-      will-change: transform, left, top;
-      pointer-events: none;
-    }
-    .tail-core {
-      position: absolute; left: 50%; top: 55%;
-      width: 20px; height: 20px;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background: radial-gradient(circle, #caa26f 0%, #8d6e63 70%, #3e2723 100%);
-      box-shadow: inset 0 0 10px rgba(62,39,35,0.6);
-    }
-    .tail-stick {
-      position: absolute; left: 50%; top: 55%;
-      width: 3px; height: var(--len, 55px);
-      transform-origin: 50% 100%;
-      transform: translate(-50%, -100%) rotate(var(--rot, 0deg));
-      border-radius: 2px;
-      background: linear-gradient(to top, #6d3d1f 0%, #c07a3e 60%, #f6d7b8 100%);
-      opacity: 0.95;
-    }
-    .tail-stick::after {
-      content: '';
-      position: absolute; left: 50%; top: -9px;
-      width: 7px; height: 7px;
-      transform: translateX(-50%);
-      border-radius: 50%;
-      background: radial-gradient(circle, #fff 10%, #ffeb3b 35%, #ff3d00 100%);
-      box-shadow: 0 0 12px rgba(255, 200, 0, 0.95), 0 0 20px rgba(255, 61, 0, 0.65);
-      animation: incense-flicker 0.14s infinite alternate;
+
+    #dragon-cursor img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      /* 如果你的圖片預設是朝右的，不需要改動；如果是朝左，可以預設加 scaleX(-1) */
+      filter: drop-shadow(0 0 10px rgba(255, 160, 0, 0.6));
     }
 
     /* Bubbles */
@@ -317,31 +172,18 @@
     <div id="score-board">分數: <span id="score">0</span></div>
     <div id="timer-board">時間: <span id="timer">60</span></div>
 
-    <div id="dragon-body-container"></div>
-
-    <div id="aim-cursor">
-      <div class="dragon-head-group">
-        <div class="smoke-effect"></div>
-        <div class="dh-horn horn-left straw-texture"></div>
-        <div class="dh-horn horn-right straw-texture"></div>
-        <div class="dh-whisker whisker-left"></div>
-        <div class="dh-whisker whisker-right"></div>
-        <div class="dh-skull straw-texture"></div>
-        <div class="dh-jaw straw-texture"></div>
-        <div class="dh-snout straw-texture"></div>
-        <div class="dh-eye eye-left"></div>
-        <div class="dh-eye eye-right"></div>
-        <div class="incense-glow"><div class="incense-particles"></div></div>
-      </div>
+    <!-- REPLACED: Simple Image Cursor -->
+    <div id="dragon-cursor">
+      <img src="image.png" alt="Dragon Head" id="dragon-img-el">
     </div>
 
     <div id="game-area"></div>
     <button id="mute-btn" title="Mute/unmute">🔊</button>
 
     <div id="start-screen" class="overlay-screen">
-      <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 38px; margin:0;">🔥 大坑舞火龍 (Short) 🔥</h1>
+      <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 38px; margin:0;">🔥 大坑舞火龍 🔥</h1>
       <p style="font-size: 16px; color: #ddd; margin: 10px 0 0;">
-        用「右手手腕」控制龍頭收集吉祥字！<br>避開 Emoji 泡泡。
+        用「右手手腕」控制舞龍！<br>避開 Emoji 泡泡。
       </p>
       <button id="startBtn">起龍！(Start)</button>
       <div id="err" style="margin-top:10px; display:none;"></div>
@@ -366,22 +208,8 @@
     const GOOD_POINTS = 10;
     const BAD_POINTS  = -5;
 
-    const START_GOOD = 6;
-    const START_BAD  = 4;
-
     const SMOOTHING = 0.22;
-
-    /* --- REVERTED CONSTANTS FOR FULL SIZE --- */
-    const HEAD_R = 60;         // Back to 60
-    const ITEM_R = 35;
-
-    /* --- CHANGED: REDUCED SEGMENT COUNT --- */
-    const bodySegmentCount = 5; // Reduced from 14 to 5
-    
-    const bodySpacing = 26;    // Back to 26
-    const sticksPerSegment = 28;
-    const stickLenMin = 26;    // Back to 26
-    const stickLenMax = 46;    // Back to 46
+    const COLLISION_R = 60; // Hitbox radius
 
     const video = document.getElementById('video');
     const bgVideo = document.getElementById('bg-video');
@@ -389,8 +217,10 @@
     const gameArea = document.getElementById('game-area');
     const scoreEl = document.getElementById('score');
     const timerEl = document.getElementById('timer');
-    const aimCursor = document.getElementById('aim-cursor');
-    const dragonBodyContainer = document.getElementById('dragon-body-container');
+    
+    // Updated elements
+    const dragonCursor = document.getElementById('dragon-cursor');
+    const dragonImgEl = document.getElementById('dragon-img-el');
 
     const startScreen = document.getElementById('start-screen');
     const gameOverScreen = document.getElementById('game-over-screen');
@@ -429,7 +259,6 @@
     }
     document.getElementById('mute-btn').addEventListener('click', () => setMuted(!isMuted));
 
-    // Ensure bg video plays
     bgVideo.muted = true;
 
     // Game vars
@@ -441,117 +270,13 @@
     let gameWidth = window.innerWidth;
     let gameHeight = window.innerHeight;
 
-    let cursor = { x: -100, y: -100, visible: false };
-    let mirror = true; // webcam is mirrored
+    let cursor = { x: -200, y: -200, visible: false };
+    
+    // For Direction Logic
+    let prevCursorX = 0;
+    let facingRight = true; // Assume image faces right by default
 
-    // Dragon body arrays
-    const bodySegments = [];
-    const bodyPositions = [];
-
-    function buildIncenseSegment(isTail=false) {
-      const seg = document.createElement('div');
-      seg.classList.add(isTail ? 'dragon-tail' : 'dragon-body-segment');
-
-      if (!isTail) {
-        const glow = document.createElement('div');
-        glow.className = 'segment-glow';
-        seg.appendChild(glow);
-
-        const core = document.createElement('div');
-        core.className = 'segment-core';
-        seg.appendChild(core);
-
-        for (let i = 0; i < sticksPerSegment; i++) {
-          const stick = document.createElement('div');
-          stick.className = 'incense-stick';
-          const rot = (360 / sticksPerSegment) * i + (Math.random() * 10 - 5);
-          const len = stickLenMin + Math.random() * (stickLenMax - stickLenMin);
-          const flicker = (0.09 + Math.random() * 0.08).toFixed(2) + 's';
-          stick.style.setProperty('--rot', rot + 'deg');
-          stick.style.setProperty('--len', len + 'px');
-          stick.style.setProperty('--flicker', flicker);
-          seg.appendChild(stick);
-        }
-      } else {
-        const core = document.createElement('div');
-        core.className = 'tail-core';
-        seg.appendChild(core);
-
-        const tailSticks = 36;
-        for (let i = 0; i < tailSticks; i++) {
-          const stick = document.createElement('div');
-          stick.className = 'tail-stick';
-          const rot = (360 / tailSticks) * i + (Math.random() * 12 - 6);
-          // Reverted tail stick length for full size
-          const len = 40 + Math.random() * 28; 
-          stick.style.setProperty('--rot', rot + 'deg');
-          stick.style.setProperty('--len', len + 'px');
-          seg.appendChild(stick);
-        }
-      }
-      return seg;
-    }
-
-    function initDragonBody() {
-      dragonBodyContainer.innerHTML = '';
-      bodySegments.length = 0;
-      bodyPositions.length = 0;
-
-      for (let i = 0; i < bodySegmentCount; i++) {
-        const el = buildIncenseSegment(false);
-        // Reverted scale logic
-        const scale = 1 - (i * 0.022);
-        el.dataset.baseScale = scale.toFixed(3);
-        dragonBodyContainer.appendChild(el);
-        bodySegments.push(el);
-        bodyPositions.push({ x: -100, y: -100, a: 0 });
-      }
-
-      const tail = buildIncenseSegment(true);
-      // Reverted tail scale
-      tail.dataset.baseScale = '0.72';
-      dragonBodyContainer.appendChild(tail);
-      bodySegments.push(tail);
-      bodyPositions.push({ x: -100, y: -100, a: 0 });
-    }
-
-    function updateDragonBody(headX, headY) {
-      let targetX = headX;
-      let targetY = headY;
-
-      for (let i = 0; i < bodySegments.length; i++) {
-        const segment = bodySegments[i];
-        const currentPos = bodyPositions[i];
-
-        const dx = targetX - currentPos.x;
-        const dy = targetY - currentPos.y;
-        const d = Math.sqrt(dx*dx + dy*dy);
-        const angle = Math.atan2(dy, dx);
-
-        if (d > bodySpacing) {
-          const moveDist = d - bodySpacing;
-          currentPos.x += Math.cos(angle) * moveDist * 0.55;
-          currentPos.y += Math.sin(angle) * moveDist * 0.55;
-        }
-
-        const prevA = currentPos.a || angle;
-        let da = angle - prevA;
-        if (da > Math.PI) da -= Math.PI * 2;
-        if (da < -Math.PI) da += Math.PI * 2;
-        currentPos.a = prevA + da * 0.25;
-
-        segment.style.display = 'block';
-        segment.style.left = currentPos.x + 'px';
-        segment.style.top = currentPos.y + 'px';
-
-        const baseScale = parseFloat(segment.dataset.baseScale || '1');
-        const deg = (currentPos.a * 180 / Math.PI) + 90;
-        segment.style.transform = `translate(-50%, -50%) rotate(${deg}deg) scale(${baseScale})`;
-
-        targetX = currentPos.x;
-        targetY = currentPos.y;
-      }
-    }
+    let mirror = true;
 
     // MediaPipe
     let handLandmarker = null;
@@ -578,7 +303,7 @@
         minHandDetectionConfidence: 0.5,
         minHandPresenceConfidence: 0.5,
         minTrackingConfidence: 0.5
-      }); 
+      });
     }
 
     function updateWristFromLandmarks(result) {
@@ -680,16 +405,35 @@
         }
       }
 
+      // Update Cursor Image
       if (cursor.visible) {
-        aimCursor.style.display = 'flex';
-        aimCursor.style.left = cursor.x + 'px';
-        aimCursor.style.top = cursor.y + 'px';
-        updateDragonBody(cursor.x, cursor.y);
+        dragonCursor.style.display = 'flex';
+        dragonCursor.style.left = cursor.x + 'px';
+        dragonCursor.style.top = cursor.y + 'px';
+
+        // --- DIRECTION LOGIC ---
+        // Calculate difference (delta) from last frame
+        const dx = cursor.x - prevCursorX;
+        
+        // Threshold to prevent jitter (e.g., must move > 2px to change direction)
+        if (dx > 2) {
+            facingRight = true; 
+        } else if (dx < -2) {
+            facingRight = false;
+        }
+        
+        // If your original image faces RIGHT, use 1 for Right, -1 for Left.
+        // If your original image faces LEFT, swap these values (-1 for Right, 1 for Left).
+        const scaleX = facingRight ? 1 : -1;
+        dragonImgEl.style.transform = `scaleX(${scaleX})`;
+
+        prevCursorX = cursor.x; 
+
       } else {
-        aimCursor.style.display = 'none';
-        bodySegments.forEach(seg => seg.style.display = 'none');
+        dragonCursor.style.display = 'none';
       }
 
+      // Update Bubbles
       for (const item of items) {
         if (!item.active) continue;
 
@@ -710,7 +454,8 @@
           const cy = item.y + item.height / 2;
           const dx = cursor.x - cx;
           const dy = cursor.y - cy;
-          if ((dx*dx + dy*dy) < (HEAD_R + ITEM_R) ** 2) handleHit(item);
+          // Simple circle collision
+          if ((dx*dx + dy*dy) < (COLLISION_R + 35) ** 2) handleHit(item);
         }
       }
 
@@ -719,7 +464,6 @@
 
     function startGame() {
       errEl.style.display = 'none';
-
       bgVideo.play().catch(()=>{});
 
       score = 0;
@@ -731,7 +475,9 @@
       items = [];
       isGameRunning = true;
 
-      initDragonBody();
+      // Reset cursor pos so it doesn't jump
+      prevCursorX = gameWidth / 2;
+
       spawnItems(6, 'good');
       spawnItems(4, 'bad');
 
@@ -786,3 +532,4 @@
   </script>
 </body>
 </html>
+
