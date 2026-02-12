@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>新春大坑舞火龍遊戲 (Balanced Version)</title>
+  <title>新春大坑舞火龍遊戲 (150px Body)</title>
 
   <style>
     html, body {
@@ -58,10 +58,10 @@
     /* Game area for bubbles */
     #game-area { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 
-    /* Cursor (Dragon Head) Container - REDUCED 25% */
+    /* Cursor (Dragon Head) */
     #aim-cursor {
       position: absolute; 
-      width: 210px; height: 210px; /* Was 280px */
+      width: 210px; height: 210px; 
       top: 0; left: 0;
       display: none;
       justify-content: center; align-items: center;
@@ -78,10 +78,10 @@
       animation: float-head 2s ease-in-out infinite;
     }
 
-    /* Dragon Body Segment Container - REDUCED 25% */
+    /* Dragon Body Segment Container - UPDATED TO 150px */
     .dragon-body-segment {
       position: absolute; 
-      width: 135px; height: 135px; /* Was 180px */
+      width: 150px; height: 150px; /* Updated */
       top: 0; left: 0; 
       display: none; z-index: 15;
       will-change: transform;
@@ -243,13 +243,13 @@
     const BAD_POINTS  = -5;
     const SMOOTHING = 0.22;
 
-    // --- UPDATED SIZES (Reduced by 25% from previous step) ---
-    const HEAD_R = 90; // Was 120
+    const HEAD_R = 90; 
     const ITEM_R = 40;  
     const CAM_MARGIN = 0.12; 
 
     const bodySegmentCount = 4;
-    const bodySpacing = 75; // Was 100
+    // Increased slightly for 150px segments
+    const bodySpacing = 80; 
 
     const video = document.getElementById('video');
     const bgVideo = document.getElementById('bg-video');
