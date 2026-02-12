@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>新春大坑舞火龍遊戲</title>
+  <title>新春大坑舞火龍遊戲 (Fixed Movement)</title>
 
   <style>
     html, body {
@@ -78,10 +78,10 @@
       animation: float-head 2s ease-in-out infinite;
     }
 
-    /* Dragon Body Segment Container - UPDATED TO 150px */
+    /* Dragon Body Segment Container */
     .dragon-body-segment {
       position: absolute; 
-      width: 150px; height: 150px; /* Updated */
+      width: 150px; height: 150px; 
       top: 0; left: 0; 
       display: none; z-index: 15;
       will-change: transform;
@@ -214,7 +214,7 @@
     <div id="start-screen" class="overlay-screen">
       <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 38px; margin:0;">🔥 大坑舞火龍 🔥</h1>
       <p style="font-size: 16px; color: #ddd; margin: 10px 0 0;">
-        用「右手手腕」控制龍頭收集美食與祝福！
+        用「右手手腕」控制龍頭收集美食與祝福！<br>無需將手移至畫面邊緣即可到達角落。
       </p>
       <button id="startBtn">起龍！(Start)</button>
       <div id="err" style="margin-top:10px; display:none;"></div>
@@ -233,7 +233,6 @@
     const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
     // --- CONFIGURATION ---
-    
     const goodWords = ['福', '春', '財', '安', '吉', '祥', '賀', '馬'];
     const goodImages = ['egg-tart.png', 'buns.png', 'tea.png', 'food.png'];
     const badWords  = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
@@ -248,8 +247,7 @@
     const CAM_MARGIN = 0.12; 
 
     const bodySegmentCount = 4;
-    // Increased slightly for 150px segments
-    const bodySpacing = 80; 
+    const bodySpacing = 80;
 
     const video = document.getElementById('video');
     const bgVideo = document.getElementById('bg-video');
@@ -469,6 +467,19 @@
         }
     }
 
+    // --- FIX: Random Velocity with Minimum Speed ---
+    function getRandomVelocity() {
+        // Random direction (-1 or 1)
+        const dirX = Math.random() < 0.5 ? -1 : 1;
+        const dirY = Math.random() < 0.5 ? -1 : 1;
+        
+        // Minimum speed of 2.0, max 4.5
+        const vx = dirX * (2.0 + Math.random() * 2.5);
+        const vy = dirY * (2.0 + Math.random() * 2.5);
+        
+        return { vx, vy };
+    }
+
     function spawnItems(count, type) {
       for (let i = 0; i < count; i++) {
         const el = document.createElement('div');
@@ -480,12 +491,14 @@
         gameArea.appendChild(el);
 
         const size = 80;
+        const v = getRandomVelocity();
+
         items.push({
           element: el,
           x: Math.random() * (gameWidth - size),
           y: Math.random() * (gameHeight - size),
-          vx: (Math.random() - 0.5) * 2.8,
-          vy: (Math.random() - 0.5) * 2.8,
+          vx: v.vx,
+          vy: v.vy,
           width: size, height: size,
           active: true
         });
@@ -499,6 +512,11 @@
         item.x = Math.random() * (gameWidth - item.width);
         item.y = Math.random() * (gameHeight - item.height);
         
+        // Reset velocity so it doesn't get stuck in a "slow" state
+        const v = getRandomVelocity();
+        item.vx = v.vx;
+        item.vy = v.vy;
+
         const type = item.element.dataset.kind; 
         setBubbleContent(item.element, type);
     }
