@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>新春大坑舞火龍遊戲 (Image Version)</title>
+  <title>新春大坑舞火龍遊戲 (Mixed Version)</title>
 
   <style>
     html, body {
@@ -61,7 +61,6 @@
     /* Cursor (Dragon Head) Container */
     #aim-cursor {
       position: absolute; 
-      /* Adjust size based on your image aspect ratio */
       width: 140px; height: 140px; 
       top: 0; left: 0;
       display: none;
@@ -71,7 +70,6 @@
       will-change: transform;
     }
 
-    /* The actual Head Image */
     .dragon-head-img {
       width: 100%;
       height: 100%;
@@ -90,12 +88,10 @@
       pointer-events: none;
     }
 
-    /* The actual Body Image */
     .dragon-body-img {
       width: 100%;
       height: 100%;
       object-fit: contain;
-      /* Optional: Add glow */
       filter: drop-shadow(0 0 8px rgba(255, 100, 0, 0.4));
     }
 
@@ -107,12 +103,14 @@
     /* Bubbles */
     .floating-item {
       position: absolute;
-      font-size: 40px;
+      font-size: 24px;
       font-weight: 900;
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 70px; height: 70px;
+      text-align: center;
+      line-height: 1.1;
+      width: 80px; height: 80px;
       border-radius: 50%;
       background-color: #fff9d1;
       box-shadow: 0 4px 10px rgba(0,0,0,0.35);
@@ -120,9 +118,19 @@
       will-change: transform;
       top: 0; left: 0;
       user-select: none;
+      overflow: hidden; 
+      white-space: nowrap;
     }
-    .good-item { color: #d32f2f; border: 3px solid #d32f2f; }
-    .bad-item  { color: #333;   border: 3px solid #555; }
+    
+    .item-img {
+      width: 85%;
+      height: 85%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    .good-item { border: 3px solid #d32f2f; color: #d32f2f; }
+    .bad-item  { color: #333; border: 3px solid #555; font-size: 38px; }
 
     .score-popup {
       position: absolute;
@@ -179,28 +187,23 @@
 </head>
 
 <body>
-  <!-- Looping mp4 background -->
   <video id="bg-video" autoplay muted loop playsinline preload="auto">
     <source src="animated.mp4" type="video/mp4" />
   </video>
 
-  <!-- Audio -->
   <audio id="bgm" loop src="bgm.mp3"></audio>
   <audio id="sfx-collect" src="Collect.mp3"></audio>
   <audio id="sfx-crunch" src="Crunch.mp3"></audio>
   <audio id="sfx-end" src="end.mp3"></audio>
 
-  <!-- Webcam -->
   <video id="video" playsinline autoplay muted></video>
 
   <div id="ui-layer">
     <div id="score-board">分數: <span id="score">0</span></div>
     <div id="timer-board">時間: <span id="timer">60</span></div>
 
-    <!-- Container for Body Segments -->
     <div id="dragon-body-container"></div>
 
-    <!-- Head Cursor -->
     <div id="aim-cursor">
         <img src="head.png" alt="Dragon Head" class="dragon-head-img" />
     </div>
@@ -211,7 +214,7 @@
     <div id="start-screen" class="overlay-screen">
       <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 38px; margin:0;">🔥 大坑舞火龍 🔥</h1>
       <p style="font-size: 16px; color: #ddd; margin: 10px 0 0;">
-        用「右手手腕」控制龍頭收集吉祥字！<br>避開 Emoji 泡泡。
+        用「右手手腕」控制龍頭收集美食與祝福！<br>無需將手移至畫面邊緣即可到達角落。
       </p>
       <button id="startBtn">起龍！(Start)</button>
       <div id="err" style="margin-top:10px; display:none;"></div>
@@ -229,7 +232,13 @@
 
     const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
-    const goodWords = ['福', '春', '財', '安', '旺', '吉', '祥', '賀', '馬', '年'];
+    // --- CONFIGURATION ---
+    
+    // 1. Text Words
+    const goodWords = ['福', '春', '財', '安', '吉', '祥', '賀', '馬'];
+    // 2. Image Files
+    const goodImages = ['egg-tart.png', 'buns.png', 'tea.png', 'food.png'];
+    // 3. Bad Items
     const badWords  = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
 
     const GAME_SECONDS = 60;
@@ -237,13 +246,12 @@
     const BAD_POINTS  = -5;
     const SMOOTHING = 0.22;
 
-    // Hitbox radius
     const HEAD_R = 60;
-    const ITEM_R = 35;
+    const ITEM_R = 40; 
+    const CAM_MARGIN = 0.12; 
 
-    // --- GAME CONFIG (Image Version) ---
-    const bodySegmentCount = 4; // Set to 4 as requested
-    const bodySpacing = 50;     // Distance between image segments
+    const bodySegmentCount = 4;
+    const bodySpacing = 50;
 
     const video = document.getElementById('video');
     const bgVideo = document.getElementById('bg-video');
@@ -302,11 +310,9 @@
     let cursor = { x: -100, y: -100, visible: false };
     let mirror = true;
 
-    // Dragon body arrays
     const bodySegments = [];
     const bodyPositions = [];
 
-    // --- NEW: Simple Image Body Builder ---
     function buildBodySegment() {
       const wrapper = document.createElement('div');
       wrapper.classList.add('dragon-body-segment');
@@ -327,7 +333,6 @@
 
       for (let i = 0; i < bodySegmentCount; i++) {
         const el = buildBodySegment();
-        // Slight scale down for tail effect
         const scale = 1.0 - (i * 0.1); 
         el.dataset.baseScale = scale.toFixed(2);
         
@@ -350,14 +355,12 @@
         const d = Math.sqrt(dx*dx + dy*dy);
         const angle = Math.atan2(dy, dx);
 
-        // Follow logic
         if (d > bodySpacing) {
           const moveDist = d - bodySpacing;
           currentPos.x += Math.cos(angle) * moveDist * 0.55;
           currentPos.y += Math.sin(angle) * moveDist * 0.55;
         }
 
-        // Smooth rotation
         const prevA = currentPos.a || angle;
         let da = angle - prevA;
         if (da > Math.PI) da -= Math.PI * 2;
@@ -367,9 +370,6 @@
         segment.style.display = 'block';
         
         const baseScale = parseFloat(segment.dataset.baseScale || '1');
-        // Convert radians to degrees. 
-        // Note: If your body.png points "Right", adding 0 deg is correct.
-        // If it points "Up", add 90 deg. Currently assuming it points Right (0deg).
         const deg = (currentPos.a * 180 / Math.PI); 
 
         segment.style.transform = `translate3d(${currentPos.x}px, ${currentPos.y}px, 0) translate(-50%, -50%) rotate(${deg}deg) scale(${baseScale})`;
@@ -379,12 +379,11 @@
       }
     }
 
-    // MediaPipe Setup
+    // MediaPipe
     let handLandmarker = null;
     let lastVideoTime = -1;
     let wristN = { x: 0.5, y: 0.65 };
     
-    // Performance limiters
     let lastLandmarkTime = 0;
     const LANDMARK_INTERVAL = 50; 
 
@@ -434,26 +433,62 @@
       let y = lm[0].y;
       if (mirror) x = 1 - x;
 
-      wristN.x = wristN.x + (x - wristN.x) * SMOOTHING;
-      wristN.y = wristN.y + (y - wristN.y) * SMOOTHING;
+      let xMapped = (x - CAM_MARGIN) / (1 - 2 * CAM_MARGIN);
+      let yMapped = (y - CAM_MARGIN) / (1 - 2 * CAM_MARGIN);
+
+      xMapped = Math.max(0, Math.min(1, xMapped));
+      yMapped = Math.max(0, Math.min(1, yMapped));
+
+      wristN.x = wristN.x + (xMapped - wristN.x) * SMOOTHING;
+      wristN.y = wristN.y + (yMapped - wristN.y) * SMOOTHING;
 
       cursor.x = wristN.x * gameWidth;
       cursor.y = wristN.y * gameHeight;
       cursor.visible = true;
     }
 
+    // --- NEW: CONTENT HELPER ---
+    // Randomly sets the bubble content to either a Word or an Image
+    function setBubbleContent(el, type) {
+        el.innerHTML = ''; // Clear existing
+        el.dataset.kind = type;
+
+        if (type === 'good') {
+            // 50% chance for Text, 50% chance for Image
+            if (Math.random() < 0.5) {
+                // Show Text
+                const txt = goodWords[Math.floor(Math.random() * goodWords.length)];
+                el.textContent = txt;
+                if (txt.length > 2) el.style.fontSize = '20px';
+                else el.style.fontSize = '24px';
+            } else {
+                // Show Image
+                const imgFile = goodImages[Math.floor(Math.random() * goodImages.length)];
+                const img = document.createElement('img');
+                img.src = imgFile;
+                img.classList.add('item-img');
+                el.appendChild(img);
+            }
+        } else {
+            // Bad Items: Always emojis
+            const txt = badWords[Math.floor(Math.random() * badWords.length)];
+            el.textContent = txt;
+            el.style.fontSize = '38px';
+        }
+    }
+
     function spawnItems(count, type) {
       for (let i = 0; i < count; i++) {
         const el = document.createElement('div');
         el.classList.add('floating-item', type === 'good' ? 'good-item' : 'bad-item');
-        el.textContent = type === 'good'
-          ? goodWords[Math.floor(Math.random() * goodWords.length)]
-          : badWords[Math.floor(Math.random() * badWords.length)];
-        el.dataset.kind = type;
+        
+        // Use helper to set content
+        setBubbleContent(el, type);
+
         el.dataset.points = String(type === 'good' ? GOOD_POINTS : BAD_POINTS);
         gameArea.appendChild(el);
 
-        const size = 70;
+        const size = 80;
         items.push({
           element: el,
           x: Math.random() * (gameWidth - size),
@@ -464,6 +499,17 @@
           active: true
         });
       }
+    }
+
+    function recycleItem(item) {
+        if (!isGameRunning) return;
+        item.active = true;
+        item.element.style.opacity = '1';
+        item.x = Math.random() * (gameWidth - item.width);
+        item.y = Math.random() * (gameHeight - item.height);
+        
+        const type = item.element.dataset.kind; // 'good' or 'bad'
+        setBubbleContent(item.element, type);
     }
 
     function handleHit(item) {
@@ -487,15 +533,7 @@
       item.element.style.opacity = '0';
 
       setTimeout(() => {
-        if (!isGameRunning) return;
-        item.active = true;
-        item.element.style.opacity = '1';
-        item.x = Math.random() * (gameWidth - item.width);
-        item.y = Math.random() * (gameHeight - item.height);
-        const kind = item.element.dataset.kind;
-        item.element.textContent = kind === 'good'
-          ? goodWords[Math.floor(Math.random() * goodWords.length)]
-          : badWords[Math.floor(Math.random() * badWords.length)];
+        recycleItem(item);
       }, 450);
     }
 
@@ -505,111 +543,4 @@
       const now = performance.now();
       if (now - lastLandmarkTime > LANDMARK_INTERVAL && video.readyState >= 2 && handLandmarker) {
         if (video.currentTime !== lastVideoTime) {
-          const res = handLandmarker.detectForVideo(video, now);
-          updateWristFromLandmarks(res);
-          lastVideoTime = video.currentTime;
-          lastLandmarkTime = now;
-        }
-      }
-
-      if (cursor.visible) {
-        aimCursor.style.display = 'flex';
-        // Head moves with cursor
-        aimCursor.style.transform = `translate3d(${cursor.x}px, ${cursor.y}px, 0) translate(-50%, -50%)`;
-        updateDragonBody(cursor.x, cursor.y);
-      } else {
-        aimCursor.style.display = 'none';
-        bodySegments.forEach(seg => seg.style.display = 'none');
-      }
-
-      for (const item of items) {
-        if (!item.active) continue;
-
-        item.x += item.vx;
-        item.y += item.vy;
-
-        if (item.x <= 0 || item.x >= gameWidth - item.width) item.vx *= -1;
-        if (item.y <= 0 || item.y >= gameHeight - item.height) item.vy *= -1;
-
-        item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
-        item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
-
-        item.element.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)`;
-
-        if (cursor.visible) {
-          const cx = item.x + item.width / 2;
-          const cy = item.y + item.height / 2;
-          const dx = cursor.x - cx;
-          const dy = cursor.y - cy;
-          if ((dx*dx + dy*dy) < (HEAD_R + ITEM_R) ** 2) handleHit(item);
-        }
-      }
-      requestAnimationFrame(loop);
-    }
-
-    function startGame() {
-      errEl.style.display = 'none';
-      bgVideo.play().catch(()=>{});
-
-      score = 0;
-      timeLeft = GAME_SECONDS;
-      scoreEl.textContent = '0';
-      timerEl.textContent = String(GAME_SECONDS);
-
-      gameArea.innerHTML = '';
-      items = [];
-      isGameRunning = true;
-
-      initDragonBody();
-      spawnItems(6, 'good');
-      spawnItems(4, 'bad');
-
-      startScreen.style.display = 'none';
-      gameOverScreen.style.display = 'none';
-
-      if (!isMuted) sounds.bgm.play().catch(() => {});
-
-      if (timerInterval) clearInterval(timerInterval);
-      timerInterval = setInterval(() => {
-        timeLeft -= 1;
-        timerEl.textContent = String(timeLeft);
-        if (timeLeft <= 0) endGame();
-      }, 1000);
-
-      loop();
-    }
-
-    function endGame() {
-      isGameRunning = false;
-      clearInterval(timerInterval);
-      timerInterval = null;
-      sounds.bgm.pause();
-      sounds.bgm.currentTime = 0;
-      playSound('end');
-      finalScoreEl.textContent = String(score);
-      gameOverScreen.style.display = 'flex';
-    }
-
-    window.addEventListener('resize', () => {
-      gameWidth = window.innerWidth;
-      gameHeight = window.innerHeight;
-    });
-
-    startBtn.addEventListener('click', async () => {
-      startBtn.disabled = true;
-      try {
-        await initCamera();
-        await initHandLandmarker();
-        startGame();
-      } catch (e) {
-        errEl.style.display = 'block';
-        errEl.textContent = String(e && e.message ? e.message : e);
-      } finally {
-        startBtn.disabled = false;
-      }
-    });
-
-    restartBtn2.addEventListener('click', () => startGame());
-  </script>
-</body>
-</html>
+          const res = handLandmarker.detectForV
