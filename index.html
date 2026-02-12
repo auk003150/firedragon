@@ -543,4 +543,110 @@
       const now = performance.now();
       if (now - lastLandmarkTime > LANDMARK_INTERVAL && video.readyState >= 2 && handLandmarker) {
         if (video.currentTime !== lastVideoTime) {
-          const res = handLandmarker.detectForV
+          const res = handLandmarker.detectForVideo(video, now);
+          updateWristFromLandmarks(res);
+          lastVideoTime = video.currentTime;
+          lastLandmarkTime = now;
+        }
+      }
+
+      if (cursor.visible) {
+        aimCursor.style.display = 'flex';
+        aimCursor.style.transform = `translate3d(${cursor.x}px, ${cursor.y}px, 0) translate(-50%, -50%)`;
+        updateDragonBody(cursor.x, cursor.y);
+      } else {
+        aimCursor.style.display = 'none';
+        bodySegments.forEach(seg => seg.style.display = 'none');
+      }
+
+      for (const item of items) {
+        if (!item.active) continue;
+
+        item.x += item.vx;
+        item.y += item.vy;
+
+        if (item.x <= 0 || item.x >= gameWidth - item.width) item.vx *= -1;
+        if (item.y <= 0 || item.y >= gameHeight - item.height) item.vy *= -1;
+
+        item.x = Math.max(0, Math.min(item.x, gameWidth - item.width));
+        item.y = Math.max(0, Math.min(item.y, gameHeight - item.height));
+
+        item.element.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)`;
+
+        if (cursor.visible) {
+          const cx = item.x + item.width / 2;
+          const cy = item.y + item.height / 2;
+          const dx = cursor.x - cx;
+          const dy = cursor.y - cy;
+          if ((dx*dx + dy*dy) < (HEAD_R + ITEM_R) ** 2) handleHit(item);
+        }
+      }
+      requestAnimationFrame(loop);
+    }
+
+    function startGame() {
+      errEl.style.display = 'none';
+      bgVideo.play().catch(()=>{});
+
+      score = 0;
+      timeLeft = GAME_SECONDS;
+      scoreEl.textContent = '0';
+      timerEl.textContent = String(GAME_SECONDS);
+
+      gameArea.innerHTML = '';
+      items = [];
+      isGameRunning = true;
+
+      initDragonBody();
+      spawnItems(6, 'good'); // Random mix of words and images
+      spawnItems(4, 'bad'); 
+
+      startScreen.style.display = 'none';
+      gameOverScreen.style.display = 'none';
+
+      if (!isMuted) sounds.bgm.play().catch(() => {});
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timeLeft -= 1;
+        timerEl.textContent = String(timeLeft);
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+
+      loop();
+    }
+
+    function endGame() {
+      isGameRunning = false;
+      clearInterval(timerInterval);
+      timerInterval = null;
+      sounds.bgm.pause();
+      sounds.bgm.currentTime = 0;
+      playSound('end');
+      finalScoreEl.textContent = String(score);
+      gameOverScreen.style.display = 'flex';
+    }
+
+    window.addEventListener('resize', () => {
+      gameWidth = window.innerWidth;
+      gameHeight = window.innerHeight;
+    });
+
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      try {
+        await initCamera();
+        await initHandLandmarker();
+        startGame();
+      } catch (e) {
+        errEl.style.display = 'block';
+        errEl.textContent = String(e && e.message ? e.message : e);
+      } finally {
+        startBtn.disabled = false;
+      }
+    });
+
+    restartBtn2.addEventListener('click', () => startGame());
+  </script>
+</body>
+</html>
