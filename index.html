@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>新春大坑舞火龍遊戲 (Large Version)</title>
+  <title>新春大坑舞火龍遊戲 (Balanced Version)</title>
 
   <style>
     html, body {
@@ -58,10 +58,10 @@
     /* Game area for bubbles */
     #game-area { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 
-    /* Cursor (Dragon Head) Container - DOUBLED SIZE */
+    /* Cursor (Dragon Head) Container - REDUCED 25% */
     #aim-cursor {
       position: absolute; 
-      width: 280px; height: 280px; /* 140px * 2 */
+      width: 210px; height: 210px; /* Was 280px */
       top: 0; left: 0;
       display: none;
       justify-content: center; align-items: center;
@@ -78,10 +78,10 @@
       animation: float-head 2s ease-in-out infinite;
     }
 
-    /* Dragon Body Segment Container - DOUBLED SIZE */
+    /* Dragon Body Segment Container - REDUCED 25% */
     .dragon-body-segment {
       position: absolute; 
-      width: 180px; height: 180px; /* 90px * 2 */
+      width: 135px; height: 135px; /* Was 180px */
       top: 0; left: 0; 
       display: none; z-index: 15;
       will-change: transform;
@@ -103,7 +103,7 @@
     /* Bubbles */
     .floating-item {
       position: absolute;
-      font-size: 24px;
+      font-size: 36px;
       font-weight: 900;
       display: flex;
       justify-content: center;
@@ -130,7 +130,7 @@
     }
 
     .good-item { border: 3px solid #d32f2f; color: #d32f2f; }
-    .bad-item  { color: #333; border: 3px solid #555; font-size: 38px; }
+    .bad-item  { color: #333; border: 3px solid #555; font-size: 56px; }
 
     .score-popup {
       position: absolute;
@@ -212,7 +212,7 @@
     <button id="mute-btn" title="Mute/unmute">🔊</button>
 
     <div id="start-screen" class="overlay-screen">
-      <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 38px; margin:0;">🔥 大坑舞火龍 (加大版) 🔥</h1>
+      <h1 style="color:#ffeb3b; text-shadow: 0 0 10px #ff5722; font-size: 38px; margin:0;">🔥 大坑舞火龍 🔥</h1>
       <p style="font-size: 16px; color: #ddd; margin: 10px 0 0;">
         用「右手手腕」控制龍頭收集美食與祝福！<br>無需將手移至畫面邊緣即可到達角落。
       </p>
@@ -234,11 +234,8 @@
 
     // --- CONFIGURATION ---
     
-    // 1. Text Words
     const goodWords = ['福', '春', '財', '安', '吉', '祥', '賀', '馬'];
-    // 2. Image Files (Assuming .png based on your last request, change to .jpg if needed)
     const goodImages = ['egg-tart.png', 'buns.png', 'tea.png', 'food.png'];
-    // 3. Bad Items
     const badWords  = ['⚽', '🍔', '🎧', '🧊', '🧼', '🍺', '💡', '📎', '🧽', '🧯'];
 
     const GAME_SECONDS = 60;
@@ -246,13 +243,13 @@
     const BAD_POINTS  = -5;
     const SMOOTHING = 0.22;
 
-    // --- SIZE UPDATES ---
-    const HEAD_R = 120; // Doubled radius for collision (60 -> 120)
+    // --- UPDATED SIZES (Reduced by 25% from previous step) ---
+    const HEAD_R = 90; // Was 120
     const ITEM_R = 40;  
     const CAM_MARGIN = 0.12; 
 
     const bodySegmentCount = 4;
-    const bodySpacing = 100; // Increased spacing for larger segments (50 -> 100)
+    const bodySpacing = 75; // Was 100
 
     const video = document.getElementById('video');
     const bgVideo = document.getElementById('bg-video');
@@ -308,7 +305,7 @@
     let timerInterval = null;
     let gameWidth = window.innerWidth;
     let gameHeight = window.innerHeight;
-    let cursor = { x: -300, y: -300, visible: false }; // Moved further offscreen
+    let cursor = { x: -300, y: -300, visible: false };
     let mirror = true;
 
     const bodySegments = [];
@@ -339,7 +336,7 @@
         
         dragonBodyContainer.appendChild(el);
         bodySegments.push(el);
-        bodyPositions.push({ x: -400, y: -400, a: 0 }); // Further offscreen
+        bodyPositions.push({ x: -400, y: -400, a: 0 }); 
       }
     }
 
@@ -448,7 +445,6 @@
       cursor.visible = true;
     }
 
-    // --- HELPER: Random Content ---
     function setBubbleContent(el, type) {
         el.innerHTML = ''; 
         el.dataset.kind = type;
@@ -457,8 +453,8 @@
             if (Math.random() < 0.5) {
                 const txt = goodWords[Math.floor(Math.random() * goodWords.length)];
                 el.textContent = txt;
-                if (txt.length > 2) el.style.fontSize = '20px';
-                else el.style.fontSize = '24px';
+                if (txt.length > 2) el.style.fontSize = '30px'; 
+                else el.style.fontSize = '36px'; 
             } else {
                 const imgFile = goodImages[Math.floor(Math.random() * goodImages.length)];
                 const img = document.createElement('img');
@@ -469,7 +465,7 @@
         } else {
             const txt = badWords[Math.floor(Math.random() * badWords.length)];
             el.textContent = txt;
-            el.style.fontSize = '38px';
+            el.style.fontSize = '56px'; 
         }
     }
 
@@ -573,7 +569,6 @@
           const cy = item.y + item.height / 2;
           const dx = cursor.x - cx;
           const dy = cursor.y - cy;
-          // Updated Hit Logic for Larger Head
           if ((dx*dx + dy*dy) < (HEAD_R + ITEM_R) ** 2) handleHit(item);
         }
       }
